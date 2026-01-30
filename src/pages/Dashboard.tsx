@@ -1,4 +1,4 @@
-﻿import { useMemo, type ReactNode, type CSSProperties } from 'react';
+import { useMemo, type ReactNode, type CSSProperties } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Layout } from '@/components/Layout';
@@ -11,6 +11,7 @@ import { Target, Calendar, TrendingUp, Award, Trophy } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
 import { ActiveQuarterInfo } from '@/components/ActiveQuarterInfo';
 import { useDashboardData, UserRanking } from '@/hooks/useDashboardData';
+import { getPerformanceColor } from '@/lib/performanceColors';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -324,14 +325,6 @@ const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
-const getPerformanceColor = (pct: number) => {
-  if (pct <= 20) return '#FF0000';
-  if (pct <= 40) return '#FF6600';
-  if (pct <= 60) return '#FFCC00';
-  if (pct <= 80) return '#99CC00';
-  if (pct <= 100) return '#00CC00';
-  return '#009900';
-};
 
 function KpiCard({
   title,

@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -22,7 +23,9 @@ export default function Auth() {
     email: '',
     password: '',
     fullName: '',
+    company_id: '',
   });
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +39,7 @@ export default function Auth() {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: formData.fullName,
+            company_id: formData.company_id || null,
           },
         },
       });
@@ -106,6 +110,23 @@ export default function Auth() {
 
   useEffect(() => {
     document.title = 'Wenkey - Entrar ou Cadastrar';
+
+    const loadCompanies = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('companies')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+
+        if (error) throw error;
+        setCompanies(data || []);
+      } catch (err) {
+        console.error('Erro ao carregar empresas:', err);
+      }
+    };
+
+    loadCompanies();
   }, []);
 
   const { user } = useAuth(); // Add this to hook usage
@@ -238,6 +259,24 @@ export default function Auth() {
                         required
                       />
                     </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-company">Empresa (opcional)</Label>
+                        <Select
+                          value={formData.company_id}
+                          onValueChange={(value) => setFormData({ ...formData, company_id: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione uma empresa (opcional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companies.map((company) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     <div className="space-y-2">
                       <Label htmlFor="signup-email">Email</Label>
                       <Input

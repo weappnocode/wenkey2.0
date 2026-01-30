@@ -133,7 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const syncSession = async (reason: string) => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const hasKey = !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const hasKey = !!(
+        import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+        import.meta.env.VITE_SUPABASE_ANON_KEY
+      );
 
       if (!supabaseUrl || !hasKey) {
         console.error('CRITICAL: Supabase environment variables are missing!');
