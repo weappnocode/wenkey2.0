@@ -1,3 +1,5 @@
+import { getPerformanceColor } from "@/lib/performanceColors";
+
 interface CircularProgressProps {
   percentage: number;
   size?: number;
@@ -13,15 +15,8 @@ export function CircularProgress({
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (percentage / 100) * circumference;
 
-  // Color based on percentage - same logic as Dashboard
-  const getColor = () => {
-    if (percentage <= 20) return '#FF0000'; // Vermelho
-    if (percentage <= 40) return '#FF6600'; // Laranja
-    if (percentage <= 60) return '#FFCC00'; // Amarelo
-    if (percentage <= 80) return '#99CC00'; // Verde-claro
-    if (percentage <= 100) return '#00CC00'; // Verde
-    return '#009900'; // Verde-escuro (>100%)
-  };
+  // Reuse the same palette used pelas barras lineares
+  const color = getPerformanceColor(percentage);
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -42,7 +37,7 @@ export function CircularProgress({
           cy={size / 2}
           r={radius}
           fill="transparent"
-          stroke={getColor()}
+          stroke={color}
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
           strokeDashoffset={offset}
@@ -54,7 +49,7 @@ export function CircularProgress({
       </svg>
       {/* Percentage text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold" style={{ color: getColor() }}>
+        <span className="text-3xl font-bold" style={{ color }}>
           {Math.round(percentage)}%
         </span>
         <span className="text-xs text-muted-foreground">Alvo: 100%</span>
