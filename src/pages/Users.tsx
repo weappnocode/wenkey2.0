@@ -319,7 +319,7 @@ export default function Users() {
     try {
       if (!selectedUser) return;
 
-      // Delete company members
+      // Delete company members first
       const { error: memberError } = await supabase
         .from('company_members')
         .delete()
@@ -327,7 +327,9 @@ export default function Users() {
 
       if (memberError) throw memberError;
 
-      // Note: Deleting from profiles will cascade to auth.users due to trigger
+      // Delete from profiles
+      // This will automatically trigger the deletion from auth.users via the handle_profile_delete trigger
+      // The trigger ensures the user is removed from both the profiles table AND the auth.users table
       const { error } = await supabase
         .from('profiles')
         .delete()
