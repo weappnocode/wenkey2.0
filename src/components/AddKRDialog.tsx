@@ -138,7 +138,7 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
       onSuccess();
     } catch (error: any) {
       console.error('Erro ao adicionar Key Results:', error);
-      toast.error('Erro ao adicionar Key Results: ' + error.message);
+      toast.error('Erro ao adicionar Key Results: ' + (error?.message || 'tente novamente'));
     } finally {
       setLoading(false);
     }
