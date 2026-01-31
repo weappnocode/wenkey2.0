@@ -200,6 +200,7 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
                   <SelectItem value="number">Número</SelectItem>
                   <SelectItem value="percentage">Porcentagem</SelectItem>
                   <SelectItem value="currency">Moeda</SelectItem>
+                  <SelectItem value="date">Data</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -217,20 +218,11 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
                 <SelectContent className="bg-popover z-50">
                   <SelectItem value="increase">Aumentar</SelectItem>
                   <SelectItem value="decrease">Diminuir</SelectItem>
-                  <SelectItem value="maintain">Manter</SelectItem>
+                  <SelectItem value="greater_than">Maior Que</SelectItem>
+                  <SelectItem value="less_than">Menor Que</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Unidade</Label>
-            <Input
-              value={form.unit}
-              onChange={(e) => setForm({ ...form, unit: e.target.value })}
-              placeholder="Ex: %, dias"
-              disabled={loading}
-            />
           </div>
 
           <div className="space-y-2">

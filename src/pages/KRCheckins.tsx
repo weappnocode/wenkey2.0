@@ -827,14 +827,16 @@ export default function KRCheckins() {
     }
   };
 
-  const translateDirection = (direction: string | null) => {
+const translateDirection = (direction: string | null) => {
     switch (direction) {
       case 'increase':
         return 'crescente';
       case 'decrease':
         return 'decrescente';
-      case 'maintain':
-        return 'manter';
+      case 'greater_than':
+        return 'maior que';
+      case 'less_than':
+        return 'menor que';
       default:
         return direction || '--';
     }

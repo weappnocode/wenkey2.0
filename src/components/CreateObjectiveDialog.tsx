@@ -227,7 +227,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
             title: kr.title,
             type: kr.type,
             direction: kr.direction,
-            unit: kr.unit || null,
+            unit: null,
             user_id: kr.user_id || selectedUserId,
             company_id: selectedCompanyId,
             quarter_id: selectedQuarterId,
@@ -441,15 +441,16 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
                             <SelectTrigger className="bg-background">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-popover z-50">
-                              <SelectItem value="number">Número</SelectItem>
-                              <SelectItem value="percentage">Percentual</SelectItem>
-                              <SelectItem value="currency">Moeda</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                          <SelectContent className="bg-popover z-50">
+                            <SelectItem value="number">Número</SelectItem>
+                            <SelectItem value="percentage">Percentual</SelectItem>
+                            <SelectItem value="currency">Moeda</SelectItem>
+                            <SelectItem value="date">Data</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                        <div className="space-y-2">
+                      <div className="space-y-2">
                           <Label>Direção</Label>
                           <Select 
                             value={kr.direction} 
@@ -461,18 +462,10 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
                             <SelectContent className="bg-popover z-50">
                               <SelectItem value="increase">Aumentar</SelectItem>
                               <SelectItem value="decrease">Diminuir</SelectItem>
-                              <SelectItem value="maintain">Manter</SelectItem>
+                              <SelectItem value="greater_than">Maior Que</SelectItem>
+                              <SelectItem value="less_than">Menor Que</SelectItem>
                             </SelectContent>
                           </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Unidade</Label>
-                          <Input
-                            value={kr.unit}
-                            onChange={(e) => updateKeyResult(kr.tempId, 'unit', e.target.value)}
-                            placeholder="Ex: dias, %"
-                          />
                         </div>
                       </div>
 

@@ -26,7 +26,6 @@ interface KeyResultForm {
   title: string;
   type: string;
   direction: string;
-  unit: string;
   user_id: string;
 }
 
@@ -71,7 +70,6 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
         title: '',
         type: 'number',
         direction: 'increase',
-        unit: '',
         user_id: '',
       },
     ]);
@@ -116,7 +114,7 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
         title: kr.title,
         type: kr.type,
         direction: kr.direction,
-        unit: kr.unit || null,
+        unit: null,
         user_id: kr.user_id,
         company_id: companyId,
         quarter_id: quarterId,
@@ -232,17 +230,10 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
                           <SelectContent className="bg-popover z-50">
                             <SelectItem value="increase">Aumentar</SelectItem>
                             <SelectItem value="decrease">Diminuir</SelectItem>
+                            <SelectItem value="greater_than">Maior Que</SelectItem>
+                            <SelectItem value="less_than">Menor Que</SelectItem>
                           </SelectContent>
                         </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Unidade</Label>
-                        <Input
-                          value={kr.unit}
-                          onChange={(e) => updateKeyResult(kr.id, 'unit', e.target.value)}
-                          placeholder="Ex: dias, %"
-                        />
                       </div>
                     </div>
 
