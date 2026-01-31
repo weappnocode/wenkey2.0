@@ -90,7 +90,7 @@ interface KeyResultWithProgress extends KeyResult {
 
 export default function Objectives() {
   const { user } = useAuth();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany } = useCompany();
   const { isAdmin, isUser } = useUserRole();
   const { toast } = useToast();
 
@@ -118,18 +118,12 @@ export default function Objectives() {
   }, [user]);
 
   useEffect(() => {
-    if (!isAdmin) return;
-
     if (selectedCompanyId && filterCompanyId !== selectedCompanyId) {
       setFilterCompanyId(selectedCompanyId);
       setSelectedQuarterId('');
       setFilterUserId('');
-    } else if (!selectedCompanyId && filterCompanyId) {
-      setFilterCompanyId('');
-      setSelectedQuarterId('');
-      setFilterUserId('');
     }
-  }, [selectedCompanyId, filterCompanyId, isAdmin]);
+  }, [selectedCompanyId, filterCompanyId]);
 
   useEffect(() => {
     if (filterCompanyId) {
@@ -535,21 +529,9 @@ export default function Objectives() {
               {/* Dropdown de Empresa - PRIMEIRO */}
               <div className="space-y-2">
                 <Label htmlFor="company-select">{toTitleCase('Empresa')}</Label>
-                <Select
-                  value={filterCompanyId}
-                  onValueChange={setFilterCompanyId}
-                >
-                  <SelectTrigger id="company-select" className="bg-background">
-                    <SelectValue placeholder={toTitleCase('Selecione uma empresa')} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover z-50">
-                    {companies.map(comp => (
-                      <SelectItem key={comp.id} value={comp.id}>
-                        {toTitleCase(comp.name)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="h-10 px-3 flex items-center rounded-md border bg-muted/30 text-sm text-foreground">
+                  {selectedCompany?.name ? toTitleCase(selectedCompany.name) : toTitleCase('Nenhuma empresa selecionada')}
+                </div>
               </div>
 
               {/* Dropdown de Quarter - SEGUNDO (depende da empresa) */}

@@ -55,7 +55,7 @@ interface QuarterResult {
 }
 
 export default function PerformanceHistory() {
-    const { selectedCompanyId } = useCompany();
+    const { selectedCompanyId, selectedCompany } = useCompany();
     const { isAdmin } = useUserRole();
     const [loading, setLoading] = useState(true);
     const [activeUsersOnly, setActiveUsersOnly] = useState(true);
@@ -66,7 +66,6 @@ export default function PerformanceHistory() {
     const [results, setResults] = useState<QuarterResult[]>([]);
 
     // Admin Filter State
-    const [companies, setCompanies] = useState<Company[]>([]);
     const [filterCompanyId, setFilterCompanyId] = useState<string>("");
 
     useEffect(() => {
@@ -80,26 +79,6 @@ export default function PerformanceHistory() {
             loadData();
         }
     }, [filterCompanyId]);
-
-    useEffect(() => {
-        if (isAdmin) {
-            loadCompanies();
-        }
-    }, [isAdmin]);
-
-    const loadCompanies = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('companies')
-                .select('id, name')
-                .order('name');
-
-            if (error) throw error;
-            setCompanies(data || []);
-        } catch (error) {
-            console.error('Error loading companies:', error);
-        }
-    };
 
     useEffect(() => {
         // Remove direct dependency on selectedCompanyId for loadData
@@ -221,21 +200,9 @@ export default function PerformanceHistory() {
 
                     <div className="flex items-center gap-2">
                         {isAdmin && (
-                            <Select
-                                value={filterCompanyId}
-                                onValueChange={setFilterCompanyId}
-                            >
-                                <SelectTrigger className="w-[240px]">
-                                    <SelectValue placeholder={toTitleCase('Selecione a Empresa')} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {companies.map((company) => (
-                                        <SelectItem key={company.id} value={company.id}>
-                                            {toTitleCase(company.name)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <div className="w-[240px] h-10 px-3 flex items-center rounded-md border bg-muted/30 text-sm text-foreground">
+                                {selectedCompany?.name ? toTitleCase(selectedCompany.name) : toTitleCase('Nenhuma empresa selecionada')}
+                            </div>
                         )}
                         <Select
                             value={activeUsersOnly ? "active" : "all"}

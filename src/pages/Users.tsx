@@ -74,7 +74,7 @@ interface CompanyMember {
 
 export default function Users() {
   const { user, profile } = useAuth();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany } = useCompany();
   const { isAdmin } = useUserRole();
   const [users, setUsers] = useState<Profile[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -84,7 +84,7 @@ export default function Users() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
-  const [filterCompanyId, setFilterCompanyId] = useState<string>('all');
+  const [filterCompanyId, setFilterCompanyId] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'pending'>('all');
   const [formData, setFormData] = useState({
     full_name: '',
@@ -102,14 +102,17 @@ export default function Users() {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) return;
-
+    // Sempre acompanha a empresa escolhida na sidebar
     if (selectedCompanyId && filterCompanyId !== selectedCompanyId) {
       setFilterCompanyId(selectedCompanyId);
-    } else if (!selectedCompanyId && filterCompanyId !== 'all') {
-      setFilterCompanyId('all');
     }
-  }, [selectedCompanyId, isAdmin, filterCompanyId]);
+  }, [selectedCompanyId, filterCompanyId]);
+
+  useEffect(() => {
+    if (selectedCompanyId) {
+      setFormData((prev) => ({ ...prev, company_id: selectedCompanyId }));
+    }
+  }, [selectedCompanyId]);
 
   const loadData = async () => {
     try {
@@ -390,7 +393,7 @@ export default function Users() {
       position: '',
       sector: '',
       permission_type: 'user',
-      company_id: '',
+      company_id: selectedCompanyId || '',
       avatar_file: null,
     });
   };
@@ -405,9 +408,8 @@ export default function Users() {
   };
 
   const filteredUsers = users.filter(user => {
-    const effectiveCompanyId = isAdmin ? filterCompanyId : profile?.company_id;
-    const matchesCompany = (isAdmin && filterCompanyId === 'all') ||
-      user.company_id === effectiveCompanyId;
+    const effectiveCompanyId = selectedCompanyId || profile?.company_id || '';
+    const matchesCompany = user.company_id === effectiveCompanyId;
 
     // Status is 'active' only if is_active is true AND company_id exists
     const isUserActive = user.is_active && user.company_id;
@@ -440,19 +442,9 @@ export default function Users() {
               {isAdmin && (
                 <div className="flex gap-4 w-full max-w-2xl">
                   <div className="flex-1">
-                    <Select value={filterCompanyId} onValueChange={setFilterCompanyId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={toTitleCase('Filtrar por empresa')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas as empresas</SelectItem>
-                        {companies.filter(c => c.id).map(company => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {toTitleCase(company.name)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="h-10 px-3 flex items-center rounded-md border bg-muted/30 text-sm text-foreground">
+                      {selectedCompany?.name ? toTitleCase(selectedCompany.name) : 'Nenhuma empresa selecionada'}
+                    </div>
                   </div>
                   <div className="flex-1">
                     <Select value={filterStatus} onValueChange={(v: any) => setFilterStatus(v)}>
@@ -593,23 +585,9 @@ export default function Users() {
               </div>
               <div>
                 <Label htmlFor="company">Empresa *</Label>
-                <Select
-                  value={formData.company_id}
-                  onValueChange={value =>
-                    setFormData({ ...formData, company_id: value, sector: '' })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma empresa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.map(company => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="h-10 px-3 flex items-center rounded-md border bg-muted/30 text-sm text-foreground">
+                  {selectedCompany?.name ? toTitleCase(selectedCompany.name) : 'Nenhuma empresa selecionada'}
+                </div>
               </div>
               <div>
                 <Label htmlFor="sector">Setor</Label>
@@ -701,23 +679,9 @@ export default function Users() {
               </div>
               <div>
                 <Label htmlFor="edit_company">Empresa</Label>
-                <Select
-                  value={formData.company_id}
-                  onValueChange={value =>
-                    setFormData({ ...formData, company_id: value, sector: '' })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma empresa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.map(company => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="h-10 px-3 flex items-center rounded-md border bg-muted/30 text-sm text-foreground">
+                  {selectedCompany?.name ? toTitleCase(selectedCompany.name) : 'Nenhuma empresa selecionada'}
+                </div>
               </div>
               <div>
                 <Label htmlFor="edit_sector">Setor</Label>
