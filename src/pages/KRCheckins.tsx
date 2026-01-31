@@ -85,7 +85,7 @@ interface UserProfile {
 
 export default function KRCheckins() {
   const { toast } = useToast();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany } = useCompany();
   const { user } = useAuth();
   const { role, loading: roleLoading } = useUserRole();
   const canEditAnyCheckin = role === 'admin' || role === 'manager';
@@ -122,6 +122,14 @@ export default function KRCheckins() {
       setFilterOwnerId('all');
     }
   }, [selectedCompanyId, role, roleLoading, filterCompanyId]);
+
+  // Sempre alinhar filtro à empresa escolhida na sidebar
+  useEffect(() => {
+    if (selectedCompanyId && filterCompanyId !== selectedCompanyId) {
+      setFilterCompanyId(selectedCompanyId);
+      setFilterOwnerId('all');
+    }
+  }, [selectedCompanyId, filterCompanyId]);
 
   // Carregar perfil do usuário
   useEffect(() => {
@@ -1325,27 +1333,9 @@ export default function KRCheckins() {
           {role === 'admin' && (
             <div>
               <Label htmlFor="company">{toTitleCase('Empresa')}</Label>
-              <Select
-                value={filterCompanyId || 'all'}
-                onValueChange={(value) => {
-                  setFilterCompanyId(value);
-                  setFilterOwnerId('all');
-                }}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder={toTitleCase('Selecione uma empresa')} />
-                </SelectTrigger>
-                <SelectContent className="bg-popover z-50">
-                  <SelectItem value="all">Todas as empresas</SelectItem>
-                  {companies
-                    .filter((company) => company.id)
-                    .map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {toTitleCase(company.name)}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <div className="h-10 px-3 flex items-center rounded-md border bg-muted/30 text-sm text-foreground">
+                {selectedCompany?.name ? toTitleCase(selectedCompany.name) : toTitleCase('Nenhuma empresa selecionada')}
+              </div>
             </div>
           )}
 

@@ -192,11 +192,6 @@ export default function Overview() {
     }
   };
 
-  const handleCompanyChange = async (companyId: string) => {
-    setSelectedCompany(companyId);
-    await loadQuarters(companyId);
-  };
-
   const getRankingLabel = (rank: number): string => {
     return `${rank}º LUGAR`;
   };
@@ -232,21 +227,11 @@ export default function Overview() {
               {isAdmin && (
                 <div className="flex-1 min-w-[200px]">
                   <Label>Empresa</Label>
-                  <Select
-                    value={selectedCompany}
-                    onValueChange={handleCompanyChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma empresa" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companies.map((company) => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="h-10 px-3 flex items-center rounded-md border bg-muted/30 text-sm text-foreground">
+                    {selectedCompany
+                      ? (companies.find(c => c.id === selectedCompany)?.name || 'Selecionada')
+                      : 'Nenhuma empresa selecionada'}
+                  </div>
                 </div>
               )}
 

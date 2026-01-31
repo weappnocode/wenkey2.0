@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 import {
   Dialog,
@@ -19,6 +20,7 @@ export function CompanySelector() {
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { user, profile } = useAuth();
   const { role, loading: roleLoading } = useUserRole();
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -193,6 +195,10 @@ export function CompanySelector() {
                   onClick={() => {
                     setSelectedCompany(company);
                     setOpen(false);
+                    // Admins: sempre levam para o Dashboard após escolher a empresa
+                    if (isAdmin) {
+                      navigate('/');
+                    }
                   }}
                 >
                   <div className="flex items-center gap-3">

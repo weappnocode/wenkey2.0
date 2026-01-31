@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEffect, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,10 +54,9 @@ interface CheckInFormData {
 }
 
 export default function Quarters() {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany } = useCompany();
   const { toast } = useToast();
   const { isAdmin } = useUserRole();
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [quarters, setQuarters] = useState<Quarter[]>([]);
   const [checkIns, setCheckIns] = useState<Record<string, CheckIn[]>>({});
   const [expandedQuarters, setExpandedQuarters] = useState<Set<string>>(new Set());
@@ -88,10 +86,6 @@ export default function Quarters() {
   const [deleteCheckInDialog, setDeleteCheckInDialog] = useState<CheckIn | null>(null);
 
   useEffect(() => {
-    loadCompanies();
-  }, []);
-
-  useEffect(() => {
     if (selectedCompanyId) {
       setSelectedCompanyForForm(selectedCompanyId);
       loadQuarters();
@@ -103,21 +97,6 @@ export default function Quarters() {
       loadQuarters();
     }
   }, [selectedCompanyForForm]);
-
-  const loadCompanies = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setCompanies(data || []);
-    } catch (error: any) {
-      console.error('Erro ao carregar empresas:', error);
-    }
-  };
 
   const loadQuarters = async () => {
     if (!selectedCompanyForForm) {
@@ -485,22 +464,9 @@ export default function Quarters() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Quarter/Check-ins</h1>
           <div className="flex gap-4 items-center">
-            {companies.length > 0 && (
-              <div className="w-64">
-                <Select value={selectedCompanyForForm || ''} onValueChange={setSelectedCompanyForForm}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecionar empresa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.filter(c => c.id).map(company => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="w-64 h-10 px-3 flex items-center rounded-md border bg-muted/40 text-sm text-foreground">
+              {selectedCompany?.name || 'Nenhuma empresa selecionada'}
+            </div>
             {isAdmin && (
               <Dialog open={quarterDialogOpen} onOpenChange={(open) => {
                 setQuarterDialogOpen(open);
