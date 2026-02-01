@@ -125,10 +125,15 @@ export default function Auth() {
           .select('id, name')
           .order('name');
 
-        if (error) throw error;
+        if (error) {
+          console.error('Erro ao carregar empresas:', error);
+          throw error;
+        }
+        console.log('Empresas carregadas:', data);
         setCompanies(data || []);
       } catch (err) {
         console.error('Erro ao carregar empresas:', err);
+        toast.error('Erro ao carregar empresas');
       }
     };
 
@@ -272,14 +277,18 @@ export default function Auth() {
                         onValueChange={(value) => setFormData({ ...formData, company_id: value })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma empresa" />
+                          <SelectValue placeholder={companies.length === 0 ? "Nenhuma empresa encontrada" : "Selecione uma empresa"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {companies.map((company) => (
-                            <SelectItem key={company.id} value={company.id}>
-                              {company.name}
-                            </SelectItem>
-                          ))}
+                          {companies.length === 0 ? (
+                            <div className="p-2 text-sm text-muted-foreground">Carregando empresas...</div>
+                          ) : (
+                            companies.map((company) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>

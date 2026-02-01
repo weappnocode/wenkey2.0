@@ -88,7 +88,6 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
       const { data, error } = await supabase
         .from('companies')
         .select('id, name')
-        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
@@ -129,7 +128,6 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
       const { data, error } = await supabase
         .from('quarters')
         .select('id, name')
-        .eq('is_active', true)
         .order('start_date', { ascending: false });
 
       if (error) throw error;
@@ -197,6 +195,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
     }
 
     setLoading(true);
+    console.log('Criando objetivo:', { title, selectedCompanyId, selectedUserId, selectedQuarterId });
 
     try {
       // Create objective
@@ -262,6 +261,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
       onSuccess();
     } catch (error: any) {
       console.error('Erro ao criar objetivo:', error);
+      console.error('Erro detalhado:', error?.message, error?.details);
       toast({
         title: 'Erro',
         description: error?.message || 'Não foi possível criar o objetivo',
