@@ -1,7 +1,8 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, type Profile } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { type Company } from '@/contexts/CompanyContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,8 +35,8 @@ export function AppLayout({ children }: AppLayoutProps) {
     const navigate = useNavigate();
     const location = useLocation();
     const [collapsed, setCollapsed] = useState(false);
-    const [profile, setProfile] = useState<any>(null);
-    const [company, setCompany] = useState<any>(null);
+    const [profile, setProfile] = useState<Profile | null>(null);
+    const [company, setCompany] = useState<Company | null>(null);
     const [editProfileOpen, setEditProfileOpen] = useState(false);
 
     useEffect(() => {
@@ -197,8 +198,6 @@ export function AppLayout({ children }: AppLayoutProps) {
 
     async function loadProfile(retryCount = 0) {
         if (!user) return;
-
-        let mounted = true;
 
         try {
             const { data: profileData, error: profileError } = await supabase

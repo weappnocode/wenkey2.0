@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,9 +40,9 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
     if (open && companyId) {
       loadUsers();
     }
-  }, [open, companyId]);
+  }, [open, companyId, loadUsers]);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     const { data: companyMembers } = await supabase
       .from('company_members')
       .select('user_id')
@@ -60,7 +60,7 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
         setUsers(profiles);
       }
     }
-  };
+  }, [companyId]);
 
   const addKeyResult = () => {
     setKeyResults([
@@ -79,7 +79,7 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
     setKeyResults(keyResults.filter((kr) => kr.id !== id));
   };
 
-  const updateKeyResult = (id: string, field: keyof KeyResultForm, value: any) => {
+  const updateKeyResult = <K extends keyof KeyResultForm>(id: string, field: K, value: KeyResultForm[K]) => {
     setKeyResults(
       keyResults.map((kr) => (kr.id === id ? { ...kr, [field]: value } : kr))
     );
@@ -136,9 +136,9 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
       setOpen(false);
       setKeyResults([]);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao adicionar Key Results:', error);
-      toast.error('Erro ao adicionar Key Results: ' + error.message);
+      toast.error('Erro ao adicionar Key Results: ' + (error?.message || 'tente novamente'));
     } finally {
       setLoading(false);
     }

@@ -16,6 +16,10 @@ import { Building2, Check } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toTitleCase, cn } from '@/lib/utils';
 
+type MemberWithCompany = {
+  companies: Company | null;
+};
+
 export function CompanySelector() {
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { user, profile } = useAuth();
@@ -55,9 +59,10 @@ export function CompanySelector() {
 
           if (error) throw error;
 
-          companyList = (data || [])
-            .map((item: any) => item.companies)
-            .filter((c: any) => c && c.is_active) as Company[];
+          const memberRows = (data as MemberWithCompany[] | null) ?? [];
+          companyList = memberRows
+            .map((item) => item.companies)
+            .filter((c): c is Company => Boolean(c && c.is_active));
 
           companyList.sort((a, b) => a.name.localeCompare(b.name));
         }

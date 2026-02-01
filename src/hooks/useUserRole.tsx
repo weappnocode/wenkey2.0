@@ -39,14 +39,13 @@ export function useUserRole() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('permission_type' as any)
+          .select('permission_type')
           .eq('id', user.id)
           .maybeSingle();
 
         if (mounted) {
-          const profileData = data as any;
-          if (!error && profileData?.permission_type) {
-            setRole(profileData.permission_type as UserRole);
+          if (!error && data?.permission_type) {
+            setRole(data.permission_type as UserRole);
           }
           setLoading(false);
         }

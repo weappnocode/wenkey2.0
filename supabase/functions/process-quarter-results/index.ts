@@ -1,4 +1,4 @@
-/// <reference path="../types.d.ts" />
+import '../types.d.ts';
 import {
   createClient,
   type SupabaseClient,

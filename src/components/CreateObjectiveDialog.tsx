@@ -260,11 +260,11 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
       setSelectedUserId('');
       setOpen(false);
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao criar objetivo:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível criar o objetivo',
+        description: error?.message || 'Não foi possível criar o objetivo',
         variant: 'destructive',
       });
     } finally {

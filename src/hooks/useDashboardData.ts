@@ -165,7 +165,7 @@ export function useDashboardData() {
             if (!quarters || quarters.length === 0) return null;
 
             const today = new Date().toISOString().split('T')[0];
-            let activeQuarter = quarters.find(q => q.start_date <= today && q.end_date >= today) || quarters[0];
+            const activeQuarter = quarters.find(q => q.start_date <= today && q.end_date >= today) || quarters[0];
 
             // 2. Fetch Metrics (Role Dependent)
             const userIdFilter = role === 'admin' ? null : user.id;

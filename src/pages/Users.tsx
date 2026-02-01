@@ -72,6 +72,10 @@ interface CompanyMember {
   companies: Company;
 }
 
+type FilterStatus = 'all' | 'active' | 'pending';
+type Permission = 'user' | 'manager' | 'admin';
+type ProfileWithCompany = Profile & { companies?: Company | null };
+
 export default function Users() {
   const { user, profile } = useAuth();
   const { selectedCompanyId, selectedCompany } = useCompany();
@@ -85,14 +89,14 @@ export default function Users() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [filterCompanyId, setFilterCompanyId] = useState<string>('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'pending'>('all');
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
     password: '',
     position: '',
     sector: '',
-    permission_type: 'user' as 'user' | 'manager' | 'admin',
+    permission_type: 'user' as Permission,
     company_id: '',
     avatar_file: null as File | null,
   });
@@ -132,7 +136,7 @@ export default function Users() {
         .order('full_name');
 
       if (profilesError) throw profilesError;
-      const normalized = (profilesData || []).map((p: any) => {
+      const normalized = ((profilesData as ProfileWithCompany[]) || []).map((p) => {
         let avatarUrl = p.avatar_url;
         if (avatarUrl && !String(avatarUrl).startsWith('http')) {
           const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
@@ -162,15 +166,32 @@ export default function Users() {
 
       if (membersError) throw membersError;
       setCompanyMembers(membersData || []);
-    } catch (error: any) {
-      toast.error('Erro ao carregar dados: ' + error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao carregar dados: ' + message);
     } finally {
       setLoading(false);
     }
   };
 
+  const getUserCompanyId = (user: Profile) => {
+    // Primary: value stored in profiles table
+    if (user.company_id) return user.company_id;
+
+    // Fallback: membership row
+    const membership = companyMembers.find((cm) => cm.user_id === user.id);
+    return membership?.company_id || null;
+  };
+
   const getUserCompany = (user: Profile) => {
-    return user.companies?.name || '-';
+    if (user.companies?.name) return user.companies.name;
+
+    const membership = companyMembers.find((cm) => cm.user_id === user.id);
+    if (membership?.companies?.name) return membership.companies.name;
+
+    const companyId = getUserCompanyId(user);
+    const company = companies.find((c) => c.id === companyId);
+    return company?.name || '-';
   };
 
   const getCompanySectors = (companyId: string | null | undefined) => {
@@ -179,46 +200,39 @@ export default function Users() {
     return (company?.sectors || []).filter(Boolean);
   };
 
-  const handleCreate = async () => {
+    const handleCreate = async () => {
     try {
       if (!formData.full_name || !formData.email || !formData.password || !formData.company_id) {
         toast.error('Preencha todos os campos obrigatórios');
         return;
       }
 
-      // Create user in Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
-          data: {
-            full_name: formData.full_name,
-          },
+          data: { full_name: formData.full_name },
         },
       });
 
       if (authError) throw authError;
 
       if (authData.user) {
-        let avatarUrl = null;
+        let avatarUrl: string | null = null;
 
-        // Upload avatar if provided
         if (formData.avatar_file) {
           const fileExt = formData.avatar_file.name.split('.').pop();
           const filePath = `${authData.user.id}/avatar.${fileExt}`;
 
           const { error: uploadError } = await supabase.storage
             .from('avatars')
-            .upload(filePath, formData.avatar_file, {
-              upsert: true,
-            });
+            .upload(filePath, formData.avatar_file, { upsert: true });
 
           if (!uploadError) {
             avatarUrl = filePath;
           }
         }
 
-        // Update profile with additional data
         const { error: updateError } = await supabase
           .from('profiles')
           .update({
@@ -232,13 +246,10 @@ export default function Users() {
 
         if (updateError) throw updateError;
 
-        // Add to company
-        const { error: memberError } = await supabase
-          .from('company_members')
-          .insert({
-            user_id: authData.user.id,
-            company_id: formData.company_id,
-          });
+        const { error: memberError } = await supabase.from('company_members').insert({
+          user_id: authData.user.id,
+          company_id: formData.company_id,
+        });
 
         if (memberError) throw memberError;
 
@@ -247,27 +258,25 @@ export default function Users() {
         resetForm();
         loadData();
       }
-    } catch (error: any) {
-      toast.error('Erro ao criar usuário: ' + error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao criar usuário: ' + message);
     }
   };
 
-  const handleEdit = async () => {
+    const handleEdit = async () => {
     try {
       if (!selectedUser) return;
 
       let avatarUrl = selectedUser.avatar_url;
 
-      // Upload new avatar if provided
       if (formData.avatar_file) {
         const fileExt = formData.avatar_file.name.split('.').pop();
         const filePath = `${selectedUser.id}/avatar.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(filePath, formData.avatar_file, {
-            upsert: true,
-          });
+          .upload(filePath, formData.avatar_file, { upsert: true });
 
         if (!uploadError) {
           avatarUrl = filePath;
@@ -289,21 +298,12 @@ export default function Users() {
 
       if (error) throw error;
 
-      // Update company membership if changed
       if (formData.company_id && formData.company_id !== selectedUser.company_id) {
-        // Remove old membership
-        await supabase
-          .from('company_members')
-          .delete()
-          .eq('user_id', selectedUser.id);
+        await supabase.from('company_members').delete().eq('user_id', selectedUser.id);
 
-        // Add new membership
         const { error: memberError } = await supabase
           .from('company_members')
-          .insert({
-            user_id: selectedUser.id,
-            company_id: formData.company_id,
-          });
+          .insert({ user_id: selectedUser.id, company_id: formData.company_id });
 
         if (memberError) throw memberError;
       }
@@ -313,16 +313,16 @@ export default function Users() {
       setSelectedUser(null);
       resetForm();
       loadData();
-    } catch (error: any) {
-      toast.error('Erro ao atualizar usuário: ' + error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao atualizar usuário: ' + message);
     }
   };
 
-  const handleDelete = async () => {
+    const handleDelete = async () => {
     try {
       if (!selectedUser) return;
 
-      // Delete company members first
       const { error: memberError } = await supabase
         .from('company_members')
         .delete()
@@ -330,9 +330,6 @@ export default function Users() {
 
       if (memberError) throw memberError;
 
-      // Delete from profiles
-      // This will automatically trigger the deletion from auth.users via the handle_profile_delete trigger
-      // The trigger ensures the user is removed from both the profiles table AND the auth.users table
       const { error } = await supabase
         .from('profiles')
         .delete()
@@ -344,12 +341,13 @@ export default function Users() {
       setIsDeleteDialogOpen(false);
       setSelectedUser(null);
       loadData();
-    } catch (error: any) {
-      toast.error('Erro ao excluir usuário: ' + error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao excluir usuário: ' + message);
     }
   };
 
-  const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
+    const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -360,8 +358,9 @@ export default function Users() {
 
       toast.success('Status atualizado com sucesso!');
       loadData();
-    } catch (error: any) {
-      toast.error('Erro ao atualizar status: ' + error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao atualizar status: ' + message);
     }
   };
 
@@ -409,10 +408,11 @@ export default function Users() {
 
   const filteredUsers = users.filter(user => {
     const effectiveCompanyId = selectedCompanyId || profile?.company_id || '';
-    const matchesCompany = user.company_id === effectiveCompanyId;
+    const userCompanyId = getUserCompanyId(user);
+    const matchesCompany = userCompanyId === effectiveCompanyId;
 
     // Status is 'active' only if is_active is true AND company_id exists
-    const isUserActive = user.is_active && user.company_id;
+    const isUserActive = Boolean(user.is_active && userCompanyId);
 
     const matchesStatus =
       filterStatus === 'all' ||
@@ -447,7 +447,7 @@ export default function Users() {
                     </div>
                   </div>
                   <div className="flex-1">
-                    <Select value={filterStatus} onValueChange={(v: any) => setFilterStatus(v)}>
+                    <Select value={filterStatus} onValueChange={(v: FilterStatus) => setFilterStatus(v)}>
                       <SelectTrigger>
                         <SelectValue placeholder={toTitleCase('Filtrar por status')} />
                       </SelectTrigger>
@@ -506,7 +506,7 @@ export default function Users() {
                           onClick={() => toggleUserStatus(user.id, user.is_active)}
                         >
                           {(() => {
-                            const isUserActive = user.is_active && user.company_id;
+                            const isUserActive = Boolean(user.is_active && getUserCompanyId(user));
                             return (
                               <Badge
                                 variant={isUserActive ? 'default' : 'secondary'}
@@ -627,7 +627,7 @@ export default function Users() {
                 <Select
                   value={formData.permission_type}
                   onValueChange={value =>
-                    setFormData({ ...formData, permission_type: value as any })
+                    setFormData({ ...formData, permission_type: value as Permission })
                   }
                 >
                   <SelectTrigger>
@@ -721,7 +721,7 @@ export default function Users() {
                 <Select
                   value={formData.permission_type}
                   onValueChange={value =>
-                    setFormData({ ...formData, permission_type: value as any })
+                    setFormData({ ...formData, permission_type: value as Permission })
                   }
                 >
                   <SelectTrigger>
@@ -776,3 +776,7 @@ export default function Users() {
     </Layout>
   );
 }
+
+
+
+

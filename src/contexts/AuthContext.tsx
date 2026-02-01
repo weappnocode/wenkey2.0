@@ -25,7 +25,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    // Try to recover user from localStorage on mount
+    try {
+      const stored = localStorage.getItem('sb-auth-session');
+      if (stored) {
+        const session = JSON.parse(stored);
+        return session?.user || null;
+      }
+    } catch (e) {
+      console.warn('Could not recover user from localStorage:', e);
+    }
+    return null;
+  });
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data) {
         const { data: roleData } = await supabase
           .from('profiles')
-          .select('permission_type' as any)
+          .select('permission_type')
           .eq('id', userId)
           .maybeSingle();
 
@@ -66,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile({
           ...data,
           avatar_url,
-          permission_type: (roleData as any)?.permission_type || 'user'
+          permission_type: (roleData?.permission_type as Profile['permission_type']) || 'user'
         } as Profile);
       } else {
         setProfile(null);
@@ -145,10 +157,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
+        // First, try to get the stored session from localStorage (fast path)
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error) {
           console.error(`[Auth] getSession error (${reason}):`, error);
+          // Still try to recover from localStorage
+          try {
+            const stored = localStorage.getItem('sb-auth-session');
+            if (stored) {
+              const recoveredSession = JSON.parse(stored);
+              if (recoveredSession && mounted) {
+                await applySession(recoveredSession);
+                return;
+              }
+            }
+          } catch (e) {
+            console.warn('Could not recover session from localStorage:', e);
+          }
         }
 
         await applySession(session);
@@ -167,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.warn('[Auth] Initialization timed out - forcing loading to false');
           updateLoading(false);
         }
-      }, 30000);
+      }, 10000);
 
       try {
         await syncSession('initialize');
@@ -183,6 +209,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return;
 
         console.log('Auth state changed:', event);
+
+        // Persist a copy for hard-refresh fallback
+        try {
+          if (nextSession) {
+            localStorage.setItem('sb-auth-session', JSON.stringify(nextSession));
+          } else {
+            localStorage.removeItem('sb-auth-session');
+          }
+        } catch (e) {
+          console.warn('Could not persist session to localStorage:', e);
+        }
 
         await applySession(nextSession);
         updateLoading(false);
