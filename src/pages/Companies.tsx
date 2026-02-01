@@ -8,10 +8,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Building2, Edit, Users as UsersIcon, MapPin } from 'lucide-react';
+import {
+  Plus,
+  Building2,
+  Edit,
+  Users as UsersIcon,
+  MapPin,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toTitleCase } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Company {
   id: string;
@@ -32,7 +49,9 @@ export default function Companies() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     cnpj: '',
@@ -63,7 +82,9 @@ export default function Companies() {
 
         if (error) throw error;
 
-        const companyList = data.map((item: any) => item.companies).filter(Boolean);
+        const companyList = (data as { companies: Company | null }[] | null)
+          ?.map((item) => item.companies)
+          .filter((c): c is Company => Boolean(c)) || [];
         setCompanies(companyList);
       }
     } catch (error) {
@@ -167,6 +188,30 @@ export default function Companies() {
       fetchCompanies();
     } catch (error: any) {
       toast.error(error.message || 'Erro ao atualizar empresa');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!companyToDelete) return;
+
+    try {
+      const companyId = companyToDelete.id;
+
+      // Remover vínculos de membros para não deixar órfãos
+      await supabase.from('company_members').delete().eq('company_id', companyId);
+
+      // Excluir apenas a empresa (sem apagar dados de quarters/objetivos/KRs)
+      const { error } = await supabase.from('companies').delete().eq('id', companyId);
+      if (error) throw error;
+
+      toast.success('Empresa excluída com sucesso!');
+      setIsDeleteDialogOpen(false);
+      setCompanyToDelete(null);
+      fetchCompanies();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Erro ao excluir empresa';
+      toast.error(message);
     }
   };
 
@@ -305,6 +350,20 @@ export default function Companies() {
                         onClick={() => openEditDialog(company)}
                       >
                         <Edit className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-500 hover:text-red-600"
+                        onClick={() => {
+                          setCompanyToDelete(company);
+                          setIsDeleteDialogOpen(true);
+                        }}
+                        title="Excluir empresa"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     )}
                     <Badge
@@ -446,6 +505,24 @@ export default function Companies() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir empresa</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir a empresa <strong>{companyToDelete?.name}</strong>? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
