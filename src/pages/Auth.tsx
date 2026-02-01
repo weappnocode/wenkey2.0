@@ -120,17 +120,22 @@ export default function Auth() {
 
     const loadCompanies = async () => {
       try {
-        const { data, error } = await supabase
-          .from('companies')
-          .select('id, name')
-          .order('name');
+        // Tenta via função SECURITY DEFINER para contornar RLS em ambiente público
+        const { data, error } = await supabase.rpc('public_active_companies');
 
         if (error) {
-          console.error('Erro ao carregar empresas:', error);
-          throw error;
+          console.warn('RPC public_active_companies falhou, tentando select direto', error);
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('companies')
+            .select('id, name')
+            .eq('is_active', true)
+            .order('name');
+
+          if (fallbackError) throw fallbackError;
+          setCompanies(fallbackData || []);
+        } else {
+          setCompanies((data as { id: string; name: string }[]) || []);
         }
-        console.log('Empresas carregadas:', data);
-        setCompanies(data || []);
       } catch (err) {
         console.error('Erro ao carregar empresas:', err);
         toast.error('Erro ao carregar empresas');
