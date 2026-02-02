@@ -67,6 +67,13 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
   const [keyResults, setKeyResults] = useState<KeyResultForm[]>([]);
 
   useEffect(() => {
+    setSelectedCompanyId(currentCompanyId);
+    setSelectedQuarterId(currentQuarterId);
+    setSelectedUserId('');
+    setKeyResults([]);
+  }, [currentCompanyId, currentQuarterId]);
+
+  useEffect(() => {
     if (open) {
       loadCompanies();
       loadQuarters();

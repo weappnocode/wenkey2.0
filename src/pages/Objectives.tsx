@@ -514,7 +514,7 @@ export default function Objectives() {
             <CreateObjectiveDialog
               onSuccess={loadObjectives}
               currentQuarterId={selectedQuarterId}
-              currentCompanyId={profile.company_id}
+              currentCompanyId={filterCompanyId || selectedCompanyId || profile.company_id}
             />
           )}
         </div>
