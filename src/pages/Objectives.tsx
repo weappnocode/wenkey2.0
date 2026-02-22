@@ -515,6 +515,7 @@ export default function Objectives() {
               onSuccess={loadObjectives}
               currentQuarterId={selectedQuarterId}
               currentCompanyId={filterCompanyId || selectedCompanyId || profile.company_id}
+              currentUserId={filterUserId}
             />
           )}
         </div>

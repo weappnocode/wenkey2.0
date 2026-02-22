@@ -106,7 +106,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    let abortAutoRefresh: (() => void) | null = null;
 
     const applySession = async (nextSession: Session | null) => {
       if (!mounted) return;
@@ -232,10 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Start automatic token refresh to avoid stale sessions when tab fica inativa
     try {
-      const { data: autoRefresh } = supabase.auth.startAutoRefresh();
-      abortAutoRefresh = () => {
-        autoRefresh?.subscription?.unsubscribe?.();
-      };
+      supabase.auth.startAutoRefresh();
     } catch (err) {
       console.warn('[Auth] startAutoRefresh not available or failed:', err);
     }
@@ -264,7 +260,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
       subscription.unsubscribe();
-      abortAutoRefresh?.();
       clearInterval(refreshInterval);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);

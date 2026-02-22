@@ -200,7 +200,7 @@ export default function Users() {
     return (company?.sectors || []).filter(Boolean);
   };
 
-    const handleCreate = async () => {
+  const handleCreate = async () => {
     try {
       if (!formData.full_name || !formData.email || !formData.password || !formData.company_id) {
         toast.error('Preencha todos os campos obrigatórios');
@@ -264,7 +264,7 @@ export default function Users() {
     }
   };
 
-    const handleEdit = async () => {
+  const handleEdit = async () => {
     try {
       if (!selectedUser) return;
 
@@ -319,7 +319,7 @@ export default function Users() {
     }
   };
 
-    const handleDelete = async () => {
+  const handleDelete = async () => {
     try {
       if (!selectedUser) return;
 
@@ -347,7 +347,7 @@ export default function Users() {
     }
   };
 
-    const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
+  const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -409,7 +409,9 @@ export default function Users() {
   const filteredUsers = users.filter(user => {
     const effectiveCompanyId = selectedCompanyId || profile?.company_id || '';
     const userCompanyId = getUserCompanyId(user);
-    const matchesCompany = userCompanyId === effectiveCompanyId;
+    const matchesCompany = isAdmin
+      ? (filterCompanyId === 'all' || userCompanyId === effectiveCompanyId)
+      : (userCompanyId === profile?.company_id);
 
     // Status is 'active' only if is_active is true AND company_id exists
     const isUserActive = Boolean(user.is_active && userCompanyId);

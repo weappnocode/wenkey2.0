@@ -42,9 +42,10 @@ interface CreateObjectiveDialogProps {
   onSuccess: () => void;
   currentQuarterId: string;
   currentCompanyId: string;
+  currentUserId?: string;
 }
 
-export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentCompanyId }: CreateObjectiveDialogProps) {
+export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentCompanyId, currentUserId }: CreateObjectiveDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -58,10 +59,19 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
 
   // Form fields
   const [selectedCompanyId, setSelectedCompanyId] = useState(currentCompanyId);
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState(currentUserId || '');
   const [selectedQuarterId, setSelectedQuarterId] = useState(currentQuarterId);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+
+  // Sincronizar com props quando abrirem o diálogo
+  useEffect(() => {
+    if (open) {
+      if (currentCompanyId) setSelectedCompanyId(currentCompanyId);
+      if (currentUserId) setSelectedUserId(currentUserId);
+      if (currentQuarterId) setSelectedQuarterId(currentQuarterId);
+    }
+  }, [open, currentCompanyId, currentUserId, currentQuarterId]);
 
   // Key Results
   const [keyResults, setKeyResults] = useState<KeyResultForm[]>([]);
@@ -152,7 +162,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
         .order('title');
 
       if (error) throw error;
-      
+
       // Extrair títulos únicos
       const uniqueTitles = [...new Set(data?.map(obj => obj.title) || [])];
       setExistingTitles(uniqueTitles);
@@ -184,7 +194,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
   };
 
   const updateKeyResult = (tempId: string, field: keyof KeyResultForm, value: string) => {
-    setKeyResults(keyResults.map(kr => 
+    setKeyResults(keyResults.map(kr =>
       kr.tempId === tempId ? { ...kr, [field]: value } : kr
     ));
   };
@@ -269,9 +279,10 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
     } catch (error: any) {
       console.error('Erro ao criar objetivo:', error);
       console.error('Erro detalhado:', error?.message, error?.details);
+      const msg = error?.message || error?.details || error?.hint || JSON.stringify(error);
       toast({
-        title: 'Erro',
-        description: error?.message || 'Não foi possível criar o objetivo',
+        title: 'Erro ao criar objetivo',
+        description: msg,
         variant: 'destructive',
       });
     } finally {
@@ -319,8 +330,8 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
 
             <div className="space-y-2">
               <Label htmlFor="user">Responsável *</Label>
-              <Select 
-                value={selectedUserId} 
+              <Select
+                value={selectedUserId}
                 onValueChange={setSelectedUserId}
                 disabled={!selectedCompanyId}
               >
@@ -363,9 +374,9 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
                 <ScrollArea className="h-8 flex-1">
                   <div className="flex gap-1 flex-wrap">
                     {existingTitles.map((existingTitle, index) => (
-                      <Badge 
-                        key={index} 
-                        variant="secondary" 
+                      <Badge
+                        key={index}
+                        variant="secondary"
                         className="text-xs whitespace-nowrap cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
                         onClick={() => setTitle(existingTitle)}
                       >
@@ -441,26 +452,26 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
                       <div className="grid gap-4 md:grid-cols-3">
                         <div className="space-y-2">
                           <Label>Tipo</Label>
-                          <Select 
-                            value={kr.type} 
+                          <Select
+                            value={kr.type}
                             onValueChange={(v) => updateKeyResult(kr.tempId, 'type', v)}
                           >
                             <SelectTrigger className="bg-background">
                               <SelectValue />
                             </SelectTrigger>
-                          <SelectContent className="bg-popover z-50">
-                            <SelectItem value="number">Número</SelectItem>
-                            <SelectItem value="percentage">Percentual</SelectItem>
-                            <SelectItem value="currency">Moeda</SelectItem>
-                            <SelectItem value="date">Data</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                            <SelectContent className="bg-popover z-50">
+                              <SelectItem value="number">Número</SelectItem>
+                              <SelectItem value="percentage">Percentual</SelectItem>
+                              <SelectItem value="currency">Moeda</SelectItem>
+                              <SelectItem value="date">Data</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                      <div className="space-y-2">
+                        <div className="space-y-2">
                           <Label>Direção</Label>
-                          <Select 
-                            value={kr.direction} 
+                          <Select
+                            value={kr.direction}
                             onValueChange={(v) => updateKeyResult(kr.tempId, 'direction', v)}
                           >
                             <SelectTrigger className="bg-background">
@@ -478,8 +489,8 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
 
                       <div className="space-y-2">
                         <Label>Responsável pelo KR</Label>
-                        <Select 
-                          value={kr.user_id} 
+                        <Select
+                          value={kr.user_id}
                           onValueChange={(v) => updateKeyResult(kr.tempId, 'user_id', v)}
                           disabled={!selectedCompanyId}
                         >
