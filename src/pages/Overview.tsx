@@ -31,15 +31,18 @@ interface UserRanking {
 
 export default function Overview() {
   const { user } = useAuth();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany: ctxCompany } = useCompany();
   const { role, isAdmin, loading: roleLoading } = useUserRole();
   const [quarters, setQuarters] = useState<Quarter[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companies, setCompanies] = useState<Company[]>(() =>
+    ctxCompany ? [{ id: ctxCompany.id, name: ctxCompany.name }] : []
+  );
+  // Inicializa já com a empresa do contexto (disponível via localStorage)
+  const [selectedCompany, setSelectedCompany] = useState<string>(selectedCompanyId || '');
   const [selectedQuarter, setSelectedQuarter] = useState<string>('');
-  const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [rankings, setRankings] = useState<UserRanking[]>([]);
-  const [userCompanyId, setUserCompanyId] = useState<string>('');
+  const [userCompanyId, setUserCompanyId] = useState<string>(selectedCompanyId || '');
 
   useEffect(() => {
     if (!roleLoading && user) {
@@ -67,11 +70,10 @@ export default function Overview() {
     }
   }, [selectedCompanyId, selectedCompany, roleLoading]);
 
-  const initializePage = async () => {
+  const initializePage = async (attempt = 1) => {
     try {
       setLoading(true);
 
-      // Buscar dados do perfil do usuário
       const { data: profileData } = await supabase
         .from('profiles')
         .select('company_id')
@@ -82,29 +84,37 @@ export default function Overview() {
         setUserCompanyId(profileData.company_id);
       }
 
+      // Prioridade: empresa do contexto (sidebar) > empresa do perfil
+      const defaultCompanyId = selectedCompanyId || profileData?.company_id;
+
       if (isAdmin) {
-        // Admin: carregar todas as empresas ativas
-        const { data: companiesData } = await supabase
+        const { data: companiesData, error: cErr } = await supabase
           .from('companies')
           .select('id, name')
           .eq('is_active', true)
           .order('name');
 
+        if (cErr) throw cErr;
+
         if (companiesData && companiesData.length > 0) {
           setCompanies(companiesData);
-          // Selecionar a primeira empresa ou a empresa do admin
-          const defaultCompany = profileData?.company_id || companiesData[0].id;
-          setSelectedCompany(defaultCompany);
-          await loadQuarters(defaultCompany);
+          const companyId = defaultCompanyId || companiesData[0].id;
+          setSelectedCompany(companyId);
+          await loadQuarters(companyId);
         }
       } else {
-        // User: usar apenas a empresa do usuário
-        if (profileData?.company_id) {
-          setSelectedCompany(profileData.company_id);
-          await loadQuarters(profileData.company_id);
+        if (defaultCompanyId) {
+          setSelectedCompany(defaultCompanyId);
+          await loadQuarters(defaultCompanyId);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      const isTransient = error?.message?.includes('Failed to fetch') || error?.message?.includes('AbortError');
+      if (isTransient && attempt < 3) {
+        console.warn(`[Overview] Erro transitório, tentando novamente (${attempt}/3)...`);
+        setTimeout(() => initializePage(attempt + 1), 800 * attempt);
+        return;
+      }
       console.error('Erro ao inicializar página:', error);
     } finally {
       setLoading(false);

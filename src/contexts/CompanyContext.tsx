@@ -2,6 +2,8 @@ import { createContext, useContext, useState, ReactNode, useEffect, useRef } fro
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
+const DEFAULT_COMPANY_ID = '30b26d53-7069-4f90-a200-f67e83493cec'; // Grupo RDZ
+
 export interface Company {
   id: string;
   name: string;
@@ -28,11 +30,13 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       // Fallback for migration from ID-only storage
       const legacyId = localStorage.getItem('selectedCompanyId');
       if (legacyId) {
-        return { id: legacyId, name: 'Carregando...' };
+        return { id: legacyId, name: '...' };
       }
     } catch (e) {
       console.error('Error parsing selectedCompany from localStorage', e);
     }
+
+    // If absolutely nothing is found, return a stub that will be filled by the auto-select effect
     return null;
   });
   const autoSelectLock = useRef<{ userId: string | null; applied: boolean }>({
@@ -51,20 +55,36 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     // Clearing storage is handled explicitly by the signOut function in AuthContext.
   }, [selectedCompany]);
 
-  // Auto-select the company the user is registered to (default) once per user session
+  // Auto-select logic: runs ONCE per login session (when userId changes).
+  // Does NOT interfere with manual company switches by the user.
   useEffect(() => {
     const userId = profile?.id ?? null;
-    const targetCompanyId = profile?.company_id ?? null;
 
-    // Reset guard when user changes
-    if (autoSelectLock.current.userId !== userId) {
-      autoSelectLock.current = { userId, applied: false };
+    // Detect new login (userId changed)
+    if (autoSelectLock.current.userId === userId) return;
+
+    // Reset lock for the new session
+    autoSelectLock.current = { userId, applied: false };
+
+    // Nothing to do if logged out
+    if (!userId) return;
+
+    // If already have a company selected in localStorage, keep it as-is
+    // (user may have chosen it manually in a previous session and we respect that)
+    const savedStr = localStorage.getItem('selectedCompany');
+    if (savedStr) {
+      try {
+        const saved = JSON.parse(savedStr);
+        if (saved?.id) {
+          // Mark as applied so we don't override
+          autoSelectLock.current.applied = true;
+          return;
+        }
+      } catch { /* ignore */ }
     }
 
-    if (!userId || !targetCompanyId) return;
-
-    const alreadySelected = selectedCompany?.id === targetCompanyId;
-    if (alreadySelected || autoSelectLock.current.applied) return;
+    // No saved company — fetch and apply the default
+    const targetCompanyId = profile?.company_id || DEFAULT_COMPANY_ID;
 
     const fetchAndSelect = async () => {
       try {
@@ -76,7 +96,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
         if (error) throw error;
 
-        if (data) {
+        if (data && data.is_active) {
           setSelectedCompany({
             id: data.id,
             name: data.name,
@@ -84,14 +104,15 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
           });
         }
       } catch (err) {
-        console.error('Error auto-selecting company for user:', err);
+        console.error('Error auto-selecting company:', err);
       } finally {
         autoSelectLock.current.applied = true;
       }
     };
 
     fetchAndSelect();
-  }, [profile?.id, profile?.company_id, selectedCompany]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, profile?.company_id]);
 
   return (
     <CompanyContext.Provider value={{
@@ -104,6 +125,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCompany() {
   const context = useContext(CompanyContext);
   if (context === undefined) {

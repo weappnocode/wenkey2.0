@@ -111,46 +111,7 @@ export default function KRCheckins() {
   const [currentResult, setCurrentResult] = useState<number>(0);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
-  useEffect(() => {
-    if (roleLoading || role !== 'admin') return;
-
-    if (selectedCompanyId && filterCompanyId !== selectedCompanyId) {
-      setFilterCompanyId(selectedCompanyId);
-      setFilterOwnerId('all');
-    } else if (!selectedCompanyId && filterCompanyId !== 'all') {
-      setFilterCompanyId('all');
-      setFilterOwnerId('all');
-    }
-  }, [selectedCompanyId, role, roleLoading, filterCompanyId]);
-
-  // Sempre alinhar filtro à empresa escolhida na sidebar
-  useEffect(() => {
-    if (selectedCompanyId && filterCompanyId !== selectedCompanyId) {
-      setFilterCompanyId(selectedCompanyId);
-      setFilterOwnerId('all');
-    }
-  }, [selectedCompanyId, filterCompanyId]);
-
-  // Carregar perfil do usuário
-  useEffect(() => {
-    if (user && !roleLoading) {
-      loadUserProfile();
-    }
-  }, [user, roleLoading]);
-
-
-
-  // Resetar data selecionada quando quarter mudar
-  useEffect(() => {
-    setSelectedCheckinDate(null);
-  }, [selectedQuarter]);
-
-  useEffect(() => {
-    const interval = setInterval(() => setCurrentDate(new Date()), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadUserProfile = async () => {
+  const loadUserProfile = useCallback(async () => {
     if (!user) return;
 
     const { data, error } = await supabase
@@ -160,11 +121,16 @@ export default function KRCheckins() {
       .single();
 
     if (error) {
-      toast({
-        title: 'Erro ao carregar perfil',
-        description: error.message,
-        variant: 'destructive',
-      });
+      const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError');
+      if (!isTransient) {
+        toast({
+          title: 'Erro ao carregar perfil',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        console.warn('[KRCheckins] Erro transitório ao carregar perfil, ignorando...');
+      }
       return;
     }
 
@@ -184,50 +150,9 @@ export default function KRCheckins() {
       }
     }
     // Admin: não aplica filtro automático
-  };
-  useEffect(() => {
-    if (userProfile) {
-      loadCompanies();
-    }
-  }, [userProfile]);
+  }, [user, role, toast]);
 
-  useEffect(() => {
-    const companyIdToLoad =
-      (filterCompanyId && filterCompanyId !== 'all')
-        ? filterCompanyId
-        : (userProfile?.company_id ? userProfile.company_id : selectedCompanyId);
-
-    if (companyIdToLoad) {
-      loadQuarters(companyIdToLoad);
-    }
-  }, [selectedCompanyId, filterCompanyId, userProfile]);
-
-  useEffect(() => {
-    if (filterCompanyId && filterCompanyId !== 'all') {
-      loadUsers();
-    } else {
-      setUsers([]);
-      // Não resetar filterOwnerId se for 'user', pois ele deve manter fixo no próprio ID
-      if (role !== 'user') {
-        setFilterOwnerId('all');
-      }
-    }
-  }, [filterCompanyId, userProfile]);
-
-  useEffect(() => {
-    if (selectedQuarter && userProfile) {
-      loadQuarterCheckins();
-      loadObjectivesAndKRs();
-    }
-  }, [selectedQuarter, filterCompanyId, filterOwnerId, userProfile]);
-
-  useEffect(() => {
-    if (keyResults.length > 0 && quarterCheckins.length > 0) {
-      loadCheckinResults();
-    }
-  }, [keyResults, quarterCheckins]);
-
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     // Admin vê todas, manager/user vê apenas a sua
     let query = supabase
       .from('companies')
@@ -253,9 +178,9 @@ export default function KRCheckins() {
     }
 
     setCompanies(data || []);
-  };
+  }, [role, userProfile, toast]);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async (autoSelectFirst = false) => {
     if (!filterCompanyId) return;
 
     const { data, error } = await supabase
@@ -266,18 +191,26 @@ export default function KRCheckins() {
       .order('full_name');
 
     if (error) {
-      toast({
-        title: 'Erro ao carregar usuários',
-        description: error.message,
-        variant: 'destructive',
-      });
+      const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError');
+      if (!isTransient) {
+        toast({
+          title: 'Erro ao carregar usuários',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
       return;
     }
 
     setUsers(data || []);
-  };
 
-  const loadQuarters = async (companyId: string) => {
+    // Para admin: auto-selecionar o primeiro usuário em ordem alfabética
+    if (autoSelectFirst && data && data.length > 0) {
+      setFilterOwnerId(data[0].id);
+    }
+  }, [filterCompanyId, toast]);
+
+  const loadQuarters = useCallback(async (companyId: string) => {
     const { data, error } = await supabase
       .from('quarters')
       .select('*')
@@ -286,23 +219,29 @@ export default function KRCheckins() {
       .order('start_date', { ascending: false });
 
     if (error) {
-      toast({
-        title: 'Erro ao carregar trimestres',
-        description: error.message,
-        variant: 'destructive',
-      });
+      const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError');
+      if (!isTransient) {
+        toast({
+          title: 'Erro ao carregar trimestres',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
       return;
     }
 
     setQuarters(data || []);
     if (data && data.length > 0) {
-      setSelectedQuarter(data[0].id);
+      // Seleciona o quarter atual (dentro do período) ou o mais recente
+      const today = new Date().toISOString().split('T')[0];
+      const current = data.find(q => q.start_date <= today && q.end_date >= today);
+      setSelectedQuarter(current ? current.id : data[0].id);
     } else {
       setSelectedQuarter('');
     }
-  };
+  }, [toast]);
 
-  const loadQuarterCheckins = async () => {
+  const loadQuarterCheckins = useCallback(async () => {
     if (!selectedQuarter) return;
 
     const { data, error } = await supabase
@@ -312,23 +251,27 @@ export default function KRCheckins() {
       .order('checkin_date', { ascending: true });
 
     if (error) {
-      toast({
-        title: 'Erro ao carregar checkins',
-        description: error.message,
-        variant: 'destructive',
-      });
+      const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError');
+      if (!isTransient) {
+        toast({
+          title: 'Erro ao carregar checkins',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        console.warn('[KRCheckins] Erro transitório ao carregar checkins (ignorado):', error.message);
+      }
       return;
     }
 
     setQuarterCheckins(data || []);
 
-    // Se n��o houver KRs carregados, limpamos os resultados mas mantemos os check-ins carregados
     if (keyResults.length === 0) {
       setCheckinResults({});
     }
-  };
+  }, [selectedQuarter, keyResults.length, toast]);
 
-  const loadObjectivesAndKRs = async () => {
+  const loadObjectivesAndKRs = useCallback(async () => {
     if (!selectedQuarter || !user) return;
 
     let objectivesQuery = supabase
@@ -355,11 +298,16 @@ export default function KRCheckins() {
     const { data: objData, error: objError } = await objectivesQuery;
 
     if (objError) {
-      toast({
-        title: 'Erro ao carregar objetivos',
-        description: objError.message,
-        variant: 'destructive',
-      });
+      const isTransient = objError.message?.includes('Failed to fetch') || objError.message?.includes('AbortError');
+      if (!isTransient) {
+        toast({
+          title: 'Erro ao carregar objetivos',
+          description: objError.message,
+          variant: 'destructive',
+        });
+      } else {
+        console.warn('[KRCheckins] Erro transitório ao carregar objetivos (ignorado):', objError.message);
+      }
       return;
     }
 
@@ -374,11 +322,16 @@ export default function KRCheckins() {
         .in('objective_id', objectiveIds);
 
       if (krError) {
-        toast({
-          title: 'Erro ao carregar key results',
-          description: krError.message,
-          variant: 'destructive',
-        });
+        const isTransient = krError.message?.includes('Failed to fetch') || krError.message?.includes('AbortError');
+        if (!isTransient) {
+          toast({
+            title: 'Erro ao carregar key results',
+            description: krError.message,
+            variant: 'destructive',
+          });
+        } else {
+          console.warn('[KRCheckins] Erro transitório ao carregar key results (ignorado):', krError.message);
+        }
         return;
       }
 
@@ -386,17 +339,9 @@ export default function KRCheckins() {
     } else {
       setKeyResults([]);
     }
-  };
+  }, [selectedQuarter, user, role, filterOwnerId, filterCompanyId, selectedCompanyId, toast]);
 
-  const getProgressColor = (percentage: number): string => {
-    // Verde apenas quando atingimento for 100% (ou acima, já clamped)
-    if (percentage >= 100) return '#00CC00';
-    if (percentage >= 70) return '#FFCC00'; // Amarelo para alto mas não completo
-    if (percentage >= 40) return '#FF6600'; // Laranja
-    return '#FF0000'; // Vermelho para baixo
-  };
-
-  const loadCheckinResults = async () => {
+  const loadCheckinResults = useCallback(async () => {
     if (!selectedQuarter) return;
 
     // Determinar o filtro de usuário selecionado (para filtrar pelo dono do KR)
@@ -434,16 +379,23 @@ export default function KRCheckins() {
     const { data, error } = await query;
 
     if (error) {
-      toast({
-        title: 'Erro ao carregar valores',
-        description: error.message,
-        variant: 'destructive',
-      });
+      // Erros transitórios de rede (troca de empresa, componente desmontado) não precisam de toast
+      const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError') || error.code === '20';
+      if (!isTransient) {
+        toast({
+          title: 'Erro ao carregar valores',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        console.warn('[KRCheckins] Erro transitório ao carregar valores (ignorado):', error.message);
+      }
       return;
     }
 
+
     const resultsMap: Record<string, CheckinResult> = {};
-    data?.forEach((result: any) => {
+    (data as Array<CheckinResult & { key_results: { user_id: string | null } }>)?.forEach((result) => {
       const ownerId =
         ownerMap[result.key_result_id] ?? result.key_results?.user_id ?? null;
 
@@ -472,7 +424,96 @@ export default function KRCheckins() {
     });
 
     setCheckinResults(resultsMap);
+  }, [selectedQuarter, role, user, filterOwnerId, quarterCheckins, keyResults, toast]);
+
+  useEffect(() => {
+    if (roleLoading || role !== 'admin') return;
+
+    if (selectedCompanyId && filterCompanyId !== selectedCompanyId) {
+      setFilterCompanyId(selectedCompanyId);
+      // Não reseta o usuário para 'all' - loadUsers vai auto-selecionar o primeiro
+    } else if (!selectedCompanyId && filterCompanyId !== 'all') {
+      setFilterCompanyId('all');
+      setFilterOwnerId('all');
+    }
+  }, [selectedCompanyId, role, roleLoading, filterCompanyId]);
+
+  // Sempre alinhar filtro à empresa escolhida na sidebar
+  useEffect(() => {
+    if (selectedCompanyId && filterCompanyId !== selectedCompanyId) {
+      setFilterCompanyId(selectedCompanyId);
+      // Não reseta filterOwnerId: loadUsers vai auto-selecionar o primeiro usuário
+    }
+  }, [selectedCompanyId, filterCompanyId]);
+
+  // Carregar perfil do usuário
+  useEffect(() => {
+    if (user && !roleLoading) {
+      loadUserProfile();
+    }
+  }, [user, roleLoading, loadUserProfile]);
+
+  // Resetar data selecionada quando quarter mudar
+  useEffect(() => {
+    setSelectedCheckinDate(null);
+  }, [selectedQuarter]);
+
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentDate(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (userProfile) {
+      loadCompanies();
+    }
+  }, [userProfile, loadCompanies]);
+
+  useEffect(() => {
+    const companyIdToLoad =
+      (filterCompanyId && filterCompanyId !== 'all')
+        ? filterCompanyId
+        : (userProfile?.company_id ? userProfile.company_id : selectedCompanyId);
+
+    if (companyIdToLoad) {
+      loadQuarters(companyIdToLoad);
+    }
+  }, [selectedCompanyId, filterCompanyId, userProfile, loadQuarters]);
+
+  useEffect(() => {
+    if (filterCompanyId && filterCompanyId !== 'all') {
+      // Para admin: auto-selecionar o primeiro usuário alfabético
+      const autoSelect = role === 'admin';
+      loadUsers(autoSelect);
+    } else {
+      setUsers([]);
+      if (role !== 'user') {
+        setFilterOwnerId('all');
+      }
+    }
+  }, [filterCompanyId, userProfile, role, loadUsers]);
+
+  useEffect(() => {
+    if (selectedQuarter && userProfile) {
+      loadQuarterCheckins();
+      loadObjectivesAndKRs();
+    }
+  }, [selectedQuarter, userProfile, loadQuarterCheckins, loadObjectivesAndKRs]);
+
+  useEffect(() => {
+    if (keyResults.length > 0 && quarterCheckins.length > 0) {
+      loadCheckinResults();
+    }
+  }, [keyResults, quarterCheckins, loadCheckinResults]);
+
+  const getProgressColor = (percentage: number): string => {
+    // Verde apenas quando atingimento for 100% (ou acima, já clamped)
+    if (percentage >= 100) return '#00CC00';
+    if (percentage >= 70) return '#FFCC00'; // Amarelo para alto mas não completo
+    if (percentage >= 40) return '#FF6600'; // Laranja
+    return '#FF0000'; // Vermelho para baixo
   };
+
 
   const formatInputValue = (value: string, type: string | null) => {
     if (!value) return '';
@@ -666,6 +707,15 @@ export default function KRCheckins() {
     // Calcular percentual de atingimento:
     // - aumento (maior � melhor): realizado / meta (limitado a 100%)
     // - redu��o (menor � melhor): meta / realizado (limitado a 100%; se realizado <= meta, conta 100%)
+    // Atingimento Visual (Realizado / Meta)
+    const simpleAttainment = calculateSimpleAttainment(
+      isNaN(realizado) ? null : realizado,
+      isNaN(meta) ? null : meta,
+      kr.direction,
+      kr.type
+    );
+
+    // Calcular percentual de progresso do KR (com Piso):
     const percentualAtingido = calculateKR(
       isNaN(realizado) ? null : realizado,
       isNaN(minimo) ? null : minimo,
@@ -673,7 +723,14 @@ export default function KRCheckins() {
       kr.direction,
       kr.type
     );
-    const roundedPercentual = percentualAtingido === null ? null : Number(percentualAtingido.toFixed(2));
+
+    // O checkin_results.percentual_atingido vai armazenar o Atingimento Visual (Realizado / Meta)
+    // Se for data, usamos o cálculo de KR como fallback
+    const visualAttainment = (kr.type === 'date' || kr.type === 'data') ? percentualAtingido : simpleAttainment;
+    const roundedVisualAttainment = visualAttainment === null ? null : Number(visualAttainment.toFixed(2));
+
+    // O progresso real do KR (com Piso) que sincroniza com rankings e média
+    const roundedKRProgress = percentualAtingido === null ? null : Number(percentualAtingido.toFixed(2));
 
     const key = `${currentKR.id}-${currentCheckin.id}`;
     const existingResult = checkinResults[key];
@@ -697,7 +754,7 @@ export default function KRCheckins() {
             meta_checkin: meta,
             minimo_orcamento: minimo,
             valor_realizado: isNaN(realizado) ? null : realizado,
-            percentual_atingido: roundedPercentual,
+            percentual_atingido: roundedVisualAttainment,
             note: formData.observacoes || null,
             updated_at: new Date().toISOString(),
           })
@@ -741,7 +798,7 @@ export default function KRCheckins() {
           meta_checkin: meta,
           minimo_orcamento: minimo,
           valor_realizado: isNaN(realizado) ? null : realizado,
-          percentual_atingido: roundedPercentual,
+          percentual_atingido: roundedVisualAttainment,
           note: formData.observacoes || null,
         };
         console.log('Criando novo registro:', insertData);
@@ -758,7 +815,7 @@ export default function KRCheckins() {
         console.log('Inserção bem-sucedida:', data);
       }
 
-      await updateStoredProgress(kr, roundedPercentual);
+      await updateStoredProgress(kr, roundedKRProgress);
       // Recarregar os dados para refletir as mudanças
       await loadCheckinResults();
 
@@ -768,11 +825,11 @@ export default function KRCheckins() {
       });
 
       closeDialog();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro no catch:', error);
       toast({
         title: 'Erro ao salvar',
-        description: error.message || 'Erro desconhecido',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
       });
     }
@@ -827,7 +884,7 @@ export default function KRCheckins() {
     }
   };
 
-const translateDirection = (direction: string | null) => {
+  const translateDirection = (direction: string | null) => {
     switch (direction) {
       case 'increase':
         return 'crescente';
@@ -839,6 +896,36 @@ const translateDirection = (direction: string | null) => {
         return 'menor que';
       default:
         return direction || '--';
+    }
+  };
+
+  const calculateSimpleAttainment = (
+    realized: number | null,
+    target: number | null,
+    direction: string | null,
+    type?: string | null
+  ): number | null => {
+    if (target === null || target === undefined || Number.isNaN(Number(target)) || Number(target) === 0) return null;
+    const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
+    if (safeRealized === null) return null;
+
+    const safeTarget = Number(target);
+
+    // Date/Data logic remains range-based usually, but the user said "realizado / meta"
+    // For dates, it's not a simple division. I'll keep calculateKR for dates unless asked otherwise,
+    // as "realizado/meta" doesn't translate well to timestamps.
+    if (type === 'date' || type === 'data') {
+      return null; // Fallback to calculateKR or skip
+    }
+
+    if (!direction || direction === 'increase' || direction === 'maior-é-melhor') {
+      return (safeRealized / safeTarget) * 100;
+    } else {
+      // Decrease (Menor é melhor): meta / realizado capped at 100? 
+      // User said "realizado / meta", but for decrease that would mean lower is worse.
+      // I'll use target/realized for decrease simple attainment.
+      if (safeRealized <= safeTarget) return 100;
+      return (safeTarget / safeRealized) * 100;
     }
   };
 
@@ -954,7 +1041,7 @@ const translateDirection = (direction: string | null) => {
         if (allSameObjectives) {
           const totalPct = allSameObjectives.reduce((sum, o) => sum + (o.percent_obj ?? 0), 0);
           const userCount = allSameObjectives.length;
-          const krCount = allSameObjectives.reduce((sum, o) => sum + ((o.key_results as any[])?.length || 0), 0);
+          const krCount = allSameObjectives.reduce((sum, o) => sum + ((o.key_results as Array<{ id: string }>)?.length || 0), 0);
           const avg = Math.round(totalPct / userCount);
 
           await supabase
@@ -974,7 +1061,7 @@ const translateDirection = (direction: string | null) => {
     }
   };
 
-  const parseDateOnly = (dateString: string | null | undefined) => {
+  const parseDateOnly = useCallback((dateString: string | null | undefined) => {
     if (!dateString) return null;
 
     const [yearStr, monthStr, dayPart] = dateString.split('-');
@@ -990,12 +1077,12 @@ const translateDirection = (direction: string | null) => {
     }
 
     return new Date(year, month - 1, day);
-  };
+  }, []);
 
-  const getCheckinTime = (dateString: string | null | undefined) => {
+  const getCheckinTime = useCallback((dateString: string | null | undefined) => {
     const parsed = parseDateOnly(dateString);
     return parsed ? parsed.getTime() : null;
-  };
+  }, [parseDateOnly]);
 
   const handleInputChange = (krId: string, checkinId: string, field: 'meta' | 'minimo' | 'realizado', value: string) => {
     const key = `${krId}-${checkinId}`;
@@ -1168,7 +1255,7 @@ const translateDirection = (direction: string | null) => {
     }
 
     return orderedList[orderedList.length - 1]?.id ?? null;
-  }, [quarterCheckins, currentDate]);
+  }, [quarterCheckins, currentDate, getCheckinTime]);
 
   // Inicializar data selecionada com a mais recente quando quarterCheckins mudar
   useEffect(() => {
@@ -1185,7 +1272,7 @@ const translateDirection = (direction: string | null) => {
       });
       setSelectedCheckinDate(sortedCheckins[0].id);
     }
-  }, [quarterCheckins, selectedCheckinDate, activeCheckinId]);
+  }, [quarterCheckins, selectedCheckinDate, activeCheckinId, getCheckinTime]);
 
   useEffect(() => {
     if (activeCheckinId && checkinOverallAverages[activeCheckinId]) {
@@ -1321,7 +1408,7 @@ const translateDirection = (direction: string | null) => {
     };
 
     persistCompletedCheckins();
-  }, [quarterCheckins, checkinOverallAverages, currentDate, role]);
+  }, [quarterCheckins, checkinOverallAverages, currentDate, role, getCheckinTime]);
 
   return (
     <Layout>
@@ -1505,7 +1592,20 @@ const translateDirection = (direction: string | null) => {
                                           kr.direction,
                                           kr.type
                                         );
-                                        const attainmentText = krProgress !== null ? `${krProgress.toFixed(2)}%` : '--';
+                                        const simpleAttainment = calculateSimpleAttainment(
+                                          result.valor_realizado,
+                                          result.meta_checkin,
+                                          kr.direction,
+                                          kr.type
+                                        );
+
+                                        const visualAttainmentValue = (kr.type === 'date' || kr.type === 'data')
+                                          ? krProgress
+                                          : (result.percentual_atingido ?? simpleAttainment);
+
+                                        const attainmentText = visualAttainmentValue !== null ? `${visualAttainmentValue.toFixed(2)}%` : '--';
+                                        const krText = krProgress !== null ? `${krProgress.toFixed(2)}%` : '--';
+
                                         const progressValue = krProgress ?? 0;
                                         const progressColor = krProgress !== null ? getProgressColor(krProgress) : '#e5e7eb';
 
@@ -1526,13 +1626,13 @@ const translateDirection = (direction: string | null) => {
                                                 value={progressValue}
                                                 className="h-2"
                                                 style={{
-                                                  ['--progress-color' as any]: progressColor
-                                                }}
+                                                  '--progress-color': progressColor
+                                                } as React.CSSProperties}
                                               />
                                               <div className="flex justify-between items-center text-[10px]">
                                                 <span className="text-muted-foreground">KR:</span>
                                                 <span className="font-semibold text-primary text-sm">
-                                                  {attainmentText}
+                                                  {krText}
                                                 </span>
                                               </div>
                                             </div>
@@ -1687,7 +1787,18 @@ const translateDirection = (direction: string | null) => {
                       const progress = formData.realizado
                         ? calculateKR(realizedVal, minVal, metaVal, currentKR.direction, currentKR.type)
                         : null;
-                      const progressText = progress !== null ? `${progress.toFixed(2)}%` : '--';
+
+                      const simpleAttainment = formData.realizado
+                        ? calculateSimpleAttainment(realizedVal, metaVal, currentKR.direction, currentKR.type)
+                        : null;
+
+                      const visualAttainmentValue = (currentKR.type === 'date' || currentKR.type === 'data')
+                        ? progress
+                        : simpleAttainment;
+
+                      const attainmentText = visualAttainmentValue !== null ? `${visualAttainmentValue.toFixed(2)}%` : '--';
+                      const krText = progress !== null ? `${progress.toFixed(2)}%` : '--';
+
                       const progressValue = progress ?? 0;
                       const progressColor = progress !== null ? getProgressColor(progress) : '#e5e7eb';
 
@@ -1703,10 +1814,10 @@ const translateDirection = (direction: string | null) => {
                                 <div className="text-sm space-y-1">
                                   <div className="font-semibold text-[#0d3a8c]">
                                     <span>Atingimento:</span>
-                                    <span className="ml-1">{progressText}</span>
+                                    <span className="ml-1">{attainmentText}</span>
                                   </div>
                                   <div className="font-semibold text-primary text-sm">
-                                    KR: {progressText}
+                                    KR: {krText}
                                   </div>
                                 </div>
                               )}
@@ -1715,7 +1826,7 @@ const translateDirection = (direction: string | null) => {
                           <Progress
                             value={progressValue}
                             className="h-3"
-                            style={{ ['--progress-color' as any]: progressColor }}
+                            style={{ '--progress-color': progressColor } as React.CSSProperties}
                           />
                           {currentKR.type === 'date' || currentKR.type === 'data' ? (
                             <Input

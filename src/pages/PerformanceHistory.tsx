@@ -19,7 +19,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, TrendingUp } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -65,27 +65,10 @@ export default function PerformanceHistory() {
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [results, setResults] = useState<QuarterResult[]>([]);
 
-    // Admin Filter State
-    const [filterCompanyId, setFilterCompanyId] = useState<string>("");
+    // Admin Filter State — inicializa já com a empresa do contexto (localStorage)
+    const [filterCompanyId, setFilterCompanyId] = useState<string>(selectedCompanyId || "");
 
-    useEffect(() => {
-        if (selectedCompanyId) {
-            setFilterCompanyId(selectedCompanyId);
-        }
-    }, [selectedCompanyId]);
-
-    useEffect(() => {
-        if (filterCompanyId) {
-            loadData();
-        }
-    }, [filterCompanyId]);
-
-    useEffect(() => {
-        // Remove direct dependency on selectedCompanyId for loadData
-        // because we want to update filterCompanyId first
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             setLoading(true);
 
@@ -128,13 +111,31 @@ export default function PerformanceHistory() {
             if (resultsError) throw resultsError;
             setResults(resultsData || []);
 
-        } catch (error: any) {
-            console.error('Error loading history:', error);
-            toast.error('Erro ao carregar histórico de performance');
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : '';
+            const isTransient = msg.includes('Failed to fetch') || msg.includes('AbortError');
+            if (!isTransient) {
+                console.error('Error loading history:', error);
+                toast.error('Erro ao carregar histórico de performance');
+            } else {
+                console.warn('[PerformanceHistory] Erro transitório, ignorando:', msg);
+            }
         } finally {
             setLoading(false);
         }
-    };
+    }, [filterCompanyId]);
+
+    useEffect(() => {
+        if (selectedCompanyId) {
+            setFilterCompanyId(selectedCompanyId);
+        }
+    }, [selectedCompanyId]);
+
+    useEffect(() => {
+        if (filterCompanyId) {
+            loadData();
+        }
+    }, [filterCompanyId, loadData]);
 
     // Helper to get result for a specific cell
     const getResult = (userId: string, quarterId: string) => {
@@ -142,13 +143,13 @@ export default function PerformanceHistory() {
     };
 
     // Helper to calculate average for a user
-    const getUserAverage = (userId: string) => {
+    const getUserAverage = useCallback((userId: string) => {
         const userResults = results.filter(r => r.user_id === userId);
         if (userResults.length === 0) return 0;
 
         const sum = userResults.reduce((acc, curr) => acc + (curr.result_percent || 0), 0);
         return Math.round(sum / userResults.length);
-    };
+    }, [results]);
 
     const getPerformanceColor = (pct: number) => {
         return 'text-black font-normal';
@@ -170,7 +171,7 @@ export default function PerformanceHistory() {
             const avgB = getUserAverage(b.id);
             return avgB - avgA;
         });
-    }, [users, activeUsersOnly, results]);
+    }, [users, activeUsersOnly, getUserAverage]);
 
     const effectiveCompanyId = isAdmin ? filterCompanyId : selectedCompanyId;
 
