@@ -36,12 +36,6 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
   const [users, setUsers] = useState<Profile[]>([]);
   const [keyResults, setKeyResults] = useState<KeyResultForm[]>([]);
 
-  useEffect(() => {
-    if (open && companyId) {
-      loadUsers();
-    }
-  }, [open, companyId, loadUsers]);
-
   const loadUsers = useCallback(async () => {
     const { data: companyMembers } = await supabase
       .from('company_members')
@@ -61,6 +55,12 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
       }
     }
   }, [companyId]);
+
+  useEffect(() => {
+    if (open && companyId) {
+      loadUsers();
+    }
+  }, [open, companyId, loadUsers]);
 
   const addKeyResult = () => {
     setKeyResults([
@@ -138,7 +138,8 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
       onSuccess();
     } catch (error: unknown) {
       console.error('Erro ao adicionar Key Results:', error);
-      toast.error('Erro ao adicionar Key Results: ' + (error?.message || 'tente novamente'));
+      const message = error instanceof Error ? error.message : 'tente novamente';
+      toast.error('Erro ao adicionar Key Results: ' + message);
     } finally {
       setLoading(false);
     }

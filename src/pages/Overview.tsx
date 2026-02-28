@@ -45,10 +45,11 @@ export default function Overview() {
   const [userCompanyId, setUserCompanyId] = useState<string>(selectedCompanyId || '');
 
   useEffect(() => {
-    if (!roleLoading && user) {
+    if (!roleLoading && user?.id) {
       initializePage();
     }
-  }, [roleLoading, user, isAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleLoading, user?.id, isAdmin]);
 
   useEffect(() => {
     if (selectedCompany && selectedQuarter) {
@@ -57,18 +58,12 @@ export default function Overview() {
   }, [selectedCompany, selectedQuarter]);
 
   useEffect(() => {
-    if (roleLoading) return;
-
-    if (selectedCompanyId && selectedCompany !== selectedCompanyId) {
+    // Apenas sincroniza quando usuário trocar a empresa ativamente no menu lateral
+    if (!roleLoading && selectedCompanyId && selectedCompany !== selectedCompanyId) {
       setSelectedCompany(selectedCompanyId);
       loadQuarters(selectedCompanyId);
-    } else if (!selectedCompanyId && selectedCompany) {
-      setSelectedCompany('');
-      setSelectedQuarter('');
-      setQuarters([]);
-      setRankings([]);
     }
-  }, [selectedCompanyId, selectedCompany, roleLoading]);
+  }, [selectedCompanyId, roleLoading]);
 
   const initializePage = async (attempt = 1) => {
     try {
@@ -197,8 +192,13 @@ export default function Overview() {
       });
 
       setRankings(rankings);
-    } catch (error) {
-      console.error('Erro ao processar rankings:', error);
+    } catch (error: any) {
+      const isTransient = error?.message?.includes('Failed to fetch') || error?.message?.includes('AbortError');
+      if (!isTransient) {
+        console.error('Erro ao processar rankings:', error);
+      } else {
+        console.warn('[Overview] Erro transitório ao carregar rankings (ignorado):', error?.message);
+      }
     }
   };
 

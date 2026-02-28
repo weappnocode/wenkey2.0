@@ -53,7 +53,7 @@ export default function Dashboard() {
   }
 
   // 3. No Company Selected or No Data
-  if (!selectedCompanyId || !data || !data.active_quarter) {
+  if (!selectedCompanyId || !data) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground gap-4">
@@ -66,7 +66,7 @@ export default function Dashboard() {
               </div>
             </>
           ) : (
-            <p>Não foi possível localizar quarters para esta empresa.</p>
+            <p>Carregando dados da empresa...</p>
           )}
         </div>
       </Layout>
@@ -87,7 +87,15 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border w-full h-full">
-            <ActiveQuarterInfo quarter={active_quarter} />
+            {active_quarter ? (
+              <ActiveQuarterInfo quarter={active_quarter} />
+            ) : (
+              <div className="flex flex-col items-center justify-center w-full h-full min-h-[120px] p-6 text-center text-muted-foreground">
+                <Calendar className="w-8 h-8 mb-2 opacity-20" />
+                <p>Nenhum quarter com período ativo.</p>
+                <p className="text-xs mt-1">Crie um novo quarter nas configurações se você for administrador.</p>
+              </div>
+            )}
           </div>
         </div>
 

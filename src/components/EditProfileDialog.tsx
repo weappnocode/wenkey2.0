@@ -7,13 +7,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, Loader2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Profile, useAuth } from '@/contexts/AuthContext';
 import { toTitleCase } from '@/lib/utils';
 
 interface EditProfileDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  profile: any;
+  profile: Profile | null;
   onProfileUpdated: () => void;
 }
 
@@ -86,11 +86,12 @@ export function EditProfileDialog({ open, onOpenChange, profile, onProfileUpdate
 
       onProfileUpdated();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao atualizar perfil:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Não foi possível atualizar o perfil.';
       toast({
         title: 'Erro',
-        description: toTitleCase(error.message || 'Não foi possível atualizar o perfil.'),
+        description: toTitleCase(errorMessage),
         variant: 'destructive',
       });
     } finally {

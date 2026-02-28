@@ -30,20 +30,29 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-    const { signOut, user, refreshProfile } = useAuth();
+    const { signOut, user, profile, refreshProfile } = useAuth();
     const { role } = useUserRole();
     const navigate = useNavigate();
     const location = useLocation();
     const [collapsed, setCollapsed] = useState(false);
-    const [profile, setProfile] = useState<Profile | null>(null);
-    const [company, setCompany] = useState<Company | null>(null);
+    const [company, setCompany] = useState<{ name: string } | null>(null);
     const [editProfileOpen, setEditProfileOpen] = useState(false);
 
     useEffect(() => {
-        if (user) {
-            loadProfile();
-        }
-    }, [user]);
+        const loadCompany = async () => {
+            if (profile?.company_id) {
+                const { data } = await supabase
+                    .from('companies')
+                    .select('name')
+                    .eq('id', profile.company_id)
+                    .maybeSingle();
+                if (data) setCompany(data);
+            } else {
+                setCompany(null);
+            }
+        };
+        loadCompany();
+    }, [profile?.company_id]);
 
     const navItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
@@ -141,7 +150,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                                     <p className="text-sm text-sidebar-foreground/60">{toTitleCase(profile.position)}</p>
                                 )}
                                 {company && (
-                                    <p className="text-sm text-sidebar-foreground/60">{toTitleCase(company.name)}</p>
+                                    <p className="text-sm text-sidebar-foreground/60">{company.name}</p>
                                 )}
                                 <p className="sr-only">Wenkey</p>
                             </div>
@@ -181,68 +190,14 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </div>
             </main>
 
-            {/* Edit Profile Dialog */}
             <EditProfileDialog
                 open={editProfileOpen}
                 onOpenChange={setEditProfileOpen}
                 profile={profile}
                 onProfileUpdated={async () => {
-                    if (user) {
-                        await refreshProfile();
-                        await loadProfile();
-                    }
+                    await refreshProfile();
                 }}
             />
         </div>
     );
-
-    async function loadProfile(retryCount = 0) {
-        if (!user) return;
-
-        try {
-            const { data: profileData, error: profileError } = await supabase
-                .from('profiles')
-                .select('full_name, position, avatar_url, company_id')
-                .eq('id', user.id)
-                .maybeSingle();
-
-            if (profileError) {
-                console.error('Layout: Error loading profile:', profileError);
-                if (retryCount < 3) {
-                    setTimeout(() => loadProfile(retryCount + 1), 1000 * (retryCount + 1));
-                    return;
-                }
-            }
-
-            if (profileData) {
-                let avatarUrl = profileData.avatar_url;
-                if (avatarUrl && !avatarUrl.startsWith('http')) {
-                    const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
-                    avatarUrl = data.publicUrl;
-                }
-                setProfile({ ...profileData, avatar_url: avatarUrl });
-
-                if (profileData.company_id) {
-                    const { data: companyData, error: companyError } = await supabase
-                        .from('companies')
-                        .select('name')
-                        .eq('id', profileData.company_id)
-                        .maybeSingle();
-
-                    if (companyError) {
-                        console.error('Layout: Error loading company:', companyError);
-                    }
-
-                    if (companyData) {
-                        setCompany(companyData);
-                    }
-                }
-            }
-        } catch (err) {
-            console.error('Layout: Unexpected error in loadProfile:', err);
-            if (retryCount < 3) {
-                setTimeout(() => loadProfile(retryCount + 1), 1000 * (retryCount + 1));
-            }
-        }
-    }
 }

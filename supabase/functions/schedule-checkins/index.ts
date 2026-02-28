@@ -1,6 +1,7 @@
 // @ts-types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts"
 
 import { createClient } from '@supabase/supabase-js'
+// @ts-ignore - google-auth-library resolved via deno.json import map (npm:google-auth-library)
 import { JWT } from 'google-auth-library'
 
 

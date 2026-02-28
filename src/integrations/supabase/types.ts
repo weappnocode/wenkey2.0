@@ -565,6 +565,7 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean
+          permission_type: 'user' | 'manager' | 'admin'
           position: string | null
           sector: string | null
           updated_at: string
@@ -578,6 +579,7 @@ export type Database = {
           full_name: string
           id: string
           is_active?: boolean
+          permission_type?: 'user' | 'manager' | 'admin'
           position?: string | null
           sector?: string | null
           updated_at?: string
@@ -591,6 +593,7 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean
+          permission_type?: 'user' | 'manager' | 'admin'
           position?: string | null
           sector?: string | null
           updated_at?: string
@@ -816,6 +819,7 @@ export type Database = {
         Returns: boolean
       }
       is_manager_or_admin: { Args: { _user_id: string }; Returns: boolean }
+      public_active_companies: { Args: Record<PropertyKey, never>; Returns: { id: string; name: string }[] }
       recalculate_all_percentages: { Args: never; Returns: undefined }
     }
     Enums: {

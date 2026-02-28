@@ -169,11 +169,16 @@ export default function KRCheckins() {
     const { data, error } = await query.order('name');
 
     if (error) {
-      toast({
-        title: 'Erro ao carregar empresas',
-        description: error.message,
-        variant: 'destructive',
-      });
+      const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError');
+      if (!isTransient) {
+        toast({
+          title: 'Erro ao carregar empresas',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        console.warn('[KRCheckins] Erro transitório ao carregar empresas (ignorado):', error.message);
+      }
       return;
     }
 

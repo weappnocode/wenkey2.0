@@ -87,9 +87,14 @@ export default function Companies() {
           .filter((c): c is Company => Boolean(c)) || [];
         setCompanies(companyList);
       }
-    } catch (error) {
-      console.error('Error fetching companies:', error);
-      toast.error('Erro ao carregar empresas');
+    } catch (error: any) {
+      const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError');
+      if (!isTransient) {
+        console.error('Error fetching companies:', error);
+        toast.error('Erro ao carregar empresas');
+      } else {
+        console.warn('[Companies] Erro transitório ao carregar empresas (ignorado):', error.message);
+      }
     } finally {
       setLoading(false);
     }

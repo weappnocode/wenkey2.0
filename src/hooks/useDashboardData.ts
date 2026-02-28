@@ -142,13 +142,27 @@ export function useDashboardData() {
             if (!user || !selectedCompanyId || !role) return null;
 
             // 1. Fetch User Profile & Quarters (Basic Data)
-            const { data: profile } = await supabase
+            const { data: profile, error: profileError } = await supabase
                 .from('profiles')
                 .select('id, company_id, full_name, sector, avatar_url, is_active')
                 .eq('id', user.id)
                 .maybeSingle();
 
-            if (!profile || !profile.company_id) return null;
+            if (profileError) {
+                console.error("[useDashboardData] profileError:", profileError);
+            }
+
+            if (!profile) {
+                console.warn("[useDashboardData] No profile found");
+                return null;
+            }
+
+            // Admins can view any company's dashboard, so we shouldn't fail if they don't have a company_id
+            // ONLY if they aren't an admin and don't have a company_id should we fail.
+            if (!profile.company_id && role !== 'admin') {
+                console.warn("[useDashboardData] No company in profile and not admin");
+                return null;
+            }
 
             let avatar_url = profile.avatar_url;
             if (avatar_url && !avatar_url.startsWith('http')) {
@@ -156,13 +170,38 @@ export function useDashboardData() {
                 avatar_url = data.publicUrl;
             }
 
-            const { data: quarters } = await supabase
+            const { data: quarters, error: quartersError } = await supabase
                 .from('quarters')
                 .select('id, name, start_date, end_date, is_active')
                 .eq('company_id', selectedCompanyId)
                 .order('start_date', { ascending: false });
 
-            if (!quarters || quarters.length === 0) return null;
+            if (quartersError) {
+                console.error("[useDashboardData] quartersError:", quartersError);
+            }
+
+            if (!quarters || quarters.length === 0) {
+                console.warn("[useDashboardData] No quarters found for company", selectedCompanyId);
+                // Return data with empty quarters instead of completely failing the dashboard
+                // Let's not return null here, return the partial data so we can see the profile
+                // but the UI handles it as missing active_quarter.
+                return {
+                    company_id: selectedCompanyId,
+                    user_id: user.id,
+                    quarters: [],
+                    active_quarter: null,
+                    userProfile: { ...profile, avatar_url, company_id: profile.company_id || selectedCompanyId },
+                    metrics: {
+                        activeObjectivesCount: 0,
+                        activeOKRsCount: 0,
+                        currentQuarterProgress: 0,
+                        quarterPerformance: [],
+                        userRankings: [],
+                        objectiveRankings: [],
+                        okrRankings: []
+                    }
+                };
+            }
 
             const today = new Date().toISOString().split('T')[0];
             const activeQuarter = quarters.find(q => q.start_date <= today && q.end_date >= today) || quarters[0];

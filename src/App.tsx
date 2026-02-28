@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CompanyProvider, useCompany } from "@/contexts/CompanyContext"; // Adicionado useCompany
 
 import Auth from "./pages/Auth";
@@ -70,33 +71,34 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <CompanyProvider>
+            <ErrorBoundary>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/confirm-email" element={<ConfirmEmail />} />
 
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/confirm-email" element={<ConfirmEmail />} />
+                {/* Pending Approval (Standalone) */}
+                <Route path="/pending-approval" element={<ProtectedRoute><PendingApproval /></ProtectedRoute>} />
 
-              {/* Pending Approval (Standalone) */}
-              <Route path="/pending-approval" element={<ProtectedRoute><PendingApproval /></ProtectedRoute>} />
+                {/* Protected Routes with Sidebar Layout */}
+                <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/companies" element={<Companies />} />
+                  <Route path="/users" element={<Users />} />
+                  <Route path="/quarters" element={<Quarters />} />
+                  <Route path="/objectives" element={<Objectives />} />
+                  <Route path="/kr-checkins" element={<KRCheckins />} />
+                  <Route path="/overview" element={<Overview />} />
+                  <Route path="/performance-history" element={<PerformanceHistory />} />
+                  <Route path="/prototypes" element={<Prototypes />} />
+                  <Route path="/profile" element={<Profile />} />
+                </Route>
 
-              {/* Protected Routes with Sidebar Layout */}
-              <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/companies" element={<Companies />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/quarters" element={<Quarters />} />
-                <Route path="/objectives" element={<Objectives />} />
-                <Route path="/kr-checkins" element={<KRCheckins />} />
-                <Route path="/overview" element={<Overview />} />
-                <Route path="/performance-history" element={<PerformanceHistory />} />
-                <Route path="/prototypes" element={<Prototypes />} />
-                <Route path="/profile" element={<Profile />} />
-              </Route>
-
-              {/* 404 */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                {/* 404 */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ErrorBoundary>
           </CompanyProvider>
         </AuthProvider>
       </BrowserRouter>
