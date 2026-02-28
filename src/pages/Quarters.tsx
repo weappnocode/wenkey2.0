@@ -12,11 +12,12 @@ import { useEffect, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, CalendarIcon, ChevronDown, ChevronRight, CalendarPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useUserRole } from '@/hooks/useUserRole';
+import { ScheduleCheckInDialog } from '@/components/ScheduleCheckInDialog';
 
 interface Quarter {
   id: string;
@@ -80,6 +81,12 @@ export default function Quarters() {
     occurred_at: undefined,
     note: '',
   });
+
+  // Schedule Check-in dialog states
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [schedulingCheckInId, setSchedulingCheckInId] = useState<string | null>(null);
+  const [schedulingCheckInDate, setSchedulingCheckInDate] = useState<Date | undefined>(undefined);
+  const [schedulingQuarterName, setSchedulingQuarterName] = useState<string>('');
 
   // Delete dialogs
   const [deleteQuarterDialog, setDeleteQuarterDialog] = useState<Quarter | null>(null);
@@ -683,6 +690,22 @@ export default function Quarters() {
                             {isAdmin && (
                               <div className="flex gap-2">
                                 <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSchedulingCheckInId(checkIn.id);
+                                    const dateStr = checkIn.checkin_date || checkIn.occurred_at;
+                                    const dateParts = dateStr ? dateStr.split('-').map(Number) : null;
+                                    const parsedDate = dateParts ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2]) : new Date();
+                                    setSchedulingCheckInDate(parsedDate);
+                                    setSchedulingQuarterName(quarter.name);
+                                    setScheduleDialogOpen(true);
+                                  }}
+                                >
+                                  <CalendarPlus className="w-4 h-4 mr-2" />
+                                  Agendar
+                                </Button>
+                                <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => openEditCheckInDialog(checkIn, quarter)}
@@ -809,6 +832,18 @@ export default function Quarters() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Schedule Check-in Dialog */}
+        {selectedCompanyForForm && (
+          <ScheduleCheckInDialog
+            open={scheduleDialogOpen}
+            onOpenChange={setScheduleDialogOpen}
+            checkInId={schedulingCheckInId}
+            initialDate={schedulingCheckInDate}
+            quarterName={schedulingQuarterName}
+            companyId={selectedCompanyForForm}
+          />
+        )}
       </div>
     </Layout>
   );

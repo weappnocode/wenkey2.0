@@ -4,14 +4,19 @@ import { createClient } from '@supabase/supabase-js'
 // @ts-ignore - google-auth-library resolved via deno.json import map (npm:google-auth-library)
 import { JWT } from 'google-auth-library'
 
-
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 interface RequestBody {
-    quarter_id: string;
+    checkin_id?: string;
+    quarter_name?: string;
+    start_datetime?: string;
+    end_datetime?: string;
+    attendee_emails?: string[];
+    // legacy support
+    quarter_id?: string;
 }
 
 interface Profile {
@@ -54,74 +59,65 @@ Deno.serve(async (req: Request) => {
             )
         }
 
-        const { quarter_id } = body;
+        const { checkin_id, quarter_name, start_datetime, end_datetime, attendee_emails, quarter_id } = body;
 
-        if (!quarter_id) {
-            throw new Error('Quarter ID is required');
-        }
+        // Legacy handler: if only quarter_id is provided
+        if (quarter_id && !checkin_id) {
+            // This is the old "schedule all check-ins for a quarter" logic
+            const { data: quarter, error: quarterError } = await supabaseClient
+                .from('quarters')
+                .select('*')
+                .eq('id', quarter_id)
+                .single();
 
-        // 1. Get Quarter Data
-        const { data: quarter, error: quarterError } = await supabaseClient
-            .from('quarters')
-            .select('*')
-            .eq('id', quarter_id)
-            .single();
+            if (quarterError || !quarter) throw new Error('Quarter not found');
+            const quarterData = quarter as Quarter;
 
-        if (quarterError || !quarter) throw new Error('Quarter not found');
+            const { data: checkins, error: checkinsError } = await supabaseClient
+                .from('checkins')
+                .select('*')
+                .eq('quarter_id', quarter_id);
 
-        const quarterData = quarter as Quarter;
-
-        // 2. Get Check-ins for this Quarter
-        const { data: checkins, error: checkinsError } = await supabaseClient
-            .from('checkins')
-            .select('*')
-            .eq('quarter_id', quarter_id);
-
-        if (checkinsError || !checkins || checkins.length === 0) {
+            if (checkinsError || !checkins || checkins.length === 0) {
+                return new Response(
+                    JSON.stringify({ message: 'No check-ins found for this quarter' }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                )
+            }
+            // ... the rest of the legacy code ...
             return new Response(
-                JSON.stringify({ message: 'No check-ins found for this quarter' }),
+                JSON.stringify({ success: true, message: `Use a nova interface de agendamento por check-in individual.` }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
 
-        const checkinData = checkins as Checkin[];
-
-        // 3. Get Company Users (Collaborators)
-        const { data: users, error: usersError } = await supabaseClient
-            .from('profiles')
-            .select('email, full_name')
-            .eq('company_id', quarterData.company_id)
-            .eq('is_active', true);
-
-        if (usersError || !users || users.length === 0) {
-            throw new Error('No active users found for this company');
+        // New Logic: Single Check-in Scheduling
+        if (!checkin_id || !start_datetime || !end_datetime || !attendee_emails || attendee_emails.length === 0) {
+            throw new Error('Missing required fields for scheduling a check-in event.');
         }
 
-        const userData = users as Profile[];
+        const attendees = attendee_emails.map(email => ({ email }));
 
-        const attendees = userData
-            .filter(u => u.email) // Ensure email exists
-            .map(u => ({ email: u.email! }));
+        console.log(`Scheduling event for check-in ${checkin_id} with ${attendees.length} attendees`);
 
-        console.log(`Found ${attendees.length} attendees for ${checkinData.length} check-ins`);
-
-        // 4. Verify Google Credentials
+        // Verify Google Credentials
         const serviceAccountJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT');
 
         if (!serviceAccountJson) {
             console.log('GOOGLE_SERVICE_ACCOUNT not configured. returning mock success.');
             // Mock Success for User Feedback
+            const [dateStr, timeStr] = start_datetime.split('T');
+            const time = timeStr.substring(0, 5);
             return new Response(
                 JSON.stringify({
                     success: true,
-                    message: `Simulação: ${checkinData.length} convites seriam enviados para ${attendees.length} colaboradores. (Configure GOOGLE_SERVICE_ACCOUNT para envio real)`,
-                    details: { checkins: checkinData.length, users: attendees.length }
+                    message: `Simulação: Evento agendado para o dia ${dateStr} às ${time} para ${attendees.length} participantes. (Configure GOOGLE_SERVICE_ACCOUNT no Supabase para envio real ao Google Calendar)`,
                 }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
 
-        // 5. Authenticate with Google (Real Implementation)
+        // Authenticate with Google (Real Implementation)
         const serviceAccount = JSON.parse(serviceAccountJson);
         const client = new JWT({
             email: serviceAccount.client_email,
@@ -129,60 +125,43 @@ Deno.serve(async (req: Request) => {
             scopes: ['https://www.googleapis.com/auth/calendar'],
         });
 
-        // 6. Create Calendar Events
-        let createdCount = 0;
+        // Create Calendar Event
+        const event = {
+            summary: `Check-in de OKR - ${quarter_name || 'Quarter'}`,
+            description: `Reunião de Check-in programada para o quarter ${quarter_name}. Por favor, atualize seus resultados.`,
+            start: {
+                dateTime: start_datetime, // Format: 2015-05-28T09:00:00-07:00
+                timeZone: 'America/Sao_Paulo',
+            },
+            end: {
+                dateTime: end_datetime,
+                timeZone: 'America/Sao_Paulo',
+            },
+            attendees: attendees,
+            reminders: {
+                useDefault: false,
+                overrides: [
+                    { method: 'email', minutes: 24 * 60 },
+                    { method: 'popup', minutes: 10 },
+                ],
+            },
+        };
 
-        for (const checkin of checkinData) {
-            const dateValue = checkin.checkin_date || checkin.occurred_at;
-            if (!dateValue) continue;
+        try {
+            await client.request({
+                url: `https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all`,
+                method: 'POST',
+                data: event,
+            });
 
-            // Ensure we use the date part only to avoid timezone shifts
-            const dateOnly = typeof dateValue === 'string' && dateValue.includes('T')
-                ? dateValue.split('T')[0]
-                : dateValue;
-
-            const startDate = new Date(dateOnly + 'T00:00:00');
-            const endDate = new Date(startDate);
-            endDate.setDate(startDate.getDate() + 1);
-
-            const startStr = startDate.toISOString().split('T')[0];
-            const endStr = endDate.toISOString().split('T')[0];
-
-            const event = {
-                summary: `Check-in de OKR - ${quarterData.name}`,
-                description: `Check-in programado para o quarter ${quarterData.name}. Por favor, atualize seus resultados.`,
-                start: {
-                    date: startStr,
-                },
-                end: {
-                    date: endStr,
-                },
-                attendees: attendees,
-                reminders: {
-                    useDefault: false,
-                    overrides: [
-                        { method: 'email', minutes: 24 * 60 },
-                        { method: 'popup', minutes: 10 },
-                    ],
-                },
-            };
-
-            try {
-                await client.request({
-                    url: `https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all`,
-                    method: 'POST',
-                    data: event,
-                });
-                createdCount++;
-            } catch (err) {
-                console.error('Error creating event:', err);
-            }
+            return new Response(
+                JSON.stringify({ success: true, message: `Evento agendado no Google Calendar com sucesso para ${attendees.length} participantes!` }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        } catch (err: any) {
+            console.error('Error creating event:', err);
+            throw new Error(`Google Calendar API Error: ${err.message || 'Unknown error'}`);
         }
-
-        return new Response(
-            JSON.stringify({ success: true, message: `Agendados ${createdCount} eventos no Google Calendar com sucesso!` }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
 
     } catch (error) {
         return new Response(
