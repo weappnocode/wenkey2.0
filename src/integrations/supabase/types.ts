@@ -102,6 +102,7 @@ export type Database = {
           result_percent: number | null
           user_id: string | null
           value: number | null
+          is_scheduled: boolean | null
         }
         Insert: {
           checkin_date: string
@@ -116,6 +117,7 @@ export type Database = {
           result_percent?: number | null
           user_id?: string | null
           value?: number | null
+          is_scheduled?: boolean | null
         }
         Update: {
           checkin_date?: string
@@ -130,6 +132,7 @@ export type Database = {
           result_percent?: number | null
           user_id?: string | null
           value?: number | null
+          is_scheduled?: boolean | null
         }
         Relationships: [
           {

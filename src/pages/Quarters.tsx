@@ -12,12 +12,13 @@ import { useEffect, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, CalendarIcon, ChevronDown, ChevronRight, CalendarPlus } from 'lucide-react';
+import { Plus, Edit, Trash2, CalendarIcon, ChevronDown, ChevronRight, CalendarPlus, CalendarCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useUserRole } from '@/hooks/useUserRole';
 import { ScheduleCheckInDialog } from '@/components/ScheduleCheckInDialog';
+import { Badge } from '@/components/ui/badge';
 
 interface Quarter {
   id: string;
@@ -41,6 +42,7 @@ interface CheckIn {
   checkin_dates: string | null;
   occurred_at: string | null;
   created_at: string;
+  is_scheduled?: boolean | null;
 }
 
 interface QuarterFormData {
@@ -682,6 +684,12 @@ export default function Quarters() {
                                   const date = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
                                   return format(date, 'dd/MM/yyyy', { locale: ptBR });
                                 })()}
+                                {checkIn.is_scheduled && (
+                                  <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700 hover:bg-blue-100">
+                                    <CalendarCheck className="w-3 h-3 mr-1" />
+                                    Evento Agendado
+                                  </Badge>
+                                )}
                               </p>
                               {checkIn.note && (
                                 <p className="text-sm text-muted-foreground mt-1">{checkIn.note}</p>
@@ -842,9 +850,10 @@ export default function Quarters() {
             initialDate={schedulingCheckInDate}
             quarterName={schedulingQuarterName}
             companyId={selectedCompanyForForm}
+            onSuccess={loadQuarters}
           />
         )}
       </div>
-    </Layout>
+    </Layout >
   );
 }

@@ -44,6 +44,7 @@ interface ScheduleCheckInDialogProps {
     initialDate: Date | undefined;
     quarterName: string;
     companyId: string;
+    onSuccess?: () => void;
 }
 
 export function ScheduleCheckInDialog({
@@ -53,6 +54,7 @@ export function ScheduleCheckInDialog({
     initialDate,
     quarterName,
     companyId,
+    onSuccess,
 }: ScheduleCheckInDialogProps) {
     const { toast } = useToast();
 
@@ -149,34 +151,48 @@ export function ScheduleCheckInDialog({
 
         setIsScheduling(true);
         try {
-            // Create full start datetime
             const [hours, minutes] = startTime.split(':').map(Number);
             const startDateTime = new Date(date);
             startDateTime.setHours(hours, minutes, 0, 0);
-
-            // Create end datetime based on duration
             const endDateTime = new Date(startDateTime.getTime() + parseInt(duration) * 60000);
 
             const payload = {
+                type: 'schedule',
                 checkin_id: checkInId,
                 quarter_name: quarterName,
                 start_datetime: startDateTime.toISOString(),
                 end_datetime: endDateTime.toISOString(),
-                attendee_emails: Array.from(selectedUsers)
+                attendee_emails: Array.from(selectedUsers),
             };
 
-            const { data, error } = await supabase.functions.invoke('schedule-checkins', {
-                body: payload
+            const response = await fetch('https://n8n-terj.onrender.com/webhook/wenkey-schedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
             });
 
-            if (error) throw error;
+            if (!response.ok) {
+                throw new Error(`Erro ao contatar o servidor de agendamento (${response.status})`);
+            }
+
+            // Marcar como agendado no banco de dados para exibir a tag no card
+            if (checkInId) {
+                const { error: dbError } = await supabase
+                    .from('checkins')
+                    .update({ is_scheduled: true })
+                    .eq('id', checkInId);
+
+                if (dbError) {
+                    console.warn("Não foi possível salvar a flag de agendado no banco:", dbError);
+                }
+            }
 
             toast({
-                title: data.success ? "Agendado com sucesso" : "Aviso de Agendamento",
-                description: data.message,
-                variant: data.success ? "default" : "destructive",
+                title: "Agendado com sucesso",
+                description: `Reunião de check-in (${quarterName}) agendada para ${Array.from(selectedUsers).length} participante(s).`,
             });
 
+            onSuccess?.();
             onOpenChange(false);
         } catch (error: any) {
             console.error("Error scheduling:", error);
@@ -189,6 +205,7 @@ export function ScheduleCheckInDialog({
             setIsScheduling(false);
         }
     };
+
 
     const allSelected = companyUsers.length > 0 && selectedUsers.size === companyUsers.length;
     const indeterminate = selectedUsers.size > 0 && selectedUsers.size < companyUsers.length;

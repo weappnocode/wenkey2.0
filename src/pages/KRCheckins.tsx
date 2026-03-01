@@ -829,6 +829,24 @@ export default function KRCheckins() {
         description: 'Dados salvos com sucesso',
       });
 
+      // Dispara webhook n8n para criar evento no Google Calendar (falha silenciosa)
+      try {
+        await fetch('https://n8n-terj.onrender.com/webhook/wenkey-checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            kr_title: currentKR.title,
+            checkin_date: currentCheckin.checkin_date,
+            valor_realizado: isNaN(realizado) ? null : realizado,
+            meta: isNaN(meta) ? null : meta,
+            percentual: roundedVisualAttainment,
+            company: selectedCompany?.name ?? '',
+          }),
+        });
+      } catch (webhookErr) {
+        console.warn('[n8n] Webhook falhou (não impacta o check-in):', webhookErr);
+      }
+
       closeDialog();
     } catch (error: unknown) {
       console.error('Erro no catch:', error);
