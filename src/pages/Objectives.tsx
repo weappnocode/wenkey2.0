@@ -28,8 +28,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { toTitleCase, calculateForecast } from '@/lib/utils';
+import { toTitleCase, calculateForecast, calculateKR } from '@/lib/utils';
 import { TrendingUp, AlertTriangle, XOctagon, Info } from 'lucide-react';
+
+
 
 interface Quarter {
   id: string;
@@ -60,9 +62,15 @@ interface ObjectiveWithProgress {
   company_id: string;
   user_id: string;
   archived: boolean;
-  percent_obj: number;
+  percent_obj: number | null;
   progress: number;
-  key_results: KeyResultWithProgress[];
+  key_results?: KeyResultWithProgress[];
+}
+
+interface ForecastResult {
+  status: 'on_track' | 'at_risk' | 'off_track' | 'not_applicable';
+  projectedValue: number;
+  message: string;
 }
 
 interface KeyResultWithProgress {
@@ -78,11 +86,9 @@ interface KeyResultWithProgress {
   owner_name: string | null;
   baseline: number | null;
   direction: string | null;
-  forecast: {
-    status: 'on_track' | 'at_risk' | 'off_track' | 'not_applicable';
-    projectedValue: number;
-    message: string;
-  };
+  type: string | null;
+  weight: number;
+  forecast?: ForecastResult;
 }
 
 export default function Objectives() {
@@ -143,8 +149,19 @@ export default function Objectives() {
         .eq('archived', false)
         .neq('status', 'rascunho');
 
+      let userKrObjIds: string[] = [];
       if (userId !== 'all') {
-        query = query.eq('user_id', userId);
+        const { data: userKrs } = await supabase
+          .from('key_results')
+          .select('objective_id')
+          .eq('user_id', userId);
+        userKrObjIds = (userKrs || []).map(kr => kr.objective_id);
+
+        if (userKrObjIds.length > 0) {
+          query = query.or(`user_id.eq.${userId},id.in.(${userKrObjIds.join(',')})`);
+        } else {
+          query = query.eq('user_id', userId);
+        }
       }
 
       const { data: objectivesData } = await query.order('created_at', { ascending: false });
@@ -156,16 +173,41 @@ export default function Objectives() {
 
       const objectiveIds = objectivesData.map(obj => obj.id);
 
-      const { data: krsData } = await supabase
+      let krQuery = supabase
         .from('key_results')
-        .select('id, objective_id, title, code, target, current, baseline, direction, percent_kr, checkin_results(percentual_atingido, created_at)')
+        .select('id, objective_id, title, code, target, current, baseline, direction, type, percent_kr, weight, user_id, checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(quarter_id))')
         .in('objective_id', objectiveIds);
 
+      if (userId !== 'all') {
+        krQuery = krQuery.eq('user_id', userId);
+      }
+
+      const { data: krsData } = await krQuery;
+
+      const activeQuarter = quarters.find(q => q.id === filterRef.current.quarterId);
+
       const krsWithProgress: KeyResultWithProgress[] = (krsData || []).map((kr: any) => {
-        const results = kr.checkin_results || [];
+        const results = (kr.checkin_results || []).filter((r: any) =>
+          r.checkins && r.checkins.quarter_id === activeQuarter?.id
+        );
         const latestResult = [...results].sort((a: any, b: any) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0];
+
+        let attainmentValue = null;
+        if (latestResult) {
+          const krProgress = calculateKR(
+            latestResult.valor_realizado,
+            latestResult.minimo_orcamento,
+            latestResult.meta_checkin,
+            kr.direction,
+            kr.type
+          );
+          attainmentValue = krProgress;
+        }
+
+        const fallbackProgress = kr.percent_kr ?? 0;
+        const currentProgress = typeof attainmentValue === 'number' ? attainmentValue : fallbackProgress;
 
         return {
           id: kr.id,
@@ -174,20 +216,24 @@ export default function Objectives() {
           code: kr.code ?? null,
           target: kr.target ?? null,
           current: kr.current ?? 0,
-          percent_kr: kr.percent_kr ?? 0,
-          attainment_kr: typeof latestResult?.percentual_atingido === 'number' ? latestResult.percentual_atingido : null,
-          progress: Math.round(kr.percent_kr || 0),
+          percent_kr: currentProgress,
+          attainment_kr: typeof attainmentValue === 'number' ? attainmentValue : null,
+          progress: Math.round(currentProgress),
           owner_name: null,
           baseline: kr.baseline ?? null,
           direction: kr.direction ?? null,
+          type: kr.type ?? null,
+          weight: typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1,
           forecast: { status: 'not_applicable', projectedValue: 0, message: '' }
         };
       });
 
-      const activeQuarter = quarters.find(q => q.id === filterRef.current.quarterId);
-
       const objsWithProgress: ObjectiveWithProgress[] = objectivesData.map(obj => {
         const objKrs = krsWithProgress.filter(kr => kr.objective_id === obj.id);
+
+        let weightedSum = 0;
+        let totalWeight = 0;
+        let hasData = false;
 
         // Calcular o forecast para cada KR
         objKrs.forEach(kr => {
@@ -201,12 +247,32 @@ export default function Objectives() {
               activeQuarter.end_date
             );
           }
+
+          weightedSum += kr.progress * kr.weight;
+          totalWeight += kr.weight;
+          if (kr.attainment_kr !== null || kr.percent_kr !== null) {
+            hasData = true;
+          }
         });
 
         objKrs.sort((a, b) => b.progress - a.progress);
+
+        let objProgress = obj.percent_obj || 0;
+        if (hasData && totalWeight > 0) {
+          objProgress = weightedSum / totalWeight;
+        } else {
+          let fallbackSum = 0;
+          let fallbackWeight = 0;
+          objKrs.forEach(kr => {
+            fallbackSum += (kr.percent_kr || 0) * kr.weight;
+            fallbackWeight += kr.weight;
+          });
+          objProgress = fallbackWeight > 0 ? fallbackSum / fallbackWeight : 0;
+        }
+
         return {
           ...obj,
-          progress: Math.round(obj.percent_obj || 0),
+          progress: Math.round(objProgress),
           key_results: objKrs,
         };
       });

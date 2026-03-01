@@ -4,11 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { CircularProgress } from '@/components/CircularProgress';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Trophy } from 'lucide-react';
+
+const getInitials = (name: string) => {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
 
 interface Quarter {
   id: string;
@@ -27,6 +35,7 @@ interface UserRanking {
   full_name: string;
   position: string | null;
   result_percent: number;
+  avatar_url?: string | null;
 }
 
 export default function Overview() {
@@ -137,59 +146,62 @@ export default function Overview() {
     if (!selectedCompany || !selectedQuarter) return;
 
     try {
-      const { data: resultsData, error } = await supabase
-        .from('quarter_results')
-        .select('user_id, result_percent')
-        .eq('company_id', selectedCompany)
-        .eq('quarter_id', selectedQuarter)
-        .order('result_percent', { ascending: false });
-
-      if (error) {
-        console.error('Erro ao carregar rankings:', error);
-        return;
-      }
-
-      if (!resultsData || resultsData.length === 0) {
-        setRankings([]);
-        return;
-      }
-
-      const userIds = Array.from(new Set(resultsData.map(item => item.user_id)));
-
-      if (userIds.length === 0) {
-        setRankings([]);
-        return;
-      }
-
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, position, is_active')
-        .in('id', userIds);
+        .select('id, full_name, position, is_active, avatar_url')
+        .eq('company_id', selectedCompany)
+        .eq('is_active', true);
 
       if (profilesError) {
         console.error('Erro ao carregar perfis para o ranking:', profilesError);
         return;
       }
 
-      const profileMap = new Map(
-        (profilesData || [])
-          .filter(profile => profile.is_active)
-          .map(profile => [profile.id, profile])
+      if (!profilesData || profilesData.length === 0) {
+        setRankings([]);
+        return;
+      }
+
+      const { data: resultsData, error } = await supabase
+        .from('quarter_results')
+        .select('user_id, result_percent')
+        .eq('company_id', selectedCompany)
+        .eq('quarter_id', selectedQuarter);
+
+      if (error) {
+        console.error('Erro ao carregar rankings:', error);
+        return;
+      }
+
+      const resultMap = new Map(
+        (resultsData || []).map(r => [r.user_id, r.result_percent])
       );
 
-      const rankings: UserRanking[] = [];
-      resultsData.forEach(result => {
-        const profile = profileMap.get(result.user_id);
-        if (!profile) return;
+      let rankings: UserRanking[] = profilesData.map(profile => {
+        let av = profile.avatar_url;
+        if (av && !av.startsWith('http')) {
+          const { data } = supabase.storage.from('avatars').getPublicUrl(av);
+          av = data.publicUrl;
+        }
 
-        rankings.push({
-          rank: rankings.length + 1,
-          user_id: result.user_id,
+        return {
+          rank: 0,
+          user_id: profile.id,
           full_name: profile.full_name,
           position: profile.position,
-          result_percent: result.result_percent || 0
-        });
+          result_percent: resultMap.get(profile.id) || 0,
+          avatar_url: av
+        };
       });
+
+      // Sort by result_percent descending
+      rankings.sort((a, b) => b.result_percent - a.result_percent);
+
+      // Assign ranks after sorting
+      rankings = rankings.map((r, index) => ({
+        ...r,
+        rank: index + 1
+      }));
 
       setRankings(rankings);
     } catch (error: any) {
@@ -288,12 +300,23 @@ export default function Overview() {
                           {getRankingLabel(ranking.rank)}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="pt-6 pb-6 flex flex-col items-center space-y-4">
+                      <CardContent className="pt-6 pb-6 flex flex-col items-center space-y-4 relative">
                         <CircularProgress
                           percentage={ranking.result_percent}
                           size={140}
                           strokeWidth={12}
                         />
+
+                        <div className="absolute bottom-6 left-4">
+                          <Avatar className="h-16 w-16 border-2 border-border shadow-md">
+                            {ranking.avatar_url ? (
+                              <AvatarImage src={ranking.avatar_url} alt={ranking.full_name} className="object-cover" />
+                            ) : (
+                              <AvatarFallback className="text-lg">{getInitials(ranking.full_name)}</AvatarFallback>
+                            )}
+                          </Avatar>
+                        </div>
+
                         <div className="text-center space-y-1">
                           <p className="font-semibold text-base capitalize">
                             {ranking.full_name.toLowerCase()}

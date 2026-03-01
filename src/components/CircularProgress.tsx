@@ -4,12 +4,14 @@ interface CircularProgressProps {
   percentage: number;
   size?: number;
   strokeWidth?: number;
+  textClassName?: string;
 }
 
-export function CircularProgress({ 
-  percentage, 
-  size = 160, 
-  strokeWidth = 10 
+export function CircularProgress({
+  percentage,
+  size = 160,
+  strokeWidth = 10,
+  textClassName = "text-3xl"
 }: CircularProgressProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
@@ -49,7 +51,7 @@ export function CircularProgress({
       </svg>
       {/* Percentage text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold" style={{ color }}>
+        <span className={`${textClassName} font-bold`} style={{ color }}>
           {Math.round(percentage)}%
         </span>
         <span className="text-xs text-muted-foreground">Alvo: 100%</span>

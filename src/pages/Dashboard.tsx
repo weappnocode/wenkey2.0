@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode, type CSSProperties } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Layout } from '@/components/Layout';
 import { CircularProgress } from '@/components/CircularProgress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +16,7 @@ import { getPerformanceColor } from '@/lib/performanceColors';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { role } = useUserRole();
   const { selectedCompanyId } = useCompany();
 
   // Use the new hook for all data fetching and caching
@@ -118,12 +120,37 @@ export default function Dashboard() {
             value={`${metrics.currentQuarterProgress}%`}
             description={toTitleCase('Progresso consolidado do quarter')}
           />
-          <KpiCard
-            title={toTitleCase('Colaboradores ranqueados')}
-            icon={<Award className="h-5 w-5" />}
-            value={metrics.userRankings.length}
-            description={toTitleCase('Participantes com resultados enviados')}
-          />
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div>
+                <p className="text-base text-black">{toTitleCase('OKRs por Objetivo')}</p>
+                <p className="text-sm text-black mt-1">Key Results Ativos</p>
+              </div>
+              <div className="rounded-full bg-muted p-3 text-primary">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0 pb-4">
+              <div className="flex flex-wrap gap-2 max-h-[48px] overflow-y-auto custom-scrollbar pr-1">
+                {metrics.objectiveRankings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum objetivo.</p>
+                ) : (
+                  metrics.objectiveRankings
+                    .sort((a, b) => b.kr_count - a.kr_count)
+                    .map((objective, index) => (
+                      <div key={index} className="flex items-center gap-1.5 bg-muted/50 px-2 py-0.5 rounded-md border border-muted/60">
+                        <span className="text-[11px] font-medium text-black line-clamp-1 max-w-[90px]" title={toTitleCase(objective.objective_title)}>
+                          {toTitleCase(objective.objective_title)}
+                        </span>
+                        <span className="text-[11px] font-bold text-primary">
+                          {objective.kr_count}
+                        </span>
+                      </div>
+                    ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -144,6 +171,25 @@ export default function Dashboard() {
                   <p className="text-sm text-muted-foreground">Resultado consolidado</p>
                 </div>
               </div>
+
+              {metrics.objectiveRankings.length > 0 && (
+                <div className="mt-8 pt-6 border-t flex flex-wrap gap-8 justify-center overflow-x-auto pb-2 custom-scrollbar">
+                  {metrics.objectiveRankings.map((objective, index) => {
+                    const colorClass = getPerformanceColor(objective.result_pct);
+                    return (
+                      <div key={index} className="flex flex-col items-center gap-3 min-w-[130px]">
+                        <CircularProgress percentage={objective.result_pct} size={120} strokeWidth={10} textClassName="text-xl" />
+                        <span
+                          className={`text-sm font-medium text-center uppercase tracking-wider ${colorClass}`}
+                          style={{ maxWidth: '140px', lineHeight: '1.2' }}
+                        >
+                          {objective.objective_title}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -189,81 +235,6 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <RankingList
-            title={toTitleCase('Ranking completo')}
-            icon={<Trophy className="h-4 w-4" />}
-            emptyMessage={toTitleCase('Nenhum colaborador posicionado')}
-            data={metrics.userRankings}
-          />
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  {toTitleCase('Atingimento por Objetivo')}
-                </CardTitle>
-                <p className="text-base text-muted-foreground">
-                  {toTitleCase('Percentual médio de atingimento por objetivo na empresa.')}
-                </p>
-              </CardHeader>
-              <CardContent className="h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                {metrics.objectiveRankings.length === 0 ? (
-                  <p className="text-center text-muted-foreground">Nenhum objetivo disponível.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {metrics.objectiveRankings
-                      // Sorted in Hook
-                      .map((objective, index) => (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-base font-normal">{toTitleCase(objective.objective_title)}</span>
-                            <span className="text-base font-normal text-muted-foreground">{objective.result_pct}%</span>
-                          </div>
-                          <Progress
-                            value={objective.result_pct}
-                            className="h-2"
-                            style={getProgressStyle(objective.result_pct)}
-                          />
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  {toTitleCase('Quantidade de OKRs por Objetivo')}
-                </CardTitle>
-                <p className="text-base text-muted-foreground">
-                  {toTitleCase('Número de Key Results associados a cada objetivo.')}
-                </p>
-              </CardHeader>
-              <CardContent className="h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                {metrics.objectiveRankings.length === 0 ? (
-                  <p className="text-center text-muted-foreground">Nenhum objetivo disponível.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {metrics.objectiveRankings
-                      // Sort differently for this view
-                      .sort((a, b) => b.kr_count - a.kr_count)
-                      .map((objective, index) => (
-                        <div key={index} className="flex items-center justify-between rounded-lg border p-4">
-                          <span className="text-base font-normal">{toTitleCase(objective.objective_title)}</span>
-                          <span className="text-base font-normal text-primary">
-                            {objective.kr_count}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
 
         <Card>
           <CardHeader>
@@ -314,7 +285,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </Layout >
   );
 }
 

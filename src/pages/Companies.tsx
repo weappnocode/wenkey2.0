@@ -64,29 +64,15 @@ export default function Companies() {
 
   const fetchCompanies = async () => {
     try {
-      if (isAdmin) {
-        // Admin vê todas as empresas
-        const { data, error } = await supabase
-          .from('companies')
-          .select('*')
-          .order('name');
+      // Admin vê todas as empresas (através do useUserRole ou bypass de RLS se aplicável)
+      // Manager/User vê apenas suas empresas (controlado pelo RLS do Supabase que configuramos)
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .order('name');
 
-        if (error) throw error;
-        setCompanies(data || []);
-      } else {
-        // Manager/User vê apenas suas empresas
-        const { data, error } = await supabase
-          .from('company_members')
-          .select('companies(*)')
-          .eq('user_id', user?.id);
-
-        if (error) throw error;
-
-        const companyList = (data as { companies: Company | null }[] | null)
-          ?.map((item) => item.companies)
-          .filter((c): c is Company => Boolean(c)) || [];
-        setCompanies(companyList);
-      }
+      if (error) throw error;
+      setCompanies(data || []);
     } catch (error: any) {
       const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError');
       if (!isTransient) {

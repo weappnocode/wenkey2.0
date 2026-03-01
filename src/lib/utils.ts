@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { calculateDeadlineProgress } from './deadlineProgress';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -110,3 +111,90 @@ export function calculateForecast(
     message: ''
   };
 }
+
+export const calculateSimpleAttainment = (
+  realized: number | null,
+  target: number | null,
+  direction: string | null,
+  type?: string | null
+): number | null => {
+  if (target === null || target === undefined || Number.isNaN(Number(target)) || Number(target) === 0) return null;
+  const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
+  if (safeRealized === null) return null;
+
+  const safeTarget = Number(target);
+
+  if (type === 'date' || type === 'data') {
+    return null;
+  }
+
+  if (!direction || direction === 'increase' || direction === 'maior-é-melhor') {
+    return (safeRealized / safeTarget) * 100;
+  } else {
+    if (safeRealized <= safeTarget) return 100;
+    return (safeTarget / safeRealized) * 100;
+  }
+};
+
+export const calculateKR = (
+  realized: number | null,
+  min: number | null,
+  target: number | null,
+  direction: string | null,
+  type?: string | null
+): number | null => {
+  // Basic safety
+  if (target === null || target === undefined || Number.isNaN(Number(target))) return null;
+
+  const safeTarget = Number(target);
+  const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
+  const safeMin = (min !== null && min !== undefined) ? Number(min) : null;
+
+  // Lógica específica para DATAS
+  if (type === 'date' || type === 'data') {
+    if (safeRealized === null) return null;
+    const limit = safeMin !== null ? safeMin : safeTarget;
+    return calculateDeadlineProgress(safeTarget, limit, safeRealized);
+  }
+
+  if (safeRealized === null) return null;
+
+  // Logic for "Increase" / "Maior é melhor" (Default)
+  if (!direction || direction === 'increase' || direction === 'maior-é-melhor') {
+
+    // If Minimum Budget (Piso) is defined
+    if (safeMin !== null) {
+      // Realized >= Target -> 100%
+      if (safeRealized >= safeTarget) return 100;
+
+      // Realized < Min -> 0%
+      if (safeRealized < safeMin) return 0;
+
+      // Formula: ((Realized - Min) / (Target - Min)) * 100
+      const denominator = safeTarget - safeMin;
+      if (denominator === 0) return 0; // Avoid division by zero
+
+      const result = ((safeRealized - safeMin) / denominator) * 100;
+      return Math.max(0, Math.min(100, result));
+    }
+
+    // Fallback if no Min is defined (Simple percentage)
+    if (safeTarget === 0) return 0;
+    const result = (safeRealized / safeTarget) * 100;
+    return Math.min(100, Math.max(0, result));
+  }
+
+  // Logic for "Decrease" (Menor é melhor)
+  if (direction === 'decrease' || direction === 'menor-é-melhor') {
+    if (safeRealized <= safeTarget) return 100;
+
+    // Simple linear decay for now as no formula provided for decrease
+    if (safeTarget === 0) return 0; // Prevent div by zero
+    // Example: 200% - (Realized/Target)%
+    const result = ((2 * safeTarget - safeRealized) / safeTarget) * 100;
+    return Math.max(0, result);
+  }
+
+  return 0;
+};
+

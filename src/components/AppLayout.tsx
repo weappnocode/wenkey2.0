@@ -62,7 +62,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         { icon: Target, label: 'Objetivos', path: '/objectives' },
         { icon: TrendingUp, label: 'Check-ins KR', path: '/kr-checkins' },
         { icon: History, label: 'Histórico', path: '/performance-history' },
-        { icon: Eye, label: 'Visão Geral', path: '/overview', adminOnly: true },
+        { icon: Eye, label: 'Visão Geral', path: '/overview' },
         { icon: Beaker, label: 'Laboratório', path: '/prototypes', adminOnly: true },
     ];
 

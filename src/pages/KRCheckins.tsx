@@ -37,6 +37,8 @@ interface Objective {
   id: string;
   title: string;
   quarter_id: string;
+  user_id: string;
+  company_id: string;
 }
 
 interface KeyResult {
@@ -281,7 +283,7 @@ export default function KRCheckins() {
 
     let objectivesQuery = supabase
       .from('objectives')
-      .select('id, title, quarter_id')
+      .select('id, title, quarter_id, user_id, company_id')
       .eq('quarter_id', selectedQuarter)
       .eq('archived', false);
 
@@ -289,8 +291,19 @@ export default function KRCheckins() {
     const selectedUserId = role === 'user'
       ? user.id
       : (filterOwnerId && filterOwnerId !== 'all' ? filterOwnerId : null);
+
     if (selectedUserId) {
-      objectivesQuery = objectivesQuery.eq('user_id', selectedUserId);
+      const { data: userKrs } = await supabase
+        .from('key_results')
+        .select('objective_id')
+        .eq('user_id', selectedUserId);
+      const userKrObjIds = (userKrs || []).map(kr => kr.objective_id);
+
+      if (userKrObjIds.length > 0) {
+        objectivesQuery = objectivesQuery.or(`user_id.eq.${selectedUserId},id.in.(${userKrObjIds.join(',')})`);
+      } else {
+        objectivesQuery = objectivesQuery.eq('user_id', selectedUserId);
+      }
     }
 
     // Aplicar filtro de empresa se selecionado
@@ -321,10 +334,16 @@ export default function KRCheckins() {
     if (objData && objData.length > 0) {
       const objectiveIds = objData.map(o => o.id);
 
-      const { data: krData, error: krError } = await supabase
+      let krQuery = supabase
         .from('key_results')
         .select('*')
         .in('objective_id', objectiveIds);
+
+      if (selectedUserId) {
+        krQuery = krQuery.eq('user_id', selectedUserId);
+      }
+
+      const { data: krData, error: krError } = await krQuery;
 
       if (krError) {
         const isTransient = krError.message?.includes('Failed to fetch') || krError.message?.includes('AbortError');
@@ -1321,8 +1340,31 @@ export default function KRCheckins() {
 
       if (!targetCompanyId || !targetUserId) return;
 
+      // Prevent race conditions where filters changed but data hasn't loaded yet
+      if (objectives.length > 0) {
+        const hasForeignObjectives = objectives.some(obj => obj.user_id !== targetUserId);
+        if (hasForeignObjectives) return;
+      }
+
+      if (keyResults.length > 0) {
+        const hasForeignKRs = keyResults.some(kr => kr.company_id !== targetCompanyId);
+        if (hasForeignKRs) return;
+      }
+
       const stats = checkinOverallAverages[activeCheckinId];
-      if (!stats?.hasData) return;
+      if (!stats?.hasData) {
+        try {
+          await supabase
+            .from('quarter_results')
+            .delete()
+            .eq('company_id', targetCompanyId)
+            .eq('user_id', targetUserId)
+            .eq('quarter_id', selectedQuarter);
+        } catch (err) {
+          console.error('Erro ao limpar resultado do quarter sem dados:', err);
+        }
+        return;
+      }
 
       try {
         const { data: existingResult, error } = await supabase
@@ -1366,12 +1408,12 @@ export default function KRCheckins() {
     checkinOverallAverages,
     currentResult,
     selectedQuarter,
-    user,
-    userProfile,
     filterOwnerId,
     filterCompanyId,
     selectedCompanyId,
     role,
+    objectives,
+    keyResults,
   ]);
 
   useEffect(() => {
