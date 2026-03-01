@@ -16,6 +16,7 @@ import { CreateObjectiveDialog } from '@/components/CreateObjectiveDialog';
 import { AddKRDialog } from '@/components/AddKRDialog';
 import { EditObjectiveDialog } from '@/components/EditObjectiveDialog';
 import { EditKRDialog } from '@/components/EditKRDialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +28,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { toTitleCase } from '@/lib/utils';
+import { toTitleCase, calculateForecast } from '@/lib/utils';
+import { TrendingUp, AlertTriangle, XOctagon, Info } from 'lucide-react';
 
 interface Quarter {
   id: string;
@@ -74,6 +76,13 @@ interface KeyResultWithProgress {
   attainment_kr: number | null;
   progress: number;
   owner_name: string | null;
+  baseline: number | null;
+  direction: string | null;
+  forecast: {
+    status: 'on_track' | 'at_risk' | 'off_track' | 'not_applicable';
+    projectedValue: number;
+    message: string;
+  };
 }
 
 export default function Objectives() {
@@ -149,7 +158,7 @@ export default function Objectives() {
 
       const { data: krsData } = await supabase
         .from('key_results')
-        .select('id, objective_id, title, code, target, current, percent_kr, checkin_results(percentual_atingido, created_at)')
+        .select('id, objective_id, title, code, target, current, baseline, direction, percent_kr, checkin_results(percentual_atingido, created_at)')
         .in('objective_id', objectiveIds);
 
       const krsWithProgress: KeyResultWithProgress[] = (krsData || []).map((kr: any) => {
@@ -169,11 +178,31 @@ export default function Objectives() {
           attainment_kr: typeof latestResult?.percentual_atingido === 'number' ? latestResult.percentual_atingido : null,
           progress: Math.round(kr.percent_kr || 0),
           owner_name: null,
+          baseline: kr.baseline ?? null,
+          direction: kr.direction ?? null,
+          forecast: { status: 'not_applicable', projectedValue: 0, message: '' }
         };
       });
 
+      const activeQuarter = quarters.find(q => q.id === filterRef.current.quarterId);
+
       const objsWithProgress: ObjectiveWithProgress[] = objectivesData.map(obj => {
         const objKrs = krsWithProgress.filter(kr => kr.objective_id === obj.id);
+
+        // Calcular o forecast para cada KR
+        objKrs.forEach(kr => {
+          if (activeQuarter) {
+            kr.forecast = calculateForecast(
+              kr.baseline,
+              kr.target,
+              kr.current,
+              kr.direction,
+              activeQuarter.start_date,
+              activeQuarter.end_date
+            );
+          }
+        });
+
         objKrs.sort((a, b) => b.progress - a.progress);
         return {
           ...obj,
@@ -648,10 +677,47 @@ export default function Objectives() {
                                   <CardContent className="p-4 space-y-3">
                                     <div className="flex items-start justify-between gap-4">
                                       <div className="flex-1 space-y-1">
-                                        <div className="text-lg font-semibold">
-                                          {kr.code && <span className="text-primary">{kr.code}</span>}
-                                          {kr.code && ' - '}
-                                          {toTitleCase(kr.title)}
+                                        <div className="text-lg font-semibold flex items-center gap-2 flex-wrap">
+                                          <div>
+                                            {kr.code && <span className="text-primary">{kr.code}</span>}
+                                            {kr.code && ' - '}
+                                            {toTitleCase(kr.title)}
+                                          </div>
+                                          {kr.forecast && kr.forecast.status !== 'not_applicable' && (
+                                            <TooltipProvider delayDuration={100}>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <div className="cursor-help inline-flex">
+                                                    {kr.forecast.status === 'on_track' && (
+                                                      <Badge className="bg-emerald-500 hover:bg-emerald-600 font-medium px-2 py-0 h-6 flex gap-1 items-center">
+                                                        <TrendingUp className="h-3 w-3" /> No Ritmo
+                                                      </Badge>
+                                                    )}
+                                                    {kr.forecast.status === 'at_risk' && (
+                                                      <Badge className="bg-amber-500 hover:bg-amber-600 font-medium px-2 py-0 h-6 flex gap-1 items-center">
+                                                        <AlertTriangle className="h-3 w-3" /> Em Risco
+                                                      </Badge>
+                                                    )}
+                                                    {kr.forecast.status === 'off_track' && (
+                                                      <Badge className="bg-rose-500 hover:bg-rose-600 font-medium px-2 py-0 h-6 flex gap-1 items-center">
+                                                        <XOctagon className="h-3 w-3" /> Atrasado
+                                                      </Badge>
+                                                    )}
+                                                  </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent className="w-72 p-3 space-y-2">
+                                                  <p className="font-semibold text-sm">Previsão de Atingimento</p>
+                                                  <div className="text-xs space-y-1">
+                                                    <p>Mantendo o ritmo atual desde o início do Quarter, a projeção aponta que:</p>
+                                                    <div className="bg-muted p-2 rounded border mt-2">
+                                                      <span className="block mb-1">Valor final projetado: <strong className="text-foreground">{kr.forecast.projectedValue.toFixed(2)}</strong></span>
+                                                      <span className="block">Meta exigida: <strong className="text-foreground">{kr.target}</strong></span>
+                                                    </div>
+                                                  </div>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </TooltipProvider>
+                                          )}
                                         </div>
                                         {typeof kr.attainment_kr === 'number' && !isNaN(kr.attainment_kr) && (
                                           <div className="mt-1">

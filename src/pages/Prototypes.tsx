@@ -1,29 +1,63 @@
+import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-    Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
-    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip
-} from 'recharts';
-import { Sparkles, BrainCircuit, Activity, AlertTriangle, TrendingUp, Cpu, Zap } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Target, TrendingUp, AlertTriangle, XOctagon, Info } from 'lucide-react';
+import { calculateForecast } from '@/lib/utils';
+import { format } from 'date-fns';
 
-const radarData = [
-    { subject: 'Vendas', A: 85, fullMark: 100 },
-    { subject: 'Marketing', A: 65, fullMark: 100 },
-    { subject: 'Produto', A: 90, fullMark: 100 },
-    { subject: 'Suporte', A: 45, fullMark: 100 },
-    { subject: 'RH', A: 70, fullMark: 100 },
-    { subject: 'Financeiro', A: 80, fullMark: 100 },
-];
+const MOCK_START_DATE = new Date();
+MOCK_START_DATE.setDate(MOCK_START_DATE.getDate() - 20); // 20 dias atrás
+const MOCK_END_DATE = new Date();
+MOCK_END_DATE.setDate(MOCK_END_DATE.getDate() + 70); // Daqui a 70 dias
 
-const areaData = [
-    { name: 'Sem 1', confidence: 40, risk: 60 },
-    { name: 'Sem 2', confidence: 55, risk: 45 },
-    { name: 'Sem 3', confidence: 50, risk: 50 },
-    { name: 'Sem 4', confidence: 65, risk: 35 },
-    { name: 'Sem 5', confidence: 80, risk: 20 },
-    { name: 'Sem 6', confidence: 85, risk: 15 },
+// Quarter total ~ 90 dias
+const QUARTER_PROGRESS = 20 / 90;
+
+const mockKRs = [
+    {
+        id: '1',
+        title: 'Atingir R$ 100.000 em vendas',
+        baseline: 0,
+        current: 40000,
+        target: 100000,
+        direction: 'increase',
+        // Progresso real: 40%
+        // Progresso de tempo: ~22%
+        // Velocidade excelente -> deve ser "No Ritmo"
+    },
+    {
+        id: '2',
+        title: 'Reduzir churn para 2%',
+        baseline: 10,
+        current: 8,
+        target: 2,
+        direction: 'decrease',
+        // Baseline = 10... Target = 2... total a reduzir = 8
+        // Reduziu = 2... Ritmo = reduziu 25% da meta
+        // Tempo = ~22%
+        // OK, tá acompanhando certinho -> "No Ritmo"
+    },
+    {
+        id: '3',
+        title: 'Implementar 5 novas features xpto',
+        baseline: 0,
+        current: 0,
+        target: 5,
+        direction: 'increase',
+        // Tempo passou 22% do quarter e fez 0 -> "Atrasado"
+    },
+    {
+        id: '4',
+        title: 'Contratar 3 desenvolvedores',
+        baseline: 0,
+        current: 1,
+        target: 3,
+        direction: 'increase',
+        // Faltam 2. Tempo = 22%. Meta de atingimento pra estar safe hoje seria ~22%. 1/3 = 33%. -> "No ritmo" ou "Em Risco" devido à formula.
+    }
 ];
 
 export default function Prototypes() {
@@ -33,135 +67,104 @@ export default function Prototypes() {
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-                            <BrainCircuit className="h-8 w-8 text-indigo-500" />
                             <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">
-                                Wenkey Intelligence
+                                Laboratório: Forecast de OKRs
                             </span>
                         </h1>
                         <p className="text-muted-foreground mt-2">
-                            Amostra de visão preditiva usando IA para analisar a saúde dos seus OKRs.
+                            Validando algoritmos de Projection e Run Rate baseado no tempo do Quarter.
+                            <br />
+                            <strong>Quarter simulado:</strong> {format(MOCK_START_DATE, 'dd/MM/yyyy')} até {format(MOCK_END_DATE, 'dd/MM/yyyy')}
+                            <br />
+                            <strong>Tempo decorrido:</strong> ~{(QUARTER_PROGRESS * 100).toFixed(0)}%
                         </p>
                     </div>
-                    <Badge variant="outline" className="border-indigo-500 text-indigo-500 flex items-center gap-1.5 px-3 py-1">
-                        <Sparkles className="h-4 w-4" />
-                        Beta Lab
-                    </Badge>
                 </div>
 
-                {/* AI Insights Panel (Hero) */}
-                <div className="relative group">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl blur opacity-25 transition duration-1000 group-hover:duration-200"></div>
-                    <Card className="relative bg-card/80 backdrop-blur-xl border-border shadow-2xl overflow-hidden">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-xl">
-                                <Sparkles className="h-5 w-5 text-purple-500" />
-                                Insights Gerados
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid md:grid-cols-3 gap-6">
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2 text-rose-500 mb-2">
-                                        <AlertTriangle className="h-5 w-5" />
-                                        <h3 className="font-semibold">Risco Detectado</h3>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground leading-relaxed h-20">
-                                        O Key Result <strong className="text-foreground">"Reduzir Churn para 2%"</strong> do time de Suporte estagnou nas últimas 3 semanas. Sugerimos uma reunião de alinhamento imediata.
-                                    </p>
-                                    <Button variant="link" className="px-0 h-auto text-rose-500">Ver detalhes →</Button>
-                                </div>
-                                <div className="space-y-2 border-l border-border pl-6">
-                                    <div className="flex items-center gap-2 text-emerald-500 mb-2">
-                                        <TrendingUp className="h-5 w-5" />
-                                        <h3 className="font-semibold">Alta Performance</h3>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground leading-relaxed h-20">
-                                        O time de Produto tem <strong>94% de chance</strong> de entregar o App Mobile antes do prazo baseado na velocidade atual de check-ins.
-                                    </p>
-                                    <Button variant="link" className="px-0 h-auto text-emerald-500">Parabenizar time →</Button>
-                                </div>
-                                <div className="space-y-2 border-l border-border pl-6">
-                                    <div className="flex items-center gap-2 text-indigo-500 mb-2">
-                                        <Zap className="h-5 w-5" />
-                                        <h3 className="font-semibold">Ação Recomendada</h3>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground leading-relaxed h-20">
-                                        25% dos usuários ainda não fizeram check-in na segunda metade do trimestre. Deseja enviar um lembrete automático gamificado?
-                                    </p>
-                                    <Button variant="outline" size="sm" className="w-full mt-2 border-indigo-200 text-indigo-600 hover:bg-indigo-500 hover:text-white transition-colors">
-                                        Disparar Lembrete
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                <div className="grid gap-6">
+                    {mockKRs.map(kr => {
+                        const forecast = calculateForecast(
+                            kr.baseline,
+                            kr.target,
+                            kr.current,
+                            kr.direction,
+                            MOCK_START_DATE.toISOString(),
+                            MOCK_END_DATE.toISOString()
+                        );
 
-                <div className="grid md:grid-cols-2 gap-6">
-                    {/* Radar Health */}
-                    <Card className="border-border/50 shadow-md">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg">
-                                <Activity className="h-5 w-5 text-blue-500" />
-                                Saúde por Departamento
-                            </CardTitle>
-                            <CardDescription>Consistência de engajamento vs Progresso real</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[300px] w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                                        <PolarGrid stroke="#e2e8f0" />
-                                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 13 }} />
-                                        <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                                        <Radar name="Saúde" dataKey="A" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.4} />
-                                        <RechartsTooltip
-                                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                            itemStyle={{ color: '#8b5cf6', fontWeight: 'bold' }}
-                                        />
-                                    </RadarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
+                        const progressPercent = kr.direction === 'decrease'
+                            ? ((kr.baseline - kr.current) / (kr.baseline - kr.target)) * 100
+                            : ((kr.current - kr.baseline) / (kr.target - kr.baseline)) * 100;
 
-                    {/* Prediction Area */}
-                    <Card className="border-border/50 shadow-md">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg">
-                                <Cpu className="h-5 w-5 text-teal-500" />
-                                Trajetória de Risco (Semanal)
-                            </CardTitle>
-                            <CardDescription>Cálculo preditivo de atingimento do Quarter</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[300px] w-full mt-4">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={areaData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="colorConf" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                            </linearGradient>
-                                            <linearGradient id="colorRisk" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4} />
-                                                <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} dy={10} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} tickFormatter={(val) => `${val}%`} />
-                                        <RechartsTooltip
-                                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                        />
-                                        <Area type="monotone" dataKey="risk" stroke="#f43f5e" fillOpacity={1} fill="url(#colorRisk)" name="Risco Relativo" stackId="1" />
-                                        <Area type="monotone" dataKey="confidence" stroke="#10b981" fillOpacity={1} fill="url(#colorConf)" name="Confiança Otimizada" stackId="1" />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
+                        return (
+                            <Card key={kr.id} className="border-l-4" style={{
+                                borderLeftColor: forecast.status === 'on_track' ? '#10b981' :
+                                    forecast.status === 'at_risk' ? '#f59e0b' :
+                                        forecast.status === 'off_track' ? '#ef4444' : '#94a3b8'
+                            }}>
+                                <CardHeader className="pb-2">
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <CardTitle className="text-lg flex items-center gap-2">
+                                                <Target className="h-4 w-4 text-muted-foreground" />
+                                                {kr.title}
+                                            </CardTitle>
+                                            <CardDescription className="mt-1">
+                                                Baseline: {kr.baseline} | Atual: {kr.current} | Meta: {kr.target} ({kr.direction === 'increase' ? 'Aumentar' : 'Reduzir'})
+                                            </CardDescription>
+                                        </div>
+                                        <div>
+                                            <TooltipProvider delayDuration={100}>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <div className="cursor-help">
+                                                            {forecast.status === 'on_track' && (
+                                                                <Badge className="bg-emerald-500 hover:bg-emerald-600 font-medium px-2 py-1 flex gap-1 items-center">
+                                                                    <TrendingUp className="h-3.5 w-3.5" /> No Ritmo
+                                                                </Badge>
+                                                            )}
+                                                            {forecast.status === 'at_risk' && (
+                                                                <Badge className="bg-amber-500 hover:bg-amber-600 font-medium px-2 py-1 flex gap-1 items-center">
+                                                                    <AlertTriangle className="h-3.5 w-3.5" /> Em Risco
+                                                                </Badge>
+                                                            )}
+                                                            {forecast.status === 'off_track' && (
+                                                                <Badge className="bg-rose-500 hover:bg-rose-600 font-medium px-2 py-1 flex gap-1 items-center">
+                                                                    <XOctagon className="h-3.5 w-3.5" /> Atrasado
+                                                                </Badge>
+                                                            )}
+                                                            {forecast.status === 'not_applicable' && (
+                                                                <Badge variant="outline" className="text-slate-500 font-medium px-2 py-1 flex gap-1 items-center">
+                                                                    <Info className="h-3.5 w-3.5" /> N/A
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="left" className="w-72 p-3 space-y-2">
+                                                        <p className="font-semibold text-sm">Previsão Matemática (Linear)</p>
+                                                        <div className="text-xs space-y-1 text-slate-300">
+                                                            <p>Mantendo o ritmo atual desde o início do Quarter, a projeção aponta que:</p>
+                                                            <div className="bg-slate-800 p-2 rounded border border-slate-700 mt-2">
+                                                                <span className="block mb-1">Valor final projetado: <strong className="text-white">{forecast.projectedValue.toFixed(2)}</strong></span>
+                                                                <span className="block">Meta exigida: <strong className="text-white">{kr.target}</strong></span>
+                                                            </div>
+                                                        </div>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground mb-1">
+                                        <span>Progresso Acumulado</span>
+                                        <span className="font-bold text-slate-700 dark:text-slate-200">{progressPercent.toFixed(1)}%</span>
+                                    </div>
+                                    <Progress value={Math.max(0, Math.min(100, progressPercent))} className="h-2" />
+                                </CardContent>
+                            </Card>
+                        )
+                    })}
                 </div>
             </div>
         </Layout>
