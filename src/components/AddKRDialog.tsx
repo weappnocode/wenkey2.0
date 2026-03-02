@@ -13,6 +13,7 @@ interface AddKRDialogProps {
   objectiveId: string;
   companyId: string;
   quarterId: string;
+  defaultUserId?: string;
   onSuccess: () => void;
 }
 
@@ -29,7 +30,7 @@ interface KeyResultForm {
   user_id: string;
 }
 
-export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: AddKRDialogProps) {
+export function AddKRDialog({ objectiveId, companyId, quarterId, defaultUserId, onSuccess }: AddKRDialogProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -37,22 +38,15 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
   const [keyResults, setKeyResults] = useState<KeyResultForm[]>([]);
 
   const loadUsers = useCallback(async () => {
-    const { data: companyMembers } = await supabase
-      .from('company_members')
-      .select('user_id')
-      .eq('company_id', companyId);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+      .order('full_name');
 
-    if (companyMembers && companyMembers.length > 0) {
-      const userIds = companyMembers.map((cm) => cm.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', userIds)
-        .order('full_name');
-
-      if (profiles) {
-        setUsers(profiles);
-      }
+    if (profiles) {
+      setUsers(profiles);
     }
   }, [companyId]);
 
@@ -70,7 +64,7 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, onSuccess }: Ad
         title: '',
         type: 'number',
         direction: 'increase',
-        user_id: '',
+        user_id: defaultUserId || '',
       },
     ]);
   };

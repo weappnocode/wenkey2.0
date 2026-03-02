@@ -38,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Send, UserPlus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -364,6 +364,110 @@ export default function Users() {
     }
   };
 
+  const handleTestWebhook = async (user: Profile) => {
+    try {
+      const companyId = user.company_id || getUserCompanyId(user);
+      let companyName = 'Sua Empresa';
+
+      if (companyId) {
+        const { data: companyData } = await supabase
+          .from('companies')
+          .select('name')
+          .eq('id', companyId)
+          .single();
+
+        if (companyData) {
+          companyName = companyData.name;
+        }
+      }
+
+      const payload = {
+        user_id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        company_name: companyName,
+        activated_at: new Date().toISOString()
+      };
+
+      // Usa o mode 'no-cors' porque o n8n não retorna headers de CORS na web
+      const response = await fetch('https://n8n-terj.onrender.com/webhook/emailAtivo', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      // Quando usamos no-cors, o response é "opaco", então não podemos validar o boolean ok
+      toast.success('Requisição de teste enviada! Verifique o n8n.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao enviar teste: ' + message);
+    }
+  };
+
+  const handleTestNewUserWebhook = async (user: Profile) => {
+    try {
+      const companyId = user.company_id || getUserCompanyId(user);
+      let companyName = 'Sua Empresa';
+      let adminEmails = '';
+
+      if (companyId) {
+        // Obter nome da empresa
+        const { data: companyData } = await supabase
+          .from('companies')
+          .select('name')
+          .eq('id', companyId)
+          .single();
+
+        if (companyData) {
+          companyName = companyData.name;
+        }
+
+        // Obter emails dos admins da empresa
+        const { data: adminsData } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('company_id', companyId)
+          .in('permission_type', ['admin', 'manager'])
+          .eq('is_active', true)
+          .neq('id', user.id); // Excluir o próprio usuário se ele for admin
+
+        if (adminsData && adminsData.length > 0) {
+          adminEmails = adminsData.map(a => a.email).join(',');
+        } else {
+          // Fallback para testes: se não achar admin, manda pro próprio usuário recém criado
+          adminEmails = user.email;
+        }
+      }
+
+      const payload = {
+        type: 'new_user_registration',
+        new_user_id: user.id,
+        new_user_email: user.email,
+        new_user_name: user.full_name,
+        company_name: companyName,
+        admin_emails: adminEmails,
+        registered_at: new Date().toISOString()
+      };
+
+      const response = await fetch('https://n8n-terj.onrender.com/webhook/novocadastro', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      toast.success('Teste de novo cadastro enviado! Verifique o n8n.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao enviar teste: ' + message);
+    }
+  };
+
   const openEditDialog = (user: Profile) => {
     setSelectedUser(user);
     setFormData({
@@ -523,6 +627,22 @@ export default function Users() {
                       <TableCell className="text-right">
                         {isAdmin && (
                           <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Testar email de Novo Cadastro (Admin)"
+                              onClick={() => handleTestNewUserWebhook(user)}
+                            >
+                              <UserPlus className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Testar email de Ativação (Usuário)"
+                              onClick={() => handleTestWebhook(user)}
+                            >
+                              <Send className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"

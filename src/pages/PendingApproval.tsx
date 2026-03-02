@@ -41,13 +41,7 @@ export default function PendingApproval() {
                     </div>
 
                     <div className="flex flex-col gap-3">
-                        <Button
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => refreshProfile()}
-                        >
-                            Já fui aprovado? Verificar agora
-                        </Button>
+
                         <Button
                             variant="ghost"
                             className="w-full text-slate-500"

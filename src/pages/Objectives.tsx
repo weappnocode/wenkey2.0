@@ -727,6 +727,7 @@ export default function Objectives() {
                                 objectiveId={objective.id}
                                 companyId={objective.company_id}
                                 quarterId={objective.quarter_id}
+                                defaultUserId={filterUserId !== 'all' && filterUserId ? filterUserId : objective.user_id}
                                 onSuccess={loadObjectivesFromRef}
                               />
                             </div>

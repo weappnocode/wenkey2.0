@@ -51,32 +51,20 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
   }, [open, krId, companyId]);
 
   const loadUsers = async () => {
-    const { data: companyMembers, error } = await supabase
-      .from('company_members')
-      .select('user_id')
-      .eq('company_id', companyId);
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+      .order('full_name');
 
-    if (error) {
+    if (profilesError) {
       toast.error('Erro ao carregar responsáveis');
       return;
     }
 
-    if (companyMembers && companyMembers.length > 0) {
-      const userIds = companyMembers.map((cm) => cm.user_id);
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', userIds)
-        .order('full_name');
-
-      if (profilesError) {
-        toast.error('Erro ao carregar responsáveis');
-        return;
-      }
-
-      if (profiles) {
-        setUsers(profiles);
-      }
+    if (profiles) {
+      setUsers(profiles);
     }
   };
 

@@ -32,7 +32,7 @@ export function EditObjectiveDialog({ objective, onSuccess }: EditObjectiveDialo
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<Profile[]>([]);
-  
+
   const [title, setTitle] = useState(objective.title);
   const [description, setDescription] = useState(objective.description || '');
   const [selectedUserId, setSelectedUserId] = useState(objective.user_id);
@@ -49,22 +49,17 @@ export function EditObjectiveDialog({ objective, onSuccess }: EditObjectiveDialo
 
   const loadUsers = async () => {
     try {
-      const { data: companyMembers } = await supabase
-        .from('company_members')
-        .select('user_id')
-        .eq('company_id', objective.company_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('company_id', objective.company_id)
+        .eq('is_active', true)
+        .order('full_name');
 
-      if (companyMembers && companyMembers.length > 0) {
-        const userIds = companyMembers.map((cm) => cm.user_id);
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', userIds)
-          .order('full_name');
+      if (profilesError) throw profilesError;
 
-        if (profiles) {
-          setUsers(profiles);
-        }
+      if (profiles) {
+        setUsers(profiles);
       }
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
