@@ -196,8 +196,9 @@ export default function PerformanceHistory() {
             if (resultsError) throw resultsError;
             setResults(resultsData || []);
 
-        } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : '';
+        } catch (error) {
+            const err = error as Error;
+            const msg = err.message || '';
             const isTransient = msg.includes('Failed to fetch') || msg.includes('AbortError');
             if (!isTransient) {
                 console.error('Error loading history:', error);
@@ -208,7 +209,7 @@ export default function PerformanceHistory() {
         } finally {
             setLoading(false);
         }
-    }, [filterCompanyId, role, user?.id]);
+    }, [filterCompanyId, role, user]);
 
     useEffect(() => {
         if (selectedCompanyId) {
@@ -438,10 +439,11 @@ export default function PerformanceHistory() {
                                                                                     dataKey="value"
                                                                                     fill="hsl(var(--primary))"
                                                                                     radius={[0, 4, 4, 0]}
+                                                                                    barSize={20}
                                                                                     style={{ cursor: 'pointer' }}
-                                                                                    onClick={(data: any) => {
+                                                                                    onClick={(data: Record<string, unknown>) => {
                                                                                         console.log('Bar clicked:', data);
-                                                                                        const qId = data?.quarterId || data?.payload?.quarterId;
+                                                                                        const qId = data?.quarterId as string || (data?.payload as Record<string, unknown>)?.quarterId as string;
                                                                                         if (qId) {
                                                                                             fetchQuarterObjectives(qId, user.id);
                                                                                         } else {

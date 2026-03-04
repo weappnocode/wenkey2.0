@@ -61,8 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (data) {
-        // cast to any to avoid SelectQueryError if types are out of sync
-        const rawData = data as any;
+        const rawData = data;
         let avatar_url = rawData.avatar_url;
         if (avatar_url && !avatar_url.startsWith('http')) {
           const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(avatar_url);

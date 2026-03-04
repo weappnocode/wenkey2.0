@@ -4,6 +4,17 @@
         "allowJs": true,
         "checkJs": false,
         "noImplicitAny": false,
-        "skipLibCheck": true
-    }
+        "skipLibCheck": true,
+        "lib": [
+            "ES2020",
+            "DOM"
+        ],
+        "target": "ES2020",
+        "module": "ESNext",
+        "moduleResolution": "bundler"
+    },
+    "include": [
+        "**/*.ts",
+        "types.d.ts"
+    ]
 }

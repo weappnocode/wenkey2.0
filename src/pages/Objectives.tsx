@@ -186,11 +186,32 @@ export default function Objectives() {
 
       const activeQuarter = quarters.find(q => q.id === filterRef.current.quarterId);
 
-      const krsWithProgress: KeyResultWithProgress[] = (krsData || []).map((kr: any) => {
-        const results = (kr.checkin_results || []).filter((r: any) =>
+      type KRRow = {
+        id: string;
+        objective_id: string;
+        title: string | null;
+        code: string | null;
+        target: number | null;
+        current: number | null;
+        percent_kr: number | null;
+        baseline: number | null;
+        direction: string | null;
+        type: string | null;
+        weight: number | null;
+        checkin_results: {
+          checkins: { quarter_id: string } | null;
+          created_at: string;
+          valor_realizado: number;
+          minimo_orcamento: number;
+          meta_checkin: number;
+        }[] | null;
+      };
+
+      const krsWithProgress: KeyResultWithProgress[] = ((krsData as unknown as KRRow[]) || []).map((kr) => {
+        const results = (kr.checkin_results || []).filter((r) =>
           r.checkins && r.checkins.quarter_id === activeQuarter?.id
         );
-        const latestResult = [...results].sort((a: any, b: any) =>
+        const latestResult = [...results].sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0];
 
@@ -200,8 +221,8 @@ export default function Objectives() {
             latestResult.valor_realizado,
             latestResult.minimo_orcamento,
             latestResult.meta_checkin,
-            kr.direction,
-            kr.type
+            kr.direction || '',
+            kr.type || ''
           );
           attainmentValue = krProgress;
         }
@@ -219,7 +240,7 @@ export default function Objectives() {
           percent_kr: currentProgress,
           attainment_kr: typeof attainmentValue === 'number' ? attainmentValue : null,
           progress: Math.round(currentProgress),
-          owner_name: null,
+          owner_name: null as string | null,
           baseline: kr.baseline ?? null,
           direction: kr.direction ?? null,
           type: kr.type ?? null,
@@ -281,7 +302,7 @@ export default function Objectives() {
     } catch (err) {
       console.error('Erro ao carregar objetivos:', err);
     }
-  }, [user?.id]);
+  }, [quarters, user]);
 
   // ── master initialization ──
   const authProfileId = authProfile?.id;
@@ -358,15 +379,16 @@ export default function Objectives() {
         if (companyId && quarterId && userId) {
           await loadObjectivesFromRef();
         }
-      } catch (err: any) {
-        const isTransient = err?.message?.includes('Failed to fetch') || err?.message?.includes('AbortError');
+      } catch (err) {
+        const error = err as Error;
+        const isTransient = error?.message?.includes('Failed to fetch') || error?.message?.includes('AbortError');
         if (isTransient && attempt < 3) {
           // Retry after a short delay for transient network errors
           console.warn(`[Objectives] Erro transitório, tentando novamente (${attempt}/3)...`);
           setTimeout(() => initialize(attempt + 1), 800 * attempt);
           return;
         }
-        console.error('Erro na inicialização:', err);
+        console.error('Erro na inicialização:', error);
       } finally {
         setLoading(false);
       }
@@ -382,7 +404,7 @@ export default function Objectives() {
       filterRef.current = { companyId: filterCompanyId, quarterId: selectedQuarterId, userId: filterUserId };
       loadObjectivesFromRef();
     }
-  }, [selectedQuarterId, filterUserId]);
+  }, [selectedQuarterId, filterUserId, filterCompanyId, loadObjectivesFromRef, loading]);
 
   // ── realtime subscription (uses ref to avoid stale closure) ──
   useEffect(() => {
@@ -469,8 +491,8 @@ export default function Objectives() {
       setDeleteDialogOpen(false);
       setObjectiveToDelete(null);
       await loadObjectivesFromRef();
-    } catch (error: any) {
-      toast({ title: 'Erro', description: error.message || 'Erro ao excluir objetivo', variant: 'destructive' });
+    } catch (error) {
+      toast({ title: 'Erro', description: error instanceof Error ? error.message : 'Erro ao excluir objetivo', variant: 'destructive' });
     } finally {
       setIsDeleting(false);
     }
@@ -485,8 +507,8 @@ export default function Objectives() {
       toast({ title: 'Sucesso', description: 'Key Result excluído com sucesso!' });
       setKrToDelete(null);
       await loadObjectivesFromRef();
-    } catch (error: any) {
-      toast({ title: 'Erro', description: error.message || 'Erro ao excluir Key Result', variant: 'destructive' });
+    } catch (error) {
+      toast({ title: 'Erro', description: error instanceof Error ? error.message : 'Erro ao excluir Key Result', variant: 'destructive' });
     } finally {
       setIsDeletingKr(false);
     }
@@ -663,7 +685,6 @@ export default function Objectives() {
                               <div className="flex-1 text-left space-y-2">
                                 <div className="flex items-center gap-2">
                                   <CardTitle className="text-2xl">{toTitleCase(objective.title || '')}</CardTitle>
-                                  {getStatusBadge(objective.status)}
                                 </div>
 
                                 {objective.description && (
@@ -677,7 +698,7 @@ export default function Objectives() {
                                   </div>
                                   <Progress
                                     value={objective.progress}
-                                    style={{ '--progress-color': getProgressColor(objective.progress) } as any}
+                                    style={{ '--progress-color': getProgressColor(objective.progress) } as React.CSSProperties}
                                   />
                                 </div>
 
@@ -707,7 +728,6 @@ export default function Objectives() {
                                   objective={{
                                     id: objective.id,
                                     title: objective.title,
-                                    description: objective.description,
                                     user_id: objective.user_id,
                                     company_id: objective.company_id,
                                     quarter_id: objective.quarter_id,
@@ -765,11 +785,7 @@ export default function Objectives() {
                                                         <AlertTriangle className="h-3 w-3" /> Em Risco
                                                       </Badge>
                                                     )}
-                                                    {kr.forecast.status === 'off_track' && (
-                                                      <Badge className="bg-rose-500 hover:bg-rose-600 font-medium px-2 py-0 h-6 flex gap-1 items-center">
-                                                        <XOctagon className="h-3 w-3" /> Atrasado
-                                                      </Badge>
-                                                    )}
+
                                                   </div>
                                                 </TooltipTrigger>
                                                 <TooltipContent className="w-72 p-3 space-y-2">
@@ -829,7 +845,7 @@ export default function Objectives() {
 
                                     <Progress
                                       value={kr.progress}
-                                      style={{ '--progress-color': getProgressColor(kr.progress) } as any}
+                                      style={{ '--progress-color': getProgressColor(kr.progress) } as React.CSSProperties}
                                       className="h-2"
                                     />
                                   </CardContent>

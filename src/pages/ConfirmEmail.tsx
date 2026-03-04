@@ -63,8 +63,8 @@ const ConfirmEmail = () => {
 
       toast.success('Email confirmado com sucesso!');
       navigate('/');
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao verificar código');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao verificar código');
     } finally {
       setVerifying(false);
     }

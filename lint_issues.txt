@@ -1,0 +1,23 @@
+File: F:\WendelWenKey\src\components\ui\badge.tsx
+  - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components at 29:17)
+
+File: F:\WendelWenKey\src\components\ui\button.tsx
+  - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components at 47:18)
+
+File: F:\WendelWenKey\src\components\ui\form.tsx
+  - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components at 129:10)
+
+File: F:\WendelWenKey\src\components\ui\navigation-menu.tsx
+  - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components at 111:3)
+
+File: F:\WendelWenKey\src\components\ui\sidebar.tsx
+  - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components at 636:3)
+
+File: F:\WendelWenKey\src\components\ui\sonner.tsx
+  - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components at 27:19)
+
+File: F:\WendelWenKey\src\components\ui\toggle.tsx
+  - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components at 37:18)
+
+File: F:\WendelWenKey\src\pages\Objectives.tsx
+  - React Hook useCallback has a missing dependency: 'user'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps at 305:6)

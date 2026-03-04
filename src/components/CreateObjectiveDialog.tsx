@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -62,7 +62,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
   const [selectedUserId, setSelectedUserId] = useState(currentUserId || '');
   const [selectedQuarterId, setSelectedQuarterId] = useState(currentQuarterId);
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+
 
   // Sincronizar com props quando abrirem o diálogo
   useEffect(() => {
@@ -83,24 +83,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
     setKeyResults([]);
   }, [currentCompanyId, currentQuarterId]);
 
-  useEffect(() => {
-    if (open) {
-      loadCompanies();
-      loadQuarters();
-      loadExistingTitles();
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (selectedCompanyId) {
-      loadUsers(selectedCompanyId);
-    } else {
-      setUsers([]);
-      setSelectedUserId('');
-    }
-  }, [selectedCompanyId]);
-
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('companies')
@@ -117,9 +100,9 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
         variant: 'destructive',
       });
     }
-  };
+  }, [toast]);
 
-  const loadUsers = async (companyId: string) => {
+  const loadUsers = useCallback(async (companyId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -138,9 +121,9 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
         variant: 'destructive',
       });
     }
-  };
+  }, [toast]);
 
-  const loadQuarters = async () => {
+  const loadQuarters = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('quarters')
@@ -152,9 +135,9 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
     } catch (error) {
       console.error('Erro ao carregar trimestres:', error);
     }
-  };
+  }, []);
 
-  const loadExistingTitles = async () => {
+  const loadExistingTitles = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('objectives')
@@ -169,7 +152,24 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
     } catch (error) {
       console.error('Erro ao carregar títulos existentes:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      loadCompanies();
+      loadQuarters();
+      loadExistingTitles();
+    }
+  }, [open, loadCompanies, loadQuarters, loadExistingTitles]);
+
+  useEffect(() => {
+    if (selectedCompanyId) {
+      loadUsers(selectedCompanyId);
+    } else {
+      setUsers([]);
+      setSelectedUserId('');
+    }
+  }, [selectedCompanyId, loadUsers]);
 
   const addKeyResult = () => {
     // Validar se o responsável foi selecionado
@@ -220,7 +220,6 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
         .from('objectives')
         .insert({
           title,
-          description: description || null,
           status: 'not_started',
           weight: 1,
           company_id: selectedCompanyId,
@@ -271,18 +270,18 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
 
       // Reset form
       setTitle('');
-      setDescription('');
+
       setKeyResults([]);
       setSelectedUserId('');
       setOpen(false);
       onSuccess();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao criar objetivo:', error);
-      console.error('Erro detalhado:', error?.message, error?.details);
-      const msg = error?.message || error?.details || error?.hint || JSON.stringify(error);
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+      console.error('Erro detalhado:', errorMessage);
       toast({
         title: 'Erro ao criar objetivo',
-        description: msg,
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -366,7 +365,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
             </Select>
           </div>
 
-          {/* Título e Descrição */}
+          {/* Título do Objetivo */}
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-4 mb-2">
               <Label htmlFor="title">Título do Objetivo *</Label>
@@ -393,17 +392,6 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Aumentar a satisfação dos clientes"
               required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descreva o objetivo..."
-              rows={3}
             />
           </div>
 

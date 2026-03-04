@@ -1414,6 +1414,8 @@ export default function KRCheckins() {
     role,
     objectives,
     keyResults,
+    user,
+    userProfile?.company_id,
   ]);
 
   useEffect(() => {

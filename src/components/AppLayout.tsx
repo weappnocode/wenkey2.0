@@ -19,7 +19,8 @@ import {
     PanelLeftOpen,
     Eye,
     History,
-    Beaker
+    Beaker,
+    CreditCard
 } from 'lucide-react';
 import { cn, toTitleCase } from '@/lib/utils';
 import { CompanySelector } from './CompanySelector';
@@ -64,6 +65,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         { icon: History, label: 'Histórico', path: '/performance-history' },
         { icon: Eye, label: 'Visão Geral', path: '/overview' },
         { icon: Beaker, label: 'Laboratório', path: '/prototypes', adminOnly: true },
+        { icon: CreditCard, label: 'Assinatura', path: '/pricing', adminOnly: true },
     ];
 
     // Filter navigation items based on role

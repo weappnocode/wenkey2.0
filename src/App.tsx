@@ -23,6 +23,10 @@ import ResetPassword from "./pages/ResetPassword";
 import ConfirmEmail from "./pages/ConfirmEmail";
 import PendingApproval from "./pages/PendingApproval";
 
+import Pricing from "./pages/Pricing";
+import CheckoutSuccess from "./pages/CheckoutSuccess";
+import CheckoutCanceled from "./pages/CheckoutCanceled";
+
 
 import { AppLayout } from "@/components/AppLayout";
 
@@ -81,6 +85,10 @@ const App = () => (
                 {/* Pending Approval (Standalone) */}
                 <Route path="/pending-approval" element={<ProtectedRoute><PendingApproval /></ProtectedRoute>} />
 
+                {/* Checkout Result Routes (Standalone) */}
+                <Route path="/checkout-success" element={<ProtectedRoute><CheckoutSuccess /></ProtectedRoute>} />
+                <Route path="/checkout-canceled" element={<ProtectedRoute><CheckoutCanceled /></ProtectedRoute>} />
+
                 {/* Protected Routes with Sidebar Layout */}
                 <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                   <Route path="/" element={<Dashboard />} />
@@ -93,6 +101,7 @@ const App = () => (
                   <Route path="/performance-history" element={<PerformanceHistory />} />
                   <Route path="/prototypes" element={<Prototypes />} />
                   <Route path="/profile" element={<Profile />} />
+                  <Route path="/pricing" element={<Pricing />} />
                 </Route>
 
                 {/* 404 */}

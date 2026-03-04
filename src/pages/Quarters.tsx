@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -94,20 +94,8 @@ export default function Quarters() {
   const [deleteQuarterDialog, setDeleteQuarterDialog] = useState<Quarter | null>(null);
   const [deleteCheckInDialog, setDeleteCheckInDialog] = useState<CheckIn | null>(null);
 
-  useEffect(() => {
-    if (selectedCompanyId) {
-      setSelectedCompanyForForm(selectedCompanyId);
-      loadQuarters();
-    }
-  }, [selectedCompanyId]);
 
-  useEffect(() => {
-    if (selectedCompanyForForm) {
-      loadQuarters();
-    }
-  }, [selectedCompanyForForm]);
-
-  const loadQuarters = async () => {
+  const loadQuarters = useCallback(async () => {
     if (!selectedCompanyForForm) {
       setQuarters([]);
       setCheckIns({});
@@ -148,16 +136,29 @@ export default function Quarters() {
 
         setCheckIns(grouped);
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Erro ao carregar quarters',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCompanyForForm, toast]);
+
+  useEffect(() => {
+    if (selectedCompanyId) {
+      setSelectedCompanyForForm(selectedCompanyId);
+      loadQuarters();
+    }
+  }, [selectedCompanyId, loadQuarters]);
+
+  useEffect(() => {
+    if (selectedCompanyForForm) {
+      loadQuarters();
+    }
+  }, [selectedCompanyForForm, loadQuarters]);
 
   const toggleQuarter = (quarterId: string) => {
     const newExpanded = new Set(expandedQuarters);
@@ -197,10 +198,10 @@ export default function Quarters() {
       setQuarterDialogOpen(false);
       resetQuarterForm();
       loadQuarters();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Erro ao criar quarter',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
       });
     }
@@ -237,10 +238,10 @@ export default function Quarters() {
       setEditingQuarter(null);
       resetQuarterForm();
       loadQuarters();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Erro ao atualizar quarter',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
       });
     }
@@ -262,10 +263,10 @@ export default function Quarters() {
 
       setDeleteQuarterDialog(null);
       loadQuarters();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Erro ao excluir quarter',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
       });
     }
@@ -313,10 +314,10 @@ export default function Quarters() {
         variant: data.success ? 'default' : 'destructive',
       });
 
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Erro no agendamento',
-        description: error.message || 'Erro ao comunicar com o servidor.',
+        description: error instanceof Error ? error.message : 'Erro ao comunicar com o servidor.',
         variant: 'destructive',
       });
     }
@@ -359,10 +360,10 @@ export default function Quarters() {
       setCheckInDialogOpen(false);
       resetCheckInForm();
       loadQuarters();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Erro ao criar check-in',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
       });
     } finally {
@@ -402,10 +403,10 @@ export default function Quarters() {
       setEditingCheckIn(null);
       resetCheckInForm();
       loadQuarters();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Erro ao atualizar check-in',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
       });
     } finally {
@@ -429,10 +430,10 @@ export default function Quarters() {
 
       setDeleteCheckInDialog(null);
       loadQuarters();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Erro ao excluir check-in',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
       });
     }

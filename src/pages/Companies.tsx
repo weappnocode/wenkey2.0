@@ -73,7 +73,8 @@ export default function Companies() {
 
       if (error) throw error;
       setCompanies(data || []);
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error;
       const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError');
       if (!isTransient) {
         console.error('Error fetching companies:', error);
@@ -136,8 +137,8 @@ export default function Companies() {
         sectors: '',
       });
       fetchCompanies();
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao criar empresa');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao criar empresa');
     }
   };
 
@@ -177,8 +178,8 @@ export default function Companies() {
         sectors: '',
       });
       fetchCompanies();
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao atualizar empresa');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao atualizar empresa');
     }
   };
 
@@ -316,7 +317,7 @@ export default function Companies() {
           )}
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2">
           {companies.map((company) => (
             <Card key={company.id} className="hover:shadow-md transition-shadow duration-200">
               <CardHeader className="pb-3">

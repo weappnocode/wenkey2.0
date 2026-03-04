@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, Clock, Users, Loader2 } from "lucide-react";
@@ -75,14 +75,7 @@ export function ScheduleCheckInDialog({
         }
     }, [open, initialDate]);
 
-    // Load company users when dialog opens
-    useEffect(() => {
-        if (open && companyId) {
-            loadCompanyUsers();
-        }
-    }, [open, companyId]);
-
-    const loadCompanyUsers = async () => {
+    const loadCompanyUsers = useCallback(async () => {
         setIsLoadingUsers(true);
         try {
             const { data, error } = await supabase
@@ -99,16 +92,23 @@ export function ScheduleCheckInDialog({
             if (data) {
                 setSelectedUsers(new Set(data.map(u => u.email as string)));
             }
-        } catch (error: any) {
+        } catch (error) {
             toast({
                 title: "Erro ao carregar usuários",
-                description: error.message,
+                description: error instanceof Error ? error.message : "Erro desconhecido",
                 variant: "destructive",
             });
         } finally {
             setIsLoadingUsers(false);
         }
-    };
+    }, [companyId, toast]);
+
+    // Load company users when dialog opens
+    useEffect(() => {
+        if (open && companyId) {
+            loadCompanyUsers();
+        }
+    }, [open, companyId, loadCompanyUsers]);
 
     const handleToggleUser = (email: string) => {
         const newSelected = new Set(selectedUsers);
@@ -194,11 +194,12 @@ export function ScheduleCheckInDialog({
 
             onSuccess?.();
             onOpenChange(false);
-        } catch (error: any) {
+        } catch (error) {
             console.error("Error scheduling:", error);
+            const errorMessage = error instanceof Error ? error.message : "Não foi possível conectar ao serviço de agendamento.";
             toast({
                 title: "Erro no agendamento",
-                description: error.message || "Não foi possível conectar ao serviço de agendamento.",
+                description: errorMessage,
                 variant: "destructive",
             });
         } finally {

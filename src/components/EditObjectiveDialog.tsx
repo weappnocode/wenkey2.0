@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +14,7 @@ interface EditObjectiveDialogProps {
   objective: {
     id: string;
     title: string;
-    description: string | null;
+
     user_id: string;
     company_id: string;
     quarter_id: string;
@@ -34,20 +34,10 @@ export function EditObjectiveDialog({ objective, onSuccess }: EditObjectiveDialo
   const [users, setUsers] = useState<Profile[]>([]);
 
   const [title, setTitle] = useState(objective.title);
-  const [description, setDescription] = useState(objective.description || '');
+
   const [selectedUserId, setSelectedUserId] = useState(objective.user_id);
 
-  useEffect(() => {
-    if (open) {
-      loadUsers();
-      // Reset form with current objective data
-      setTitle(objective.title);
-      setDescription(objective.description || '');
-      setSelectedUserId(objective.user_id);
-    }
-  }, [open, objective]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -65,7 +55,17 @@ export function EditObjectiveDialog({ objective, onSuccess }: EditObjectiveDialo
       console.error('Erro ao carregar usuários:', error);
       toast.error('Erro ao carregar lista de usuários');
     }
-  };
+  }, [objective.company_id]);
+
+  useEffect(() => {
+    if (open) {
+      loadUsers();
+      // Reset form with current objective data
+      setTitle(objective.title);
+
+      setSelectedUserId(objective.user_id);
+    }
+  }, [open, objective.title, objective.user_id, loadUsers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +87,6 @@ export function EditObjectiveDialog({ objective, onSuccess }: EditObjectiveDialo
         .from('objectives')
         .update({
           title: title.trim(),
-          description: description.trim() || null,
           user_id: selectedUserId,
         })
         .eq('id', objective.id);
@@ -97,9 +96,10 @@ export function EditObjectiveDialog({ objective, onSuccess }: EditObjectiveDialo
       toast.success('Objetivo atualizado com sucesso!');
       setOpen(false);
       onSuccess();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao atualizar objetivo:', error);
-      toast.error('Erro ao atualizar objetivo: ' + error.message);
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+      toast.error('Erro ao atualizar objetivo: ' + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -131,16 +131,7 @@ export function EditObjectiveDialog({ objective, onSuccess }: EditObjectiveDialo
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Descrição</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descreva o objetivo com mais detalhes..."
-                rows={4}
-              />
-            </div>
+
 
             <div className="space-y-2">
               <Label htmlFor="user">Responsável *</Label>

@@ -55,8 +55,8 @@ export default function Auth() {
 
       toast.success('Conta criada! Confirme seu email. Após a confirmação, um administrador precisará ativar sua conta.');
       navigate(`/confirm-email?email=${encodeURIComponent(formData.email)}`);
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao criar conta');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao criar conta');
     } finally {
       setLoading(false);
     }
@@ -76,8 +76,8 @@ export default function Auth() {
 
       toast.success('Login realizado com sucesso!');
       navigate('/');
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao fazer login');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao fazer login');
     } finally {
       setLoading(false);
     }

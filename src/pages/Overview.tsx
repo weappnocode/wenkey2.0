@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -60,19 +60,7 @@ export default function Overview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleLoading, user?.id, isAdmin]);
 
-  useEffect(() => {
-    if (selectedCompany && selectedQuarter) {
-      loadRankings();
-    }
-  }, [selectedCompany, selectedQuarter]);
 
-  useEffect(() => {
-    // Apenas sincroniza quando usuário trocar a empresa ativamente no menu lateral
-    if (!roleLoading && selectedCompanyId && selectedCompany !== selectedCompanyId) {
-      setSelectedCompany(selectedCompanyId);
-      loadQuarters(selectedCompanyId);
-    }
-  }, [selectedCompanyId, roleLoading]);
 
   const initializePage = async (attempt = 1) => {
     try {
@@ -112,8 +100,9 @@ export default function Overview() {
           await loadQuarters(defaultCompanyId);
         }
       }
-    } catch (error: any) {
-      const isTransient = error?.message?.includes('Failed to fetch') || error?.message?.includes('AbortError');
+    } catch (error) {
+      const err = error as Error;
+      const isTransient = err?.message?.includes('Failed to fetch') || err?.message?.includes('AbortError');
       if (isTransient && attempt < 3) {
         console.warn(`[Overview] Erro transitório, tentando novamente (${attempt}/3)...`);
         setTimeout(() => initializePage(attempt + 1), 800 * attempt);
@@ -125,7 +114,7 @@ export default function Overview() {
     }
   };
 
-  const loadQuarters = async (companyId: string) => {
+  const loadQuarters = useCallback(async (companyId: string) => {
     const { data: quartersData } = await supabase
       .from('quarters')
       .select('id, name, company_id')
@@ -140,9 +129,9 @@ export default function Overview() {
       setQuarters([]);
       setSelectedQuarter('');
     }
-  };
+  }, []);
 
-  const loadRankings = async () => {
+  const loadRankings = useCallback(async () => {
     if (!selectedCompany || !selectedQuarter) return;
 
     try {
@@ -204,15 +193,30 @@ export default function Overview() {
       }));
 
       setRankings(rankings);
-    } catch (error: any) {
-      const isTransient = error?.message?.includes('Failed to fetch') || error?.message?.includes('AbortError');
+    } catch (error) {
+      const err = error as Error;
+      const isTransient = err?.message?.includes('Failed to fetch') || err?.message?.includes('AbortError');
       if (!isTransient) {
         console.error('Erro ao processar rankings:', error);
       } else {
-        console.warn('[Overview] Erro transitório ao carregar rankings (ignorado):', error?.message);
+        console.warn('[Overview] Erro transitório ao carregar rankings (ignorado):', err?.message);
       }
     }
-  };
+  }, [selectedCompany, selectedQuarter]);
+
+  useEffect(() => {
+    if (selectedCompany && selectedQuarter) {
+      loadRankings();
+    }
+  }, [selectedCompany, selectedQuarter, loadRankings]);
+
+  useEffect(() => {
+    // Apenas sincroniza quando usuário trocar a empresa ativamente no menu lateral
+    if (!roleLoading && selectedCompanyId && selectedCompany !== selectedCompanyId) {
+      setSelectedCompany(selectedCompanyId);
+      loadQuarters(selectedCompanyId);
+    }
+  }, [selectedCompanyId, roleLoading, selectedCompany, loadQuarters]);
 
   const getRankingLabel = (rank: number): string => {
     return `${rank}º LUGAR`;
@@ -293,8 +297,14 @@ export default function Overview() {
             <CardContent>
               {rankings.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                  {rankings.map((ranking) => (
-                    <Card key={ranking.user_id} className="overflow-hidden">
+                  {rankings.map((ranking, index) => (
+                    <Card
+                      key={ranking.user_id}
+                      className="overflow-hidden"
+                      style={{
+                        animation: `rankCardIn 0.5s ease-out ${index * 150}ms both`,
+                      }}
+                    >
                       <CardHeader className="pb-3 bg-muted/50">
                         <CardTitle className="text-center text-lg font-bold">
                           {getRankingLabel(ranking.rank)}
@@ -307,8 +317,8 @@ export default function Overview() {
                           strokeWidth={12}
                         />
 
-                        <div className="absolute bottom-6 left-4">
-                          <Avatar className="h-16 w-16 border-2 border-border shadow-md">
+                        <div className="absolute top-4 left-4">
+                          <Avatar className="h-12 w-12 border-2 border-border shadow-md">
                             {ranking.avatar_url ? (
                               <AvatarImage src={ranking.avatar_url} alt={ranking.full_name} className="object-cover" />
                             ) : (

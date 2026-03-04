@@ -120,7 +120,7 @@ const calculateQuarterProgress = async (
         let totalWeight = 0;
         let hasData = false;
 
-        objKrs.forEach((kr: any) => {
+        objKrs.forEach((kr) => {
             const today = new Date().toISOString().split('T')[0];
             const krCheckins = (checkins || [])
                 .filter(c => c.key_result_id === kr.id && c.checkins?.checkin_date <= today)
@@ -128,12 +128,13 @@ const calculateQuarterProgress = async (
 
             if (krCheckins.length > 0) {
                 const latest = krCheckins[0];
+                const type = kr.type as string;
                 const krProgress = calculateKR(
-                    latest.valor_realizado,
-                    latest.minimo_orcamento,
-                    latest.meta_checkin,
-                    kr.direction,
-                    kr.type
+                    Number(latest.valor_realizado),
+                    Number(latest.minimo_orcamento),
+                    Number(latest.meta_checkin),
+                    kr.direction as string,
+                    type
                 );
 
                 if (krProgress !== null) {
@@ -151,7 +152,7 @@ const calculateQuarterProgress = async (
             // Se não tem check-ins, faz média simples dos percent_kr para não zerar
             let fallbackSum = 0;
             let fallbackWeight = 0;
-            objKrs.forEach((kr: any) => {
+            objKrs.forEach((kr) => {
                 const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
                 fallbackSum += (kr.percent_kr || 0) * weight;
                 fallbackWeight += weight;
@@ -351,22 +352,22 @@ export function useDashboardData() {
                 userRankings = userRankings.map((r, i) => ({ ...r, rank: i + 1 }));
             }
 
-            const getKRAttainment = (kr: any, quarterId: string) => {
+            const getKRAttainment = (kr: Record<string, unknown>, quarterId: string) => {
                 const today = new Date().toISOString().split('T')[0];
-                const results = (kr.checkin_results || []).filter((r: any) =>
-                    r.checkins && r.checkins.quarter_id === quarterId && r.checkins.checkin_date <= today
+                const results = (kr.checkin_results as Record<string, unknown>[] || []).filter((r) =>
+                    r.checkins && (r.checkins as Record<string, unknown>).quarter_id === quarterId && (r.checkins as Record<string, unknown>).checkin_date <= today
                 );
-                const latestResult = [...results].sort((a: any, b: any) =>
-                    new Date(b.checkins?.checkin_date || 0).getTime() - new Date(a.checkins?.checkin_date || 0).getTime()
+                const latestResult = [...results].sort((a, b) =>
+                    new Date((b.checkins as Record<string, unknown>)?.checkin_date as string | number || 0).getTime() - new Date((a.checkins as Record<string, unknown>)?.checkin_date as string | number || 0).getTime()
                 )[0];
 
                 if (latestResult) {
                     return calculateKR(
-                        latestResult.valor_realizado,
-                        latestResult.minimo_orcamento,
-                        latestResult.meta_checkin,
-                        kr.direction,
-                        kr.type
+                        Number((latestResult as Record<string, unknown>).valor_realizado),
+                        Number((latestResult as Record<string, unknown>).minimo_orcamento),
+                        Number((latestResult as Record<string, unknown>).meta_checkin),
+                        kr.direction as string,
+                        kr.type as string
                     );
                 }
                 return null;
@@ -394,13 +395,13 @@ export function useDashboardData() {
                     const current = groups.get(title) || { totalPct: 0, userCount: 0, krCount: 0 };
 
                     let objAttainment = 0;
-                    const krs = obj.key_results as any[] || [];
+                    const krs = (obj.key_results as Record<string, unknown>[]) || [];
                     if (krs.length > 0) {
                         let weightedSum = 0;
                         let totalWeight = 0;
                         let hasData = false;
 
-                        krs.forEach((kr: any) => {
+                        krs.forEach((kr) => {
                             const krPercentage = getKRAttainment(kr, activeQuarter.id);
                             const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
 
@@ -416,9 +417,9 @@ export function useDashboardData() {
                         } else {
                             let fallbackSum = 0;
                             let fallbackWeight = 0;
-                            krs.forEach((kr: any) => {
+                            krs.forEach((kr) => {
                                 const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
-                                fallbackSum += (kr.percent_kr || 0) * weight;
+                                fallbackSum += ((kr.percent_kr as number) || 0) * weight;
                                 fallbackWeight += weight;
                             });
                             objAttainment = fallbackWeight > 0 ? fallbackSum / fallbackWeight : 0;
@@ -443,7 +444,7 @@ export function useDashboardData() {
 
             // Helper: OKR Rankings
             let krsQuery = supabase.from('key_results')
-                .select('title, code, percent_kr, type, direction, target, user_id, objectives(user_id), checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(quarter_id))')
+                .select('title, code, percent_kr, type, direction, target, user_id, objectives(user_id), checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(quarter_id, checkin_date))')
                 .eq('company_id', selectedCompanyId)
                 .eq('quarter_id', activeQuarter.id);
             if (userIdFilter) krsQuery = krsQuery.eq('user_id', userIdFilter);
@@ -451,11 +452,11 @@ export function useDashboardData() {
             const { data: krs } = await krsQuery;
             const okrRankings: OKRRanking[] = [];
             if (krs && krs.length > 0) {
-                const ownerIds = Array.from(new Set(krs.map(kr => (kr.objectives as any)?.user_id || kr.user_id).filter(Boolean)));
+                const ownerIds = Array.from(new Set(krs.map(kr => (kr.objectives as Record<string, unknown>)?.user_id as string || kr.user_id).filter(Boolean)));
                 const { data: owners } = await supabase.from('profiles').select('id, full_name, sector, avatar_url').in('id', ownerIds);
                 const ownersMap = new Map(owners?.map(o => [o.id, o]) || []);
                 krs.forEach(kr => {
-                    const ownerId = (kr.objectives as any)?.user_id || kr.user_id;
+                    const ownerId = (kr.objectives as Record<string, unknown>)?.user_id as string || kr.user_id;
                     const owner = ownersMap.get(ownerId);
                     let av = owner?.avatar_url;
                     if (av && !av.startsWith('http')) {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,14 +43,7 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
     code: '',
   });
 
-  useEffect(() => {
-    if (open) {
-      loadUsers();
-      loadKeyResult();
-    }
-  }, [open, krId, companyId]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, full_name')
@@ -66,9 +59,9 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
     if (profiles) {
       setUsers(profiles);
     }
-  };
+  }, [companyId]);
 
-  const loadKeyResult = async () => {
+  const loadKeyResult = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('key_results')
@@ -91,7 +84,14 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
       code: data.code ?? '',
     });
     setLoading(false);
-  };
+  }, [krId]);
+
+  useEffect(() => {
+    if (open) {
+      loadUsers();
+      loadKeyResult();
+    }
+  }, [open, loadUsers, loadKeyResult]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,9 +126,10 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
       toast.success('Key Result atualizado com sucesso');
       onSuccess();
       setOpen(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Erro ao atualizar Key Result:', err);
-      toast.error(err.message || 'Erro ao atualizar Key Result');
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao atualizar Key Result';
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }

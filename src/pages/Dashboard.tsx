@@ -13,6 +13,7 @@ import { toTitleCase } from '@/lib/utils';
 import { ActiveQuarterInfo } from '@/components/ActiveQuarterInfo';
 import { useDashboardData, UserRanking } from '@/hooks/useDashboardData';
 import { getPerformanceColor } from '@/lib/performanceColors';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -26,8 +27,8 @@ export default function Dashboard() {
     '--progress-color': getPerformanceColor(pct),
   });
 
-  const topThreeRankings = useMemo(() =>
-    data?.metrics.userRankings.slice(0, 3) || [],
+  const topRankings = useMemo(() =>
+    data?.metrics.userRankings.slice(0, 10) || [],
     [data?.metrics.userRankings]
   );
 
@@ -101,7 +102,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <KpiCard
             title={toTitleCase('Objetivos Ativos')}
             icon={<Target className="h-5 w-5" />}
@@ -114,47 +115,42 @@ export default function Dashboard() {
             value={metrics.activeOKRsCount}
             description={toTitleCase('Key Results com acompanhamento')}
           />
-          <KpiCard
-            title={toTitleCase('Média do Quarter')}
-            icon={<TrendingUp className="h-5 w-5" />}
-            value={`${metrics.currentQuarterProgress}%`}
-            description={toTitleCase('Progresso consolidado do quarter')}
-          />
-          <Card>
+          <Card className="md:col-span-2 xl:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
                 <p className="text-base text-black">{toTitleCase('OKRs por Objetivo')}</p>
-                <p className="text-sm text-black mt-1">Key Results Ativos</p>
+                <p className="text-sm text-muted-foreground mt-1">Key Results por objetivo</p>
               </div>
               <div className="rounded-full bg-muted p-3 text-primary">
                 <TrendingUp className="h-5 w-5" />
               </div>
             </CardHeader>
             <CardContent className="pt-0 pb-4">
-              <div className="flex flex-wrap gap-2 max-h-[48px] overflow-y-auto custom-scrollbar pr-1">
-                {metrics.objectiveRankings.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum objetivo.</p>
-                ) : (
-                  metrics.objectiveRankings
-                    .sort((a, b) => b.kr_count - a.kr_count)
-                    .map((objective, index) => (
-                      <div key={index} className="flex items-center gap-1.5 bg-muted/50 px-2 py-0.5 rounded-md border border-muted/60">
-                        <span className="text-[11px] font-medium text-black line-clamp-1 max-w-[90px]" title={toTitleCase(objective.objective_title)}>
-                          {toTitleCase(objective.objective_title)}
-                        </span>
-                        <span className="text-[11px] font-bold text-primary">
-                          {objective.kr_count}
-                        </span>
-                      </div>
-                    ))
-                )}
-              </div>
+              {metrics.objectiveRankings.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum objetivo.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={100}>
+                  <BarChart data={metrics.objectiveRankings.map(o => ({
+                    name: toTitleCase(o.objective_title),
+                    krs: o.kr_count,
+                  }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 20% 90%)" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} />
+                    <YAxis hide allowDecimals={false} />
+                    <RechartsTooltip
+                      contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
+                      formatter={(value: number) => [value, 'Key Results']}
+                    />
+                    <Bar dataKey="krs" fill="hsl(221 83% 53%)" radius={[4, 4, 0, 0]} barSize={28} label={{ position: 'top', fontSize: 11, fontWeight: 600, fill: 'hsl(221 83% 53%)' }} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="h-full">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
@@ -165,23 +161,21 @@ export default function Dashboard() {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col items-center gap-4">
-                <CircularProgress percentage={metrics.currentQuarterProgress} size={220} strokeWidth={14} />
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Resultado consolidado</p>
-                </div>
+              <div className="flex flex-col items-center gap-2">
+                <CircularProgress percentage={metrics.currentQuarterProgress} size={160} strokeWidth={12} />
+                <p className="text-sm text-muted-foreground">Resultado consolidado</p>
               </div>
 
               {metrics.objectiveRankings.length > 0 && (
-                <div className="mt-8 pt-6 border-t flex flex-wrap gap-8 justify-center overflow-x-auto pb-2 custom-scrollbar">
+                <div className="mt-4 pt-4 border-t flex flex-wrap gap-6 justify-center overflow-x-auto pb-1 custom-scrollbar">
                   {metrics.objectiveRankings.map((objective, index) => {
                     const colorClass = getPerformanceColor(objective.result_pct);
                     return (
-                      <div key={index} className="flex flex-col items-center gap-3 min-w-[130px]">
-                        <CircularProgress percentage={objective.result_pct} size={120} strokeWidth={10} textClassName="text-xl" />
+                      <div key={index} className="flex flex-col items-center gap-2 min-w-[100px]">
+                        <CircularProgress percentage={objective.result_pct} size={90} strokeWidth={8} textClassName="text-base" />
                         <span
-                          className={`text-sm font-medium text-center uppercase tracking-wider ${colorClass}`}
-                          style={{ maxWidth: '140px', lineHeight: '1.2' }}
+                          className={`text-xs font-medium text-center uppercase tracking-wider ${colorClass}`}
+                          style={{ maxWidth: '110px', lineHeight: '1.2' }}
                         >
                           {objective.objective_title}
                         </span>
@@ -193,7 +187,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="flex flex-col overflow-hidden">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Trophy className="h-5 w-5" />
@@ -203,30 +197,30 @@ export default function Dashboard() {
                 Colaboradores com melhor desempenho no quarter atual.
               </p>
             </CardHeader>
-            <CardContent className="h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-              {topThreeRankings.length === 0 ? (
+            <CardContent className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+              {topRankings.length === 0 ? (
                 <p className="text-center text-muted-foreground">Nenhum resultado disponível.</p>
               ) : (
-                <div className="space-y-4">
-                  {topThreeRankings.map(ranking => (
-                    <div key={ranking.user_id} className="flex items-center justify-between rounded-2xl border p-4">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="font-normal px-2 py-1 flex justify-center text-sm">
+                <div className="space-y-2">
+                  {topRankings.map(ranking => (
+                    <div key={ranking.user_id} className="flex items-center justify-between rounded-xl border px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="font-normal px-1.5 py-0.5 flex justify-center text-xs min-w-[28px]">
                           #{ranking.rank}
                         </Badge>
-                        <Avatar className="h-12 w-12">
+                        <Avatar className="h-9 w-9">
                           {ranking.avatar_url ? (
                             <AvatarImage src={ranking.avatar_url} alt={ranking.full_name} />
                           ) : (
-                            <AvatarFallback>{getInitials(ranking.full_name)}</AvatarFallback>
+                            <AvatarFallback className="text-xs">{getInitials(ranking.full_name)}</AvatarFallback>
                           )}
                         </Avatar>
                         <div>
-                          <p className="text-base font-normal leading-tight">{ranking.full_name}</p>
-                          <p className="text-sm text-muted-foreground">{ranking.sector ?? 'Sem setor'}</p>
+                          <p className="text-sm font-normal leading-tight">{ranking.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{ranking.sector ?? 'Sem setor'}</p>
                         </div>
                       </div>
-                      <span className="text-base font-normal">{ranking.result_pct}%</span>
+                      <span className="text-sm font-medium">{ranking.result_pct}%</span>
                     </div>
                   ))}
                 </div>

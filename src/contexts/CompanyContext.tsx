@@ -111,7 +111,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     };
 
     fetchAndSelect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, profile?.company_id]);
 
   return (
