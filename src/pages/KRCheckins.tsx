@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toTitleCase } from '@/lib/utils';
 import { calculateDeadlineProgress } from '@/lib/deadlineProgress';
+import { ObjectiveLineChart } from '@/components/ObjectiveLineChart';
 
 interface Quarter {
   id: string;
@@ -1415,6 +1416,69 @@ export default function KRCheckins() {
     userProfile?.company_id,
   ]);
 
+  // Auto-save objective averages to DB
+  useEffect(() => {
+    const saveObjectiveAverages = async () => {
+      if (!selectedQuarter || groupedObjectives.length === 0 || quarterCheckins.length === 0) return;
+
+      const targetUserId = filterOwnerId && filterOwnerId !== 'all' ? filterOwnerId : user?.id;
+      const targetCompanyId = filterCompanyId && filterCompanyId !== 'all'
+        ? filterCompanyId
+        : selectedCompanyId ?? userProfile?.company_id;
+
+      if (!targetUserId || !targetCompanyId) return;
+
+      const rows: {
+        company_id: string;
+        user_id: string;
+        quarter_id: string;
+        checkin_id: string;
+        objective_title: string;
+        average_pct: number;
+        updated_at: string;
+      }[] = [];
+
+      groupedObjectives.forEach((group) => {
+        quarterCheckins.forEach((checkin) => {
+          const stat = checkinGroupAverages[group.title]?.[checkin.id];
+          if (stat?.hasData) {
+            rows.push({
+              company_id: targetCompanyId,
+              user_id: targetUserId,
+              quarter_id: selectedQuarter,
+              checkin_id: checkin.id,
+              objective_title: group.title,
+              average_pct: stat.average,
+              updated_at: new Date().toISOString(),
+            });
+          }
+        });
+      });
+
+      if (rows.length === 0) return;
+
+      try {
+        await supabase
+          .from('objective_checkin_averages')
+          .upsert(rows, { onConflict: 'company_id,user_id,quarter_id,checkin_id,objective_title' });
+      } catch (err) {
+        console.error('Erro ao salvar médias de objetivo:', err);
+      }
+    };
+
+    saveObjectiveAverages();
+  }, [
+    checkinGroupAverages,
+    groupedObjectives,
+    quarterCheckins,
+    selectedQuarter,
+    filterOwnerId,
+    filterCompanyId,
+    selectedCompanyId,
+    user,
+    userProfile?.company_id,
+  ]);
+
   useEffect(() => {
     const persistCompletedCheckins = async () => {
       if (!role || role === 'user' || quarterCheckins.length === 0) return;
@@ -1591,8 +1655,14 @@ export default function KRCheckins() {
                       <React.Fragment key={group.title}>
                         <TableRow className="bg-muted/50">
                           <TableCell colSpan={2} className="sticky left-0 bg-muted/50 z-10 px-2">
-                            <div className="text-base font-bold text-primary uppercase py-2">
-                              {toTitleCase(group.title)}
+                            <div className="flex items-center gap-3 py-2">
+                              <div className="text-base font-bold text-primary uppercase">
+                                {toTitleCase(group.title)}
+                              </div>
+                              <ObjectiveLineChart
+                                checkins={quarterCheckins}
+                                averages={checkinGroupAverages[group.title] ?? {}}
+                              />
                             </div>
                           </TableCell>
                           {quarterCheckins.map((checkin) => {

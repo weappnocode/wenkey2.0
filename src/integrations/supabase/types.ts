@@ -95,14 +95,13 @@ export type Database = {
           company_id: string | null
           created_at: string
           id: string
+          is_scheduled: boolean | null
           key_result_id: string | null
           note: string | null
           occurred_at: string | null
           quarter_id: string
-          result_percent: number | null
           user_id: string | null
           value: number | null
-          is_scheduled: boolean | null
         }
         Insert: {
           checkin_date: string
@@ -110,14 +109,13 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
+          is_scheduled?: boolean | null
           key_result_id?: string | null
           note?: string | null
           occurred_at?: string | null
           quarter_id: string
-          result_percent?: number | null
           user_id?: string | null
           value?: number | null
-          is_scheduled?: boolean | null
         }
         Update: {
           checkin_date?: string
@@ -125,14 +123,13 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
+          is_scheduled?: boolean | null
           key_result_id?: string | null
           note?: string | null
           occurred_at?: string | null
           quarter_id?: string
-          result_percent?: number | null
           user_id?: string | null
           value?: number | null
-          is_scheduled?: boolean | null
         }
         Relationships: [
           {
@@ -419,6 +416,61 @@ export type Database = {
           },
         ]
       }
+      objective_checkin_averages: {
+        Row: {
+          average_pct: number
+          checkin_id: string
+          company_id: string
+          id: string
+          objective_title: string
+          quarter_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          average_pct?: number
+          checkin_id: string
+          company_id: string
+          id?: string
+          objective_title: string
+          quarter_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          average_pct?: number
+          checkin_id?: string
+          company_id?: string
+          id?: string
+          objective_title?: string
+          quarter_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objective_checkin_averages_checkin_id_fkey"
+            columns: ["checkin_id"]
+            isOneToOne: false
+            referencedRelation: "checkins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objective_checkin_averages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objective_checkin_averages_quarter_id_fkey"
+            columns: ["quarter_id"]
+            isOneToOne: false
+            referencedRelation: "quarters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       objectives: {
         Row: {
           archived: boolean | null
@@ -513,51 +565,6 @@ export type Database = {
           },
         ]
       }
-      objective_group_results: {
-        Row: {
-          avg_attainment_pct: number | null
-          company_id: string
-          id: string
-          kr_count: number | null
-          objective_title: string
-          quarter_id: string
-          updated_at: string
-        }
-        Insert: {
-          avg_attainment_pct?: number | null
-          company_id: string
-          id?: string
-          kr_count?: number | null
-          objective_title: string
-          quarter_id: string
-          updated_at?: string
-        }
-        Update: {
-          avg_attainment_pct?: number | null
-          company_id?: string
-          id?: string
-          kr_count?: number | null
-          objective_title?: string
-          quarter_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "objective_group_results_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "objective_group_results_quarter_id_fkey"
-            columns: ["quarter_id"]
-            isOneToOne: false
-            referencedRelation: "quarters"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -568,7 +575,7 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean
-          permission_type: 'user' | 'manager' | 'admin'
+          permission_type: Database["public"]["Enums"]["user_permission"]
           position: string | null
           sector: string | null
           updated_at: string
@@ -582,7 +589,7 @@ export type Database = {
           full_name: string
           id: string
           is_active?: boolean
-          permission_type?: 'user' | 'manager' | 'admin'
+          permission_type?: Database["public"]["Enums"]["user_permission"]
           position?: string | null
           sector?: string | null
           updated_at?: string
@@ -596,7 +603,7 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean
-          permission_type?: 'user' | 'manager' | 'admin'
+          permission_type?: Database["public"]["Enums"]["user_permission"]
           position?: string | null
           sector?: string | null
           updated_at?: string
@@ -622,6 +629,7 @@ export type Database = {
           name: string
           quarter_id: string
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           checkin_date: string
@@ -633,6 +641,7 @@ export type Database = {
           name: string
           quarter_id: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           checkin_date?: string
@@ -644,6 +653,7 @@ export type Database = {
           name?: string
           quarter_id?: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -658,6 +668,13 @@ export type Database = {
             columns: ["quarter_id"]
             isOneToOne: false
             referencedRelation: "quarters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quarter_checkins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -758,6 +775,72 @@ export type Database = {
           },
         ]
       }
+      stripe_customers: {
+        Row: {
+          created_at: string
+          id: string
+          stripe_customer_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          stripe_customer_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          stripe_customer_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          id: string
+          status: string
+          stripe_price_id: string
+          stripe_subscription_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end: string
+          current_period_start: string
+          id?: string
+          status: string
+          stripe_price_id: string
+          stripe_subscription_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          status?: string
+          stripe_price_id?: string
+          stripe_subscription_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -822,7 +905,13 @@ export type Database = {
         Returns: boolean
       }
       is_manager_or_admin: { Args: { _user_id: string }; Returns: boolean }
-      public_active_companies: { Args: Record<PropertyKey, never>; Returns: { id: string; name: string }[] }
+      public_active_companies: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
       recalculate_all_percentages: { Args: never; Returns: undefined }
     }
     Enums: {
@@ -842,116 +931,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   public: {
