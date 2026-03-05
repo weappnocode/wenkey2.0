@@ -10,7 +10,7 @@ import {
 
 interface DataPoint {
     label: string;
-    value: number;
+    value: number | null;
     hasData: boolean;
 }
 
@@ -31,16 +31,17 @@ export function ObjectiveLineChart({
                 const day = dayPart?.replace(/[^0-9]/g, '');
                 return {
                     label: `${day}/${month}`,
-                    value: stat?.hasData ? stat.average : 0,
+                    // Use null for missing data so the tick stays but no line is drawn
+                    value: stat?.hasData ? stat.average : null,
                     hasData: !!stat?.hasData,
-                } as DataPoint;
+                };
             });
     }, [checkins, averages]);
 
-    // Filtra apenas pontos com dados para a linha
-    const pointsWithData = chartData.filter((d) => d.hasData);
+    // Check if there is at least one point with actual data
+    const hasAnyData = chartData.some((d) => d.hasData);
 
-    if (pointsWithData.length === 0) {
+    if (!hasAnyData) {
         return (
             <div className="flex items-center justify-center h-[60px] text-xs text-muted-foreground">
                 Sem dados
@@ -49,9 +50,15 @@ export function ObjectiveLineChart({
     }
 
     return (
-        <div className="w-full h-full pt-2">
+        <div
+            className="w-full h-full pt-2"
+            style={{
+                paddingLeft: `calc(50% / ${checkins.length} - 10px)`,
+                paddingRight: `calc(50% / ${checkins.length} - 10px)`,
+            }}
+        >
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 100, left: 100, bottom: 5 }}>
+                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
                     <XAxis
                         dataKey="label"
                         tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }}
