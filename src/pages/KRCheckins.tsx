@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { callN8nWebhook } from '@/lib/n8nWebhook';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -850,17 +851,13 @@ export default function KRCheckins() {
 
       // Dispara webhook n8n para criar evento no Google Calendar (falha silenciosa)
       try {
-        await fetch('https://n8n-terj.onrender.com/webhook/wenkey-checkin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            kr_title: currentKR.title,
-            checkin_date: currentCheckin.checkin_date,
-            valor_realizado: isNaN(realizado) ? null : realizado,
-            meta: isNaN(meta) ? null : meta,
-            percentual: roundedVisualAttainment,
-            company: selectedCompany?.name ?? '',
-          }),
+        await callN8nWebhook('wenkey-checkin', {
+          kr_title: currentKR.title,
+          checkin_date: currentCheckin.checkin_date,
+          valor_realizado: isNaN(realizado) ? null : realizado,
+          meta: isNaN(meta) ? null : meta,
+          percentual: roundedVisualAttainment,
+          company: selectedCompany?.name ?? '',
         });
       } catch (webhookErr) {
         console.warn('[n8n] Webhook falhou (não impacta o check-in):', webhookErr);

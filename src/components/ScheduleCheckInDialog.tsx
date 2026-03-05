@@ -4,6 +4,7 @@ import { ptBR } from "date-fns/locale";
 import { CalendarIcon, Clock, Users, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { callN8nWebhook } from "@/lib/n8nWebhook";
 import { useToast } from "@/hooks/use-toast";
 
 import {
@@ -165,14 +166,10 @@ export function ScheduleCheckInDialog({
                 attendee_emails: Array.from(selectedUsers),
             };
 
-            const response = await fetch('https://n8n-terj.onrender.com/webhook/wenkey-schedule', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+            const result = await callN8nWebhook('wenkey-schedule', payload);
 
-            if (!response.ok) {
-                throw new Error(`Erro ao contatar o servidor de agendamento (${response.status})`);
+            if (!result.success) {
+                throw new Error(`Erro ao contatar o servidor de agendamento`);
             }
 
             // Marcar como agendado no banco de dados para exibir a tag no card

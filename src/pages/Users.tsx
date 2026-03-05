@@ -46,6 +46,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 import { toTitleCase } from '@/lib/utils';
+import { callN8nWebhook } from '@/lib/n8nWebhook';
 
 interface Profile {
   id: string;
@@ -356,7 +357,47 @@ export default function Users() {
 
       if (error) throw error;
 
-      toast.success('Status atualizado com sucesso!');
+      // Se está ativando (false → true), dispara webhook de email de ativação
+      if (!currentStatus) {
+        const activatedUser = users.find(u => u.id === userId);
+        if (activatedUser) {
+          try {
+            const companyId = activatedUser.company_id || getUserCompanyId(activatedUser);
+            let companyName = 'Sua Empresa';
+
+            if (companyId) {
+              const { data: companyData } = await supabase
+                .from('companies')
+                .select('name')
+                .eq('id', companyId)
+                .single();
+              if (companyData) companyName = companyData.name;
+            }
+
+            const result = await callN8nWebhook('emailAtivo', {
+              user_id: activatedUser.id,
+              email: activatedUser.email,
+              full_name: activatedUser.full_name,
+              company_name: companyName,
+              activated_at: new Date().toISOString(),
+            });
+
+            if (result.success) {
+              toast.success('Usuário ativado e email de boas-vindas enviado!');
+            } else {
+              toast.success('Usuário ativado! (email pode não ter sido enviado)');
+            }
+          } catch (webhookErr) {
+            console.warn('[n8n] Webhook emailAtivo falhou (não impacta a ativação):', webhookErr);
+            toast.success('Usuário ativado! (email pode não ter sido enviado)');
+          }
+        } else {
+          toast.success('Status atualizado com sucesso!');
+        }
+      } else {
+        toast.success('Usuário desativado com sucesso!');
+      }
+
       loadData();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
@@ -389,18 +430,13 @@ export default function Users() {
         activated_at: new Date().toISOString()
       };
 
-      // Usa o mode 'no-cors' porque o n8n não retorna headers de CORS na web
-      const response = await fetch('https://n8n-terj.onrender.com/webhook/emailAtivo', {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
+      const result = await callN8nWebhook('emailAtivo', payload);
 
-      // Quando usamos no-cors, o response é "opaco", então não podemos validar o boolean ok
-      toast.success('Requisição de teste enviada! Verifique o n8n.');
+      if (result.success) {
+        toast.success('Email de ativação enviado com sucesso!');
+      } else {
+        toast.error('Falha ao enviar email: ' + (result.error || 'Erro desconhecido'));
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
       toast.error('Erro ao enviar teste: ' + message);
@@ -452,16 +488,13 @@ export default function Users() {
         registered_at: new Date().toISOString()
       };
 
-      const response = await fetch('https://n8n-terj.onrender.com/webhook/novocadastro', {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
+      const result = await callN8nWebhook('novocadastro', payload);
 
-      toast.success('Teste de novo cadastro enviado! Verifique o n8n.');
+      if (result.success) {
+        toast.success('Notificação de novo cadastro enviada!');
+      } else {
+        toast.error('Falha ao enviar notificação: ' + (result.error || 'Erro desconhecido'));
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
       toast.error('Erro ao enviar teste: ' + message);

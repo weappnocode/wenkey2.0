@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { callN8nWebhook } from '@/lib/n8nWebhook';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,6 +53,37 @@ export default function Auth() {
       });
 
       if (error) throw error;
+
+      // Dispara webhook n8n para notificar admins sobre novo cadastro (falha silenciosa)
+      try {
+        const selectedCompany = companies.find(c => c.id === formData.company_id);
+        const companyName = selectedCompany?.name || 'Sua Empresa';
+
+        // Busca emails dos admins/managers da empresa
+        const { data: adminsData } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('company_id', formData.company_id)
+          .in('permission_type', ['admin', 'manager'])
+          .eq('is_active', true);
+
+        const adminEmails = adminsData && adminsData.length > 0
+          ? adminsData.map(a => a.email).join(',')
+          : '';
+
+        if (adminEmails) {
+          await callN8nWebhook('novocadastro', {
+            type: 'new_user_registration',
+            new_user_email: formData.email,
+            new_user_name: formData.fullName,
+            company_name: companyName,
+            admin_emails: adminEmails,
+            registered_at: new Date().toISOString(),
+          });
+        }
+      } catch (webhookErr) {
+        console.warn('[n8n] Webhook novocadastro falhou (não impacta o cadastro):', webhookErr);
+      }
 
       toast.success('Conta criada! Confirme seu email. Após a confirmação, um administrador precisará ativar sua conta.');
       navigate(`/confirm-email?email=${encodeURIComponent(formData.email)}`);

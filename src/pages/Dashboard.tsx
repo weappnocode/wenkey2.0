@@ -28,7 +28,7 @@ export default function Dashboard() {
   });
 
   const topRankings = useMemo(() =>
-    data?.metrics.userRankings.slice(0, 10) || [],
+    data?.metrics.userRankings.slice(0, 5) || [],
     [data?.metrics.userRankings]
   );
 
@@ -191,7 +191,7 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Trophy className="h-5 w-5" />
-                Ranking do Quarter
+                Ranking 5 Primeiros no Quarter
               </CardTitle>
               <p className="text-sm text-muted-foreground">
                 Colaboradores com melhor desempenho no quarter atual.
