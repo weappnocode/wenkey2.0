@@ -51,7 +51,7 @@ export function ObjectiveLineChart({
     return (
         <div className="w-full h-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 30, bottom: 5 }}>
+                <LineChart data={chartData} margin={{ top: 5, right: 100, left: 100, bottom: 5 }}>
                     <XAxis
                         dataKey="label"
                         tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }}

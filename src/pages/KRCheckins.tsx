@@ -1594,29 +1594,28 @@ export default function KRCheckins() {
         </div>
 
         {selectedQuarter && (
-          <div className="flex items-center gap-6 mb-4 xl:max-w-[70vw]">
-            <Card className="w-fit flex-shrink-0">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">RESULTADO ATUAL</p>
-                    <p className="text-4xl font-bold text-primary">{currentResult}%</p>
-                  </div>
-                  <Progress
-                    value={currentResult}
-                    className="h-3 w-32"
-                    style={{ '--progress-color': getProgressColor(currentResult) } as React.CSSProperties}
-                  />
-                </div>
+          <div className="flex items-stretch gap-0 mb-4 w-full h-[120px]">
+            {/* This card width (260px) perfectly matches the combined width of the "Código" (60px) and "Key Result" (200px) sticky columns below */}
+            <Card className="w-[260px] flex-shrink-0 flex flex-col justify-center rounded-r-none border-r-0">
+              <CardContent className="p-4 flex flex-col items-center justify-center h-full">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">RESULTADO ATUAL</p>
+                <p className="text-4xl font-bold text-primary mb-3">{currentResult}%</p>
+                <Progress
+                  value={currentResult}
+                  className="h-3 w-full max-w-[140px]"
+                  style={{ '--progress-color': getProgressColor(currentResult) } as React.CSSProperties}
+                />
               </CardContent>
             </Card>
 
             {quarterCheckins.length > 0 && (
-              <Card className="flex-1 h-[96px] pt-1">
-                <ObjectiveLineChart
-                  checkins={quarterCheckins}
-                  averages={checkinOverallAverages}
-                />
+              <Card className="flex-1 min-w-0 rounded-l-none overflow-hidden">
+                <CardContent className="p-0 h-full pt-4">
+                  <ObjectiveLineChart
+                    checkins={quarterCheckins}
+                    averages={checkinOverallAverages}
+                  />
+                </CardContent>
               </Card>
             )}
           </div>
