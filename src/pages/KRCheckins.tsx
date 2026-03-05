@@ -1594,21 +1594,32 @@ export default function KRCheckins() {
         </div>
 
         {selectedQuarter && (
-          <Card className="w-fit">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">RESULTADO ATUAL</p>
-                  <p className="text-4xl font-bold text-primary">{currentResult}%</p>
+          <div className="flex items-center gap-6 mb-4 xl:max-w-[70vw]">
+            <Card className="w-fit flex-shrink-0">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">RESULTADO ATUAL</p>
+                    <p className="text-4xl font-bold text-primary">{currentResult}%</p>
+                  </div>
+                  <Progress
+                    value={currentResult}
+                    className="h-3 w-32"
+                    style={{ '--progress-color': getProgressColor(currentResult) } as React.CSSProperties}
+                  />
                 </div>
-                <Progress
-                  value={currentResult}
-                  className="h-3 w-32"
-                  style={{ '--progress-color': getProgressColor(currentResult) } as React.CSSProperties}
+              </CardContent>
+            </Card>
+
+            {quarterCheckins.length > 0 && (
+              <Card className="flex-1 h-[96px] pt-1">
+                <ObjectiveLineChart
+                  checkins={quarterCheckins}
+                  averages={checkinOverallAverages}
                 />
-              </div>
-            </CardContent>
-          </Card>
+              </Card>
+            )}
+          </div>
         )}
 
         {selectedQuarter && quarterCheckins.length > 0 && objectives.length > 0 && (
@@ -1646,18 +1657,12 @@ export default function KRCheckins() {
                   <TableBody>
                     {groupedObjectives.map((group) => (
                       <React.Fragment key={group.title}>
-                        <TableRow className="bg-muted/50 relative">
-                          <TableCell colSpan={2 + quarterCheckins.length} className="p-0 border-b-0 relative h-[60px]">
-                            <ObjectiveLineChart
-                              checkins={quarterCheckins}
-                              averages={checkinGroupAverages[group.title] ?? {}}
-                            />
-                          </TableCell>
-                        </TableRow>
                         <TableRow className="bg-muted/50">
                           <TableCell colSpan={2} className="sticky left-0 bg-muted/50 z-10 px-2 border-t-0">
-                            <div className="text-base font-bold text-primary uppercase py-2">
-                              {toTitleCase(group.title)}
+                            <div className="flex items-center gap-3 py-2">
+                              <div className="text-base font-bold text-primary uppercase">
+                                {toTitleCase(group.title)}
+                              </div>
                             </div>
                           </TableCell>
                           {quarterCheckins.map((checkin) => {
