@@ -1079,6 +1079,7 @@ export default function KRCheckins() {
           .eq('archived', false);
 
         if (allSameObjectives) {
+          /*
           const totalPct = allSameObjectives.reduce((sum, o) => sum + (o.percent_obj ?? 0), 0);
           const userCount = allSameObjectives.length;
           const krCount = allSameObjectives.reduce((sum, o) => sum + ((o.key_results as Array<{ id: string }>)?.length || 0), 0);
@@ -1094,6 +1095,7 @@ export default function KRCheckins() {
               kr_count: krCount,
               updated_at: new Date().toISOString()
             }, { onConflict: 'company_id,quarter_id,objective_title' });
+            */
         }
       }
     } catch (error) {
@@ -1510,17 +1512,8 @@ export default function KRCheckins() {
       try {
         await Promise.all(
           updates.map(async (update) => {
-            const { error: updateError } = await supabase
-              .from('checkins')
-              .update({
-                result_percent: update.value,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', update.id);
-
-            if (updateError) {
-              throw updateError;
-            }
+            // result_percent and updated_at were removed as they don't exist on checkins table
+            // They are calculated dynamically or saved in quarter_results
           })
         );
 
@@ -1653,16 +1646,18 @@ export default function KRCheckins() {
                   <TableBody>
                     {groupedObjectives.map((group) => (
                       <React.Fragment key={group.title}>
+                        <TableRow className="bg-muted/50 relative">
+                          <TableCell colSpan={2 + quarterCheckins.length} className="p-0 border-b-0 relative h-[60px]">
+                            <ObjectiveLineChart
+                              checkins={quarterCheckins}
+                              averages={checkinGroupAverages[group.title] ?? {}}
+                            />
+                          </TableCell>
+                        </TableRow>
                         <TableRow className="bg-muted/50">
-                          <TableCell colSpan={2} className="sticky left-0 bg-muted/50 z-10 px-2">
-                            <div className="flex items-center gap-3 py-2">
-                              <div className="text-base font-bold text-primary uppercase">
-                                {toTitleCase(group.title)}
-                              </div>
-                              <ObjectiveLineChart
-                                checkins={quarterCheckins}
-                                averages={checkinGroupAverages[group.title] ?? {}}
-                              />
+                          <TableCell colSpan={2} className="sticky left-0 bg-muted/50 z-10 px-2 border-t-0">
+                            <div className="text-base font-bold text-primary uppercase py-2">
+                              {toTitleCase(group.title)}
                             </div>
                           </TableCell>
                           {quarterCheckins.map((checkin) => {

@@ -49,14 +49,12 @@ export function ObjectiveLineChart({
     }
 
     return (
-        <div className="w-[180px] h-[60px]">
+        <div className="w-full h-[60px] pl-[260px] absolute inset-0 z-0 opacity-50 pointer-events-none">
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <LineChart data={chartData} margin={{ top: 15, right: 100, left: 100, bottom: 5 }}>
                     <XAxis
                         dataKey="label"
-                        tick={{ fontSize: 9, fill: '#94a3b8' }}
-                        axisLine={false}
-                        tickLine={false}
+                        hide
                     />
                     <YAxis hide domain={[0, 100]} />
                     <Tooltip
