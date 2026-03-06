@@ -47,6 +47,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 import { toTitleCase } from '@/lib/utils';
 import { callN8nWebhook } from '@/lib/n8nWebhook';
+import { EmailScheduleCard } from '@/components/EmailScheduleCard';
 
 interface Profile {
   id: string;
@@ -702,6 +703,10 @@ export default function Users() {
           </CardContent>
         </Card>
 
+        {/* Email Schedule Config – Admin only */}
+        {isAdmin && (
+          <EmailScheduleCard companyId={selectedCompanyId || profile?.company_id || ''} />
+        )}
         {/* Create Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent className="max-w-md">
