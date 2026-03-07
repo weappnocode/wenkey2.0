@@ -191,11 +191,11 @@ export default function Dashboard() {
               {topRankings.length === 0 ? (
                 <p className="text-center text-muted-foreground">Nenhum resultado disponível.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 px-1 py-1">
                   {topRankings.map((ranking, index) => (
                     <div
                       key={ranking.user_id}
-                      className={`flex items-center justify-between rounded-xl border px-3 py-2 animate-in slide-in-from-right-4 fade-in duration-500 fill-mode-both ${ranking.user_id === user?.id ? 'ring-2 ring-primary shadow-md shadow-primary/20 bg-primary/5 scale-[1.02]' : 'hover:bg-muted/50'}`}
+                      className={`flex items-center justify-between rounded-xl border px-3 py-2 animate-in slide-in-from-right-4 fade-in duration-500 fill-mode-both ${ranking.user_id === user?.id ? 'ring-2 ring-primary shadow-md shadow-primary/20 bg-primary/5' : 'hover:bg-muted/50'}`}
                       style={{ animationDelay: `${index * 150}ms` }}
                     >
                       <div className="flex items-center gap-2">
