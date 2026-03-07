@@ -115,6 +115,10 @@ export default function KRCheckins() {
   const [currentResult, setCurrentResult] = useState<number>(0);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
+  // Análise Executiva (Desativada temporariamente)
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
+  const [analysisContent, setAnalysisContent] = useState({ title: '', text: '' });
+
   const loadUserProfile = useCallback(async () => {
     if (!user) return;
 
@@ -908,35 +912,153 @@ export default function KRCheckins() {
   };
 
   const translateType = (type: string | null) => {
-    switch (type) {
+    if (!type) return '--';
+    const t = type.toLowerCase();
+    switch (t) {
       case 'currency':
       case 'moeda':
         return 'moeda';
       case 'percentual':
+      case 'percentage':
         return 'percentual';
       case 'numero':
+      case 'number':
         return 'número';
       case 'date':
       case 'data':
         return 'data';
       default:
-        return type || '--';
+        return type;
     }
   };
 
   const translateDirection = (direction: string | null) => {
-    switch (direction) {
+    if (!direction) return '--';
+    const d = direction.toLowerCase();
+    switch (d) {
       case 'increase':
+      case 'crescente':
+      case 'maior-é-melhor':
         return 'crescente';
       case 'decrease':
+      case 'decrescente':
+      case 'menor-é-melhor':
         return 'decrescente';
       case 'greater_than':
         return 'maior que';
       case 'less_than':
         return 'menor que';
       default:
-        return direction || '--';
+        return direction;
     }
+  };
+
+  // --- Helpers Expandidos para o Motor de Análise Executiva de KR ---
+  const getSeriesString = (values: number[]) => {
+    if (values.length === 0) return "";
+    return `(${values.map(v => `${v.toFixed(0)}%`).join(' → ')})`;
+  };
+
+  const readTrend = (values: number[]) => {
+    if (values.length < 2) return 'estabilidade';
+
+    const last = values[values.length - 1];
+    const first = values[0];
+    const prev = values[values.length - 2];
+    const changes = values.slice(1).map((v, i) => Math.abs(v - values[i]));
+    const maxChange = Math.max(...changes);
+
+    if (maxChange > 30) return 'oscilação forte';
+
+    const minVal = Math.min(...values);
+    if (last > minVal && last < first && last > prev) return 'recuperação parcial';
+
+    if (last < prev && last < first) return 'deterioração';
+
+    if (last >= 90 && Math.abs(last - prev) < 5) return 'estabilidade alta';
+
+    const totalDiff = last - first;
+    if (totalDiff > 15) return 'crescimento consistente';
+    if (totalDiff < -15) return 'queda recente';
+    if (maxChange > 12) return 'oscilação leve';
+
+    return 'estabilidade';
+  };
+
+  const classifyRisk = (currentValue: number, trend: string) => {
+    if (currentValue >= 100) return 'baixo';
+    if (trend === 'deterioração' || trend === 'queda recente' || trend === 'oscilação forte') return 'crítico';
+    if (currentValue < 70 || trend === 'oscilação leve' || trend === 'recuperação parcial') return 'alto';
+    return 'médio';
+  };
+
+  const generateKRExecutiveAnalysis = (kr: KeyResult) => {
+    const results = quarterCheckins
+      .map(c => checkinResults[`${kr.id}-${c.id}`])
+      .filter(r => r && r.valor_realizado !== null)
+      .sort((a, b) => {
+        const dateA = quarterCheckins.find(c => c.id === a?.checkin_id)?.checkin_date || '';
+        const dateB = quarterCheckins.find(c => c.id === b?.checkin_id)?.checkin_date || '';
+        return dateA.localeCompare(dateB);
+      });
+
+    // Percentual do KR (Progresso Real)
+    const krValues = results.map(r =>
+      calculateKR(r.valor_realizado, r.minimo_orcamento, r.meta_checkin, kr.direction, kr.type) ?? 0
+    );
+
+    if (krValues.length === 0) return "Dados insuficientes para realizar uma análise executiva neste momento.";
+
+    const lastKRValue = krValues[krValues.length - 1];
+    const lastResult = results[results.length - 1];
+    const trend = readTrend(krValues);
+    const risk = classifyRisk(lastKRValue, trend);
+    const seriesStr = getSeriesString(krValues);
+    const objectiveTitle = groupedObjectives.find(g => g.keyResults.some(k => k.id === kr.id))?.title || 'objetivo estratégico';
+
+    // Parágrafo 1: Diagnóstico do comportamento (Foco em números e evolução)
+    let p1 = "";
+    const trendDiagnosis: Record<string, string> = {
+      'crescimento consistente': 'demonstra uma trajetória de crescimento consistente e sustentável',
+      'queda recente': 'apresenta uma tendência de queda preocupante nos últimos ciclos',
+      'estabilidade': 'mantém um patamar de estabilidade operacional sem grandes variações',
+      'oscilação leve': 'apresenta comportamentos com oscilações pontuais de desempenho',
+      'oscilação forte': 'revela um cenário de forte instabilidade e ausência de consistência na execução',
+      'recuperação parcial': 'indica um processo de recuperação após perdas significativas de tração',
+      'deterioração': 'mostra um quadro de deterioração contínua, com perda de performance sucessiva',
+      'estabilidade alta': 'consolida-se em um patamar de estabilidade alta, próximo ao teto de desempenho'
+    };
+
+    const diagnosis = trendDiagnosis[trend] || trend;
+    p1 = `Os resultados do KR ${kr.code || ''} ${diagnosis} ao longo dos Check-ins ${seriesStr}. A variação observada reflete diretamente a dinâmica de ${kr.direction === 'decrease' ? 'redução' : 'crescimento'} do indicador, que encerrou o último ciclo com o valor realizado de ${formatValue(lastResult?.valor_realizado ?? 0, kr.type, kr.unit)} (progresso de ${lastKRValue.toFixed(1)}%).`;
+
+    // Parágrafo 2: Interpretação Gerencial (Risco e causas operacionais)
+    let p2 = "";
+    const riskInterpret: Record<string, string> = {
+      'crítico': 'compromete severamente o resultado de',
+      'alto': 'sugere perda de eficácia e riscos elevados para',
+      'médio': 'exige monitoramento próximo para garantir',
+      'baixo': 'garante segurança e continuidade para'
+    };
+
+    const causesMap: Record<string, string> = {
+      'oscilação forte': 'Isso sinaliza falhas de padronização ou execução irregular.',
+      'deterioração': 'Sugere fadiga do modelo ou resistência crônica ao avanço.',
+      'recuperação parcial': 'A sustentabilidade da melhora ainda não foi comprovada.',
+      'estabilidade alta': 'A maturidade do processo permite focar em outros gargalos.',
+      'crescimento consistente': 'Ações assertivas mantêm o processo sob controle.'
+    };
+
+    const causeStr = causesMap[trend] || 'A oscilação observada impacta a visibilidade dos resultados.';
+    p2 = `Esse cenário ${riskInterpret[risk]} "${objectiveTitle}". ${causeStr} O gap de ${(100 - lastKRValue).toFixed(1)}% para a meta define a urgência das intervenções para o fechamento do ciclo.`;
+
+    return `${p1}\n\n${p2}`;
+  };
+
+  const handleKRClick = (kr: KeyResult) => {
+    const text = generateKRExecutiveAnalysis(kr);
+    setAnalysisContent({ title: kr.title, text });
+    setAnalysisDialogOpen(true);
   };
 
   const calculateSimpleAttainment = (
@@ -1594,8 +1716,8 @@ export default function KRCheckins() {
         </div>
 
         {selectedQuarter && (
-          <div className="flex items-stretch gap-0 mb-4 w-full h-[120px]">
-            {/* This card width (260px) perfectly matches the combined width of the "Código" (60px) and "Key Result" (200px) sticky columns below */}
+          <div className="flex items-stretch gap-0 mb-4 h-[120px]">
+            {/* Sticky Summary Card (260px) matches exactly the width of Código(60px) + Key Result(200px) */}
             <Card className="w-[260px] flex-shrink-0 flex flex-col justify-center rounded-r-none border-r-0">
               <CardContent className="p-4 flex flex-col items-center justify-center h-full">
                 <p className="text-xs font-semibold text-muted-foreground mb-2">RESULTADO ATUAL</p>
@@ -1608,9 +1730,10 @@ export default function KRCheckins() {
               </CardContent>
             </Card>
 
+            {/* Flexible Chart Card */}
             {quarterCheckins.length > 0 && (
-              <Card className="flex-1 min-w-0 rounded-l-none overflow-hidden">
-                <CardContent className="p-0 h-full pt-4">
+              <Card className="flex-1 min-w-0 rounded-l-none border-l-0">
+                <CardContent className="p-0 h-[80px] pt-4">
                   <ObjectiveLineChart
                     checkins={quarterCheckins}
                     averages={checkinOverallAverages}
@@ -1623,9 +1746,9 @@ export default function KRCheckins() {
 
         {selectedQuarter && quarterCheckins.length > 0 && objectives.length > 0 && (
           <Card>
-            <CardContent className="p-0">
+            <CardContent className="p-0 overflow-x-auto">
               <div>
-                <Table>
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[60px] sticky left-0 bg-background z-10 text-primary font-semibold px-2">
@@ -1637,7 +1760,7 @@ export default function KRCheckins() {
                       {quarterCheckins.map((checkin) => (
                         <TableHead
                           key={checkin.id}
-                          className={`text-center min-w-[200px] px-4 cursor-pointer transition-colors ${selectedCheckinDate === checkin.id
+                          className={`text-center px-4 cursor-pointer transition-colors ${selectedCheckinDate === checkin.id
                             ? 'bg-primary/10 border-b-2 border-primary'
                             : 'hover:bg-muted/50'
                             }`}
@@ -1689,9 +1812,20 @@ export default function KRCheckins() {
                             </TableCell>
                             <TableCell className="sticky left-[60px] bg-background z-10 px-3 min-h-[140px] w-[140px]">
                               <div className="flex flex-col justify-center min-h-[140px]">
-                                <div className="text-sm font-medium uppercase whitespace-normal">{toTitleCase(kr.title)}</div>
-                                <div className="text-xs text-muted-foreground mt-1 uppercase whitespace-nowrap">
-                                  Tipo: {translateType(kr.type)} • Direção: {translateDirection(kr.direction)}
+                                <div
+                                  className="text-sm font-medium uppercase whitespace-normal"
+                                >
+                                  {toTitleCase(kr.title)}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1 uppercase whitespace-nowrap space-y-0.5">
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-semibold">Tipo:</span>
+                                    <span>{translateType(kr.type)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-semibold">Direção:</span>
+                                    <span>{translateDirection(kr.direction)}</span>
+                                  </div>
                                 </div>
                               </div>
                             </TableCell>
@@ -1702,7 +1836,7 @@ export default function KRCheckins() {
                               return (
                                 <TableCell
                                   key={checkin.id}
-                                  className="p-4 cursor-pointer hover:bg-muted/50 min-w-[200px]"
+                                  className="p-4 cursor-pointer hover:bg-muted/50"
                                   onClick={() => openDialog(kr, checkin)}
                                 >
                                   {result ? (
@@ -1792,6 +1926,7 @@ export default function KRCheckins() {
           </Card>
         )}
 
+
         {selectedQuarter && (objectives.length === 0 || quarterCheckins.length === 0) && (
           <Card>
             <CardContent className="p-6 text-center text-muted-foreground">
@@ -1818,8 +1953,8 @@ export default function KRCheckins() {
             {currentKR && currentCheckin && (
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <div className="text-sm">
-                    <span className="font-semibold">Key Result:</span> {currentKR.title}
+                  <div className="text-sm text-primary font-bold uppercase mb-2">
+                    {currentKR.title}
                   </div>
                   <div className="text-sm">
                     <span className="font-semibold">Check-in:</span> {formatDate(currentCheckin.checkin_date)}
@@ -2047,6 +2182,7 @@ export default function KRCheckins() {
             )}
           </DialogContent>
         </Dialog>
+        {/* Diálogo de Análise Executiva desativado */}
       </div>
     </Layout>
   );

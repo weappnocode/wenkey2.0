@@ -1,18 +1,4 @@
 import { useMemo } from 'react';
-import {
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    Tooltip,
-    ResponsiveContainer,
-} from 'recharts';
-
-interface DataPoint {
-    label: string;
-    value: number | null;
-    hasData: boolean;
-}
 
 interface ObjectiveLineChartProps {
     checkins: { id: string; checkin_date: string }[];
@@ -23,84 +9,107 @@ export function ObjectiveLineChart({
     checkins,
     averages,
 }: ObjectiveLineChartProps) {
-    const chartData = useMemo(() => {
-        return checkins
-            .map((checkin) => {
-                const stat = averages[checkin.id];
-                const [, month, dayPart] = checkin.checkin_date.split('-');
-                const day = dayPart?.replace(/[^0-9]/g, '');
-                return {
-                    label: `${day}/${month}`,
-                    // Use null for missing data so the tick stays but no line is drawn
-                    value: stat?.hasData ? stat.average : null,
-                    hasData: !!stat?.hasData,
-                };
-            });
+    const points = useMemo(() => {
+        const count = checkins.length || 1;
+        const colWidthPercent = 100 / count;
+        return checkins.map((checkin, index) => {
+            const stat = averages[checkin.id];
+            return {
+                id: checkin.id,
+                // Positions the dot at the center of each column (e.g. 50% for 1 col, 25%/75% for 2, etc.)
+                xPercent: index * colWidthPercent + colWidthPercent / 2,
+                value: stat?.hasData ? stat.average : null,
+                hasData: !!stat?.hasData,
+            };
+        });
     }, [checkins, averages]);
 
-    // Check if there is at least one point with actual data
-    const hasAnyData = chartData.some((d) => d.hasData);
+    const hasAnyData = points.some((p) => p.hasData);
 
     if (!hasAnyData) {
         return (
-            <div className="flex items-center justify-center h-[60px] text-xs text-muted-foreground">
+            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                 Sem dados
             </div>
         );
     }
 
+    const svgHeight = 80;
+    const padTop = 24; // Space for labels
+    const padBottom = 8;
+    const chartHeight = svgHeight - padTop - padBottom;
+
+    // Map value (0-100) to Y coordinate (inverted: 0% at bottom, 100% at top)
+    const toY = (val: number) => padTop + chartHeight * (1 - val / 100);
+
+    // Filter points that have data for the line
+    const dataPoints = points.filter(p => p.hasData && p.value !== null);
+
+    // Create polyline segments
+    const lineSegments: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    for (let i = 0; i < dataPoints.length - 1; i++) {
+        const p1 = dataPoints[i];
+        const p2 = dataPoints[i + 1];
+        lineSegments.push({
+            x1: p1.xPercent,
+            y1: toY(p1.value as number),
+            x2: p2.xPercent,
+            y2: toY(p2.value as number)
+        });
+    }
+
     return (
-        <div
-            className="w-full h-full pt-2"
-            style={{
-                paddingLeft: `calc(50% / ${checkins.length} - 10px)`,
-                paddingRight: `calc(50% / ${checkins.length} - 10px)`,
-            }}
-        >
-            <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                    <XAxis
-                        dataKey="label"
-                        tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }}
-                        axisLine={false}
-                        tickLine={false}
-                        dy={5}
-                    />
-                    <YAxis hide domain={[0, 100]} />
-                    <Tooltip
-                        formatter={(value: number) => [`${value}%`, 'Média']}
-                        contentStyle={{
-                            fontSize: '11px',
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            border: '1px solid #e2e8f0',
-                            background: '#fff',
-                        }}
-                    />
-                    <Line
-                        type="monotone"
-                        dataKey="value"
+        <div className="w-full h-full relative" style={{ minHeight: `${svgHeight}px` }}>
+            <svg
+                width="100%"
+                height={svgHeight}
+                style={{ display: 'block', overflow: 'visible' }}
+                preserveAspectRatio="none"
+            >
+                {/* Connecting Lines */}
+                {lineSegments.map((seg, i) => (
+                    <line
+                        key={i}
+                        x1={`${seg.x1}%`}
+                        y1={seg.y1}
+                        x2={`${seg.x2}%`}
+                        y2={seg.y2}
                         stroke="#3b82f6"
                         strokeWidth={2}
-                        dot={(props: { cx: number; cy: number; index: number }) => {
-                            const point = chartData[props.index];
-                            if (!point?.hasData) return <></>;
-                            return (
-                                <circle
-                                    cx={props.cx}
-                                    cy={props.cy}
-                                    r={4}
-                                    fill="#fff"
-                                    stroke="#3b82f6"
-                                    strokeWidth={2}
-                                />
-                            );
-                        }}
-                        activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
-                        connectNulls={false}
+                        strokeLinecap="round"
                     />
-                </LineChart>
-            </ResponsiveContainer>
+                ))}
+
+                {/* Points and Labels */}
+                {points.map((p) => {
+                    if (!p.hasData || p.value === null) return null;
+                    const cy = toY(p.value);
+                    return (
+                        <g key={p.id}>
+                            <text
+                                x={`${p.xPercent}%`}
+                                y={cy - 10}
+                                textAnchor="middle"
+                                fontSize={13}
+                                fontWeight={700}
+                                fill="#3b82f6"
+                                className="select-none"
+                            >
+                                {Math.round(p.value)}%
+                            </text>
+                            <circle
+                                cx={`${p.xPercent}%`}
+                                cy={cy}
+                                r={4.5}
+                                fill="#fff"
+                                stroke="#3b82f6"
+                                strokeWidth={2.5}
+                            />
+                        </g>
+                    );
+                })}
+            </svg>
         </div>
     );
 }
+
