@@ -373,31 +373,55 @@ export function useDashboardData() {
                 userRankings = userRankings.map((r, i) => ({ ...r, rank: i + 1 }));
             }
 
-            const getKRAttainment = (kr: Record<string, unknown>, quarterId: string) => {
-                const today = new Date().toISOString().split('T')[0];
+            // Identificar o activeCheckinDate global para as métricas de Objetivos e OKRs
+            // O today já está declarado acima, não precisamos redeclarar
+            const { data: globalCheckins } = await supabase
+                .from('checkins')
+                .select('id, checkin_date')
+                .eq('quarter_id', activeQuarter.id)
+                .order('checkin_date', { ascending: false });
 
-                // Pegar todos os checkins deste quarter
-                const krCheckins = (kr.checkin_results as Record<string, unknown>[] || [])
-                    .filter(r => r.checkins && (r.checkins as Record<string, unknown>).quarter_id === quarterId)
-                    .map(r => r.checkins as Record<string, unknown>);
+            let globalActiveCheckinId = null;
+            if (globalCheckins && globalCheckins.length > 0) {
+                const parseDateOnly = (dateString: string) => {
+                    const [yearStr, monthStr, dayStr] = dateString.split('-');
+                    const cleanedDay = dayStr.split('T')[0];
+                    const year = Number(yearStr);
+                    const month = Number(monthStr);
+                    const day = Number(cleanedDay);
+                    if ([year, month, day].some((value) => Number.isNaN(value))) return null;
+                    return new Date(year, month - 1, day).getTime();
+                };
 
-                // Encontrar o checkin ativo (última data até hoje)
-                let activeCheckinDate = null;
-                const sortedCheckins = [...krCheckins].sort((a, b) => new Date(a.checkin_date as string).getTime() - new Date(b.checkin_date as string).getTime());
-                const validCheckins = sortedCheckins.filter(c => (c.checkin_date as string) <= today);
+                const sorted = [...globalCheckins].sort((a, b) => (parseDateOnly(a.checkin_date) ?? Infinity) - (parseDateOnly(b.checkin_date) ?? Infinity));
+                const referenceList = sorted.filter((checkin) => parseDateOnly(checkin.checkin_date) !== null);
+                const orderedList = referenceList.length > 0 ? referenceList : sorted;
 
-                if (validCheckins.length > 0) {
-                    activeCheckinDate = validCheckins[validCheckins.length - 1].checkin_date;
-                } else if (sortedCheckins.length > 0) {
-                    activeCheckinDate = sortedCheckins[sortedCheckins.length - 1].checkin_date;
+                const now = new Date().getTime();
+                for (let i = 0; i < orderedList.length; i++) {
+                    const start = parseDateOnly(orderedList[i].checkin_date);
+                    if (start === null) continue;
+                    const nextStart = orderedList[i + 1] ? parseDateOnly(orderedList[i + 1].checkin_date) : null;
+                    if (!nextStart && now >= start) { globalActiveCheckinId = orderedList[i].id; break; }
+                    if (nextStart !== null && now >= start && now < nextStart) { globalActiveCheckinId = orderedList[i].id; break; }
                 }
+                if (!globalActiveCheckinId && orderedList.length > 0) {
+                    globalActiveCheckinId = orderedList[orderedList.length - 1].id;
+                }
+            }
 
-                if (!activeCheckinDate) return null;
+            const getKRAttainment = (kr: Record<string, unknown>, quarterId: string) => {
+                const krCheckinsData = (kr.checkin_results as Record<string, unknown>[] || [])
+                    .map(r => ({
+                        ...r,
+                        checkins: r.checkins as Record<string, unknown>
+                    }))
+                    .filter(r => r.checkins && r.checkins.quarter_id === quarterId);
 
-                // Pegar O RESULTADO ESPECÍFICO desta activeCheckinDate
-                const activeResult = (kr.checkin_results as Record<string, unknown>[] || []).find(r =>
-                    r.checkins && (r.checkins as Record<string, unknown>).checkin_date === activeCheckinDate
-                );
+                if (!globalActiveCheckinId) return null;
+
+                // Aqui nós pegamos APENAS o resultado correspondente ao globalActiveCheckinId
+                const activeResult = krCheckinsData.find(r => r.checkins.id === globalActiveCheckinId) as Record<string, unknown> | undefined;
 
                 if (activeResult && activeResult.valor_realizado !== null && activeResult.meta_checkin !== null && activeResult.minimo_orcamento !== null) {
                     return calculateKR(
@@ -414,7 +438,7 @@ export function useDashboardData() {
             // Helper: Objective Rankings
             let allObjectivesQuery = supabase
                 .from('objectives')
-                .select('id, title, percent_obj, user_id, key_results (id, percent_kr, type, direction, target, weight, checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(quarter_id, checkin_date)))')
+                .select('id, title, percent_obj, user_id, key_results (id, percent_kr, type, direction, target, weight, checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(id, quarter_id, checkin_date)))')
                 .eq('company_id', selectedCompanyId)
                 .eq('quarter_id', activeQuarter.id)
                 .eq('archived', false);
@@ -477,7 +501,7 @@ export function useDashboardData() {
 
             // Helper: OKR Rankings
             let krsQuery = supabase.from('key_results')
-                .select('title, code, percent_kr, type, direction, target, user_id, objectives(user_id), checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(quarter_id, checkin_date))')
+                .select('title, code, percent_kr, type, direction, target, user_id, objectives(user_id), checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(id, quarter_id, checkin_date))')
                 .eq('company_id', selectedCompanyId)
                 .eq('quarter_id', activeQuarter.id);
             if (userIdFilter) krsQuery = krsQuery.eq('user_id', userIdFilter);
