@@ -320,7 +320,7 @@ export default function Overview() {
                   {userRankings.map((ranking, index) => (
                     <Card
                       key={ranking.user_id}
-                      className="overflow-hidden"
+                      className={`overflow-hidden ${ranking.user_id === user?.id ? 'ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5' : ''}`}
                       style={{
                         animation: `rankCardIn 0.5s ease-out ${index * 150}ms both`,
                       }}
