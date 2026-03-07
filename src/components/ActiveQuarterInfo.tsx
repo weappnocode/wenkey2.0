@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { differenceInDays, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PieChart } from 'lucide-react';
@@ -16,6 +16,8 @@ interface ActiveQuarterInfoProps {
 }
 
 export function ActiveQuarterInfo({ quarter }: ActiveQuarterInfoProps) {
+    const [animatedProgress, setAnimatedProgress] = useState(0);
+
     const info = useMemo(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -45,6 +47,13 @@ export function ActiveQuarterInfo({ quarter }: ActiveQuarterInfoProps) {
             isFinished: today > end,
         };
     }, [quarter]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setAnimatedProgress(info.progress);
+        }, 100);
+        return () => clearTimeout(timer);
+    }, [info.progress]);
 
     if (info.isFuture) {
         return (
@@ -99,17 +108,17 @@ export function ActiveQuarterInfo({ quarter }: ActiveQuarterInfoProps) {
                 <div className="h-5 w-full bg-slate-200/80 rounded-sm relative overflow-visible">
                     {/* Progress Fill with Gradient */}
                     <div
-                        className="h-full rounded-l-sm transition-all duration-500"
+                        className="h-full rounded-l-sm transition-all duration-[1500ms] ease-out"
                         style={{
-                            width: `${info.progress}%`,
+                            width: `${animatedProgress}%`,
                             background: `linear-gradient(90deg, #22c55e 0%, #ef4444 100%)`
                         }}
                     />
 
                     {/* Current Day Marker */}
                     <div
-                        className="absolute top-0 -ml-[1px] h-full w-[2px] bg-primary z-10"
-                        style={{ left: `${info.progress}%` }}
+                        className="absolute top-0 -ml-[1px] h-full w-[2px] bg-primary z-10 transition-all duration-[1500ms] ease-out"
+                        style={{ left: `${animatedProgress}%` }}
                     >
                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-0.5 flex flex-col items-center">
                             <span className="text-[9px] font-bold text-primary uppercase leading-none bg-background/80 px-1 rounded-sm backdrop-blur-sm">

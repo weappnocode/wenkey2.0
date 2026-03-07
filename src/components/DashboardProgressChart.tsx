@@ -28,7 +28,7 @@ export function DashboardProgressChart() {
                         Nenhum check-in no quarter.
                     </div>
                 ) : (
-                    <div className="h-full w-full">
+                    <div className="h-full w-full animate-in zoom-in-95 fade-in duration-700 fill-mode-both" style={{ animationDelay: '300ms' }}>
                         <ObjectiveLineChart
                             checkins={data.checkins}
                             averages={data.averages}

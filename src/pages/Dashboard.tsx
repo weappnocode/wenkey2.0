@@ -151,7 +151,7 @@ export default function Dashboard() {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col items-center gap-2">
+              <div className="flex flex-col items-center gap-2 animate-in zoom-in duration-500 fade-in fill-mode-both">
                 <CircularProgress percentage={metrics.currentQuarterProgress} size={160} strokeWidth={12} />
                 <p className="text-sm text-muted-foreground">Resultado consolidado</p>
               </div>
@@ -161,7 +161,7 @@ export default function Dashboard() {
                   {metrics.objectiveRankings.map((objective, index) => {
                     const colorClass = getPerformanceColor(objective.result_pct);
                     return (
-                      <div key={index} className="flex flex-col items-center gap-2 min-w-[100px]">
+                      <div key={index} className="flex flex-col items-center gap-2 min-w-[100px] animate-in zoom-in duration-500 fade-in fill-mode-both" style={{ animationDelay: `${(index + 1) * 150}ms` }}>
                         <CircularProgress percentage={objective.result_pct} size={90} strokeWidth={8} textClassName="text-base" />
                         <span
                           className={`text-xs font-medium text-center uppercase tracking-wider ${colorClass}`}

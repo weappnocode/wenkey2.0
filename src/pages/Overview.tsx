@@ -316,11 +316,11 @@ export default function Overview() {
             </CardHeader>
             <CardContent>
               {userRankings.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 p-2">
                   {userRankings.map((ranking, index) => (
                     <Card
                       key={ranking.user_id}
-                      className={`overflow-hidden ${ranking.user_id === user?.id ? 'ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5' : ''}`}
+                      className={`overflow-hidden w-full max-w-[280px] mx-auto ${ranking.user_id === user?.id ? 'ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5' : ''}`}
                       style={{
                         animation: `rankCardIn 0.5s ease-out ${index * 150}ms both`,
                       }}
