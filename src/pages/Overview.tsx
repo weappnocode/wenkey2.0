@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Trophy, Users } from 'lucide-react';
+import { calculateQuarterProgress } from '@/hooks/useDashboardData';
 
 const getInitials = (name: string) => {
   if (!name) return '?';
@@ -172,11 +173,16 @@ export default function Overview() {
         } else {
           const userResultMap = new Map((userResultsData || []).map(r => [r.user_id, r.result_percent]));
 
-          let userRankings: UserRanking[] = profilesData.map(profile => {
+          let userRankings: UserRanking[] = await Promise.all(profilesData.map(async profile => {
             let av = profile.avatar_url;
             if (av && !av.startsWith('http')) {
               const { data } = supabase.storage.from('avatars').getPublicUrl(av);
               av = data.publicUrl;
+            }
+
+            let resultPercent = userResultMap.get(profile.id) || 0;
+            if (profile.is_team) {
+              resultPercent = await calculateQuarterProgress(selectedCompany, selectedQuarter, profile.id);
             }
 
             return {
@@ -184,11 +190,11 @@ export default function Overview() {
               user_id: profile.id,
               full_name: profile.full_name,
               position: profile.position,
-              result_percent: userResultMap.get(profile.id) || 0,
+              result_percent: resultPercent,
               avatar_url: av,
               is_team: profile.is_team || false
             };
-          });
+          }));
 
           userRankings.sort((a, b) => b.result_percent - a.result_percent);
           userRankings = userRankings.map((r, index) => ({ ...r, rank: index + 1 }));

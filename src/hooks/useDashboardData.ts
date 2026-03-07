@@ -76,11 +76,11 @@ export interface DashboardData {
 }
 
 // Helper Functions (Business Logic)
-const calculateQuarterProgress = async (
+export const calculateQuarterProgress = async (
     companyId: string,
     quarterId: string,
     userId: string | null
-): Promise<number> => {
+): Promise<number | null> => {
     let query = supabase
         .from('objectives')
         .select('id')
@@ -94,7 +94,7 @@ const calculateQuarterProgress = async (
 
     const { data: objectives } = await query;
 
-    if (!objectives || objectives.length === 0) return 0;
+    if (!objectives || objectives.length === 0) return null;
 
     const objectiveIds = objectives.map(o => o.id);
 
@@ -301,7 +301,7 @@ export function useDashboardData() {
                 if (quarterResult && quarterResult.result_percent !== null) {
                     currentQuarterProgress = Math.round(quarterResult.result_percent);
                 } else {
-                    currentQuarterProgress = await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, user.id);
+                    currentQuarterProgress = (await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, user.id)) ?? 0;
                 }
             } else {
                 const { data: allQuarterResults } = await supabase
@@ -352,7 +352,7 @@ export function useDashboardData() {
                     // portanto sempre calculamos o progresso do time em tempo real se não houver no banco,
                     // ou mesmo forçamos o cálculo em tempo real caso eles ganhem/percam KRs
                     if (prof.is_team) {
-                        resultPct = await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, prof.id);
+                        resultPct = (await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, prof.id)) ?? 0;
                     }
 
                     userRankings.push({

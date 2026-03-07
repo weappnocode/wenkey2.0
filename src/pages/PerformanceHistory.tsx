@@ -18,12 +18,14 @@ import {
 } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronUp, Trophy, TrendingUp, Target, AlertTriangle, XOctagon, Users } from 'lucide-react';
+import { Trophy, TrendingUp, Target, AlertTriangle, XOctagon, Users } from 'lucide-react';
+import { calculateQuarterProgress } from '@/hooks/useDashboardData';
+
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -195,7 +197,28 @@ export default function PerformanceHistory() {
                 .eq('company_id', filterCompanyId);
 
             if (resultsError) throw resultsError;
-            setResults(resultsData || []);
+
+            const dbResults = resultsData || [];
+
+            // Para times, o progresso deve ser calculado ativamente
+            const teams = normalizedUsers.filter(u => u.is_team);
+            for (const team of teams) {
+                for (const quarter of quartersData || []) {
+                    // Ignora se já tivermos algum quarter_result do time salvo (improvável)
+                    if (!dbResults.some(r => r.user_id === team.id && r.quarter_id === quarter.id)) {
+                        const progress = await calculateQuarterProgress(filterCompanyId, quarter.id, team.id);
+                        if (progress !== null) {
+                            dbResults.push({
+                                quarter_id: quarter.id,
+                                user_id: team.id,
+                                result_percent: progress
+                            });
+                        }
+                    }
+                }
+            }
+
+            setResults(dbResults);
 
         } catch (error) {
             const err = error as Error;
