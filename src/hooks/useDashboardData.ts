@@ -339,22 +339,32 @@ export function useDashboardData() {
 
             let userRankings: UserRanking[] = [];
             if (profilesData && profilesData.length > 0) {
-                profilesData.forEach(prof => {
+                for (const prof of profilesData) {
                     let av = prof.avatar_url;
                     if (av && !av.startsWith('http')) {
                         const { data } = supabase.storage.from('avatars').getPublicUrl(av);
                         av = data.publicUrl;
                     }
+
+                    let resultPct = Math.round(quarterResultsMap.get(prof.id) || 0);
+
+                    // Times não fazem login para gerar quarter_results na tela de Check-ins,
+                    // portanto sempre calculamos o progresso do time em tempo real se não houver no banco,
+                    // ou mesmo forçamos o cálculo em tempo real caso eles ganhem/percam KRs
+                    if (prof.is_team) {
+                        resultPct = await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, prof.id);
+                    }
+
                     userRankings.push({
                         rank: 0,
                         user_id: prof.id,
                         full_name: prof.full_name,
                         sector: prof.sector,
                         avatar_url: av,
-                        result_pct: Math.round(quarterResultsMap.get(prof.id) || 0),
+                        result_pct: resultPct,
                         is_team: prof.is_team || false
                     });
-                });
+                }
 
                 // Sort descending
                 userRankings.sort((a, b) => b.result_pct - a.result_pct);
