@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Target, Calendar, TrendingUp, Award, Trophy } from 'lucide-react';
+import { Target, Calendar, TrendingUp, Award, Trophy, Users } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
 import { ActiveQuarterInfo } from '@/components/ActiveQuarterInfo';
+import { DashboardProgressChart } from '@/components/DashboardProgressChart';
 import { useDashboardData, UserRanking } from '@/hooks/useDashboardData';
 import { getPerformanceColor } from '@/lib/performanceColors';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
@@ -103,18 +104,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <KpiCard
-            title={toTitleCase('Objetivos Ativos')}
-            icon={<Target className="h-5 w-5" />}
-            value={metrics.activeObjectivesCount}
-            description={toTitleCase('Objetivos acompanhados neste quarter')}
-          />
-          <KpiCard
-            title={toTitleCase('OKRs Ativos')}
-            icon={<Calendar className="h-5 w-5" />}
-            value={metrics.activeOKRsCount}
-            description={toTitleCase('Key Results com acompanhamento')}
-          />
+          <DashboardProgressChart />
           <Card className="md:col-span-2 xl:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
@@ -216,7 +206,10 @@ export default function Dashboard() {
                           )}
                         </Avatar>
                         <div>
-                          <p className="text-sm font-normal leading-tight">{ranking.full_name}</p>
+                          <p className="text-sm font-normal leading-tight flex items-center gap-1.5">
+                            {ranking.is_team && <Users className="h-3 w-3 text-primary" />}
+                            {ranking.full_name}
+                          </p>
                           <p className="text-xs text-muted-foreground">{ranking.sector ?? 'Sem setor'}</p>
                         </div>
                       </div>
@@ -260,6 +253,7 @@ export default function Dashboard() {
                                   <AvatarFallback className="text-[8px]">{getInitials(okr.owner_name || '')}</AvatarFallback>
                                 )}
                               </Avatar>
+                              {okr.owner_is_team && <Users className="h-3 w-3 text-primary" />}
                               {toTitleCase(okr.owner_name)} ({toTitleCase(okr.owner_sector ?? 'Sem setor')})
                             </span>
                           )}
@@ -364,7 +358,10 @@ function RankingList({
                     )}
                   </Avatar>
                   <div>
-                    <p className="text-base font-normal leading-tight text-black">{toTitleCase(ranking.full_name)}</p>
+                    <p className="text-base font-normal leading-tight text-black flex items-center gap-1.5">
+                      {ranking.is_team && <Users className="h-4 w-4 text-primary" />}
+                      {toTitleCase(ranking.full_name)}
+                    </p>
                     <p className="text-sm text-black">{toTitleCase(ranking.sector ?? 'Sem setor')}</p>
                   </div>
                 </div>

@@ -29,13 +29,20 @@ interface Quarter {
   name: string;
 }
 
+interface Team {
+  id: string;
+  name: string;
+}
+
 interface KeyResultForm {
   tempId: string;
   title: string;
   type: string;
   direction: string;
   unit: string;
+  owner_type: 'user' | 'team';
   user_id: string;
+  team_id: string;
 }
 
 interface CreateObjectiveDialogProps {
@@ -51,37 +58,23 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Companies and users
+  // Companies, users and teams
   const [companies, setCompanies] = useState<Company[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [quarters, setQuarters] = useState<Quarter[]>([]);
   const [existingTitles, setExistingTitles] = useState<string[]>([]);
 
   // Form fields
   const [selectedCompanyId, setSelectedCompanyId] = useState(currentCompanyId);
+  const [ownerType, setOwnerType] = useState<'user' | 'team'>('user');
   const [selectedUserId, setSelectedUserId] = useState(currentUserId || '');
+  const [selectedTeamId, setSelectedTeamId] = useState('');
   const [selectedQuarterId, setSelectedQuarterId] = useState(currentQuarterId);
   const [title, setTitle] = useState('');
 
-
-  // Sincronizar com props quando abrirem o diálogo
-  useEffect(() => {
-    if (open) {
-      if (currentCompanyId) setSelectedCompanyId(currentCompanyId);
-      if (currentUserId) setSelectedUserId(currentUserId);
-      if (currentQuarterId) setSelectedQuarterId(currentQuarterId);
-    }
-  }, [open, currentCompanyId, currentUserId, currentQuarterId]);
-
   // Key Results
   const [keyResults, setKeyResults] = useState<KeyResultForm[]>([]);
-
-  useEffect(() => {
-    setSelectedCompanyId(currentCompanyId);
-    setSelectedQuarterId(currentQuarterId);
-    setSelectedUserId('');
-    setKeyResults([]);
-  }, [currentCompanyId, currentQuarterId]);
 
   const loadCompanies = useCallback(async () => {
     try {
@@ -115,13 +108,25 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
       setUsers(data || []);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar os usuários',
-        variant: 'destructive',
-      });
     }
-  }, [toast]);
+  }, []);
+
+  const loadTeams = useCallback(async (companyId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('company_id', companyId)
+        .eq('is_team', true)
+        .eq('is_active', true)
+        .order('full_name');
+
+      if (error) throw error;
+      setTeams((data || []).map(t => ({ id: t.id, name: t.full_name })));
+    } catch (error) {
+      console.error('Erro ao carregar times:', error);
+    }
+  }, []);
 
   const loadQuarters = useCallback(async () => {
     try {
@@ -154,27 +159,46 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
     }
   }, []);
 
+  // Sincronizar com props quando abrirem o diálogo
   useEffect(() => {
     if (open) {
+      if (currentCompanyId) setSelectedCompanyId(currentCompanyId);
+      if (currentUserId) setSelectedUserId(currentUserId);
+      if (currentQuarterId) setSelectedQuarterId(currentQuarterId);
       loadCompanies();
       loadQuarters();
       loadExistingTitles();
     }
-  }, [open, loadCompanies, loadQuarters, loadExistingTitles]);
+  }, [open, currentCompanyId, currentUserId, currentQuarterId, loadCompanies, loadQuarters, loadExistingTitles]);
+
+  useEffect(() => {
+    setSelectedCompanyId(currentCompanyId);
+    setSelectedQuarterId(currentQuarterId);
+    setSelectedUserId('');
+    setSelectedTeamId('');
+    setKeyResults([]);
+  }, [currentCompanyId, currentQuarterId]);
 
   useEffect(() => {
     if (selectedCompanyId) {
       loadUsers(selectedCompanyId);
+      loadTeams(selectedCompanyId);
     } else {
       setUsers([]);
+      setTeams([]);
       setSelectedUserId('');
+      setSelectedTeamId('');
     }
-  }, [selectedCompanyId, loadUsers]);
+  }, [selectedCompanyId, loadUsers, loadTeams]);
 
   const addKeyResult = () => {
     // Validar se o responsável foi selecionado
-    if (!selectedUserId) {
+    if (ownerType === 'user' && !selectedUserId) {
       alert('Por favor, selecione o Responsável antes de adicionar Key Results.');
+      return;
+    }
+    if (ownerType === 'team' && !selectedTeamId) {
+      alert('Por favor, selecione o Time antes de adicionar Key Results.');
       return;
     }
 
@@ -184,7 +208,9 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
       type: 'number',
       direction: 'increase',
       unit: '',
-      user_id: selectedUserId,
+      owner_type: ownerType,
+      user_id: ownerType === 'user' ? selectedUserId : '',
+      team_id: ownerType === 'team' ? selectedTeamId : '',
     };
     setKeyResults([...keyResults, newKR]);
   };
@@ -202,7 +228,9 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title || !selectedCompanyId || !selectedUserId || !selectedQuarterId) {
+    const isOwnerSelected = (ownerType === 'user' && selectedUserId) || (ownerType === 'team' && selectedTeamId);
+
+    if (!title || !selectedCompanyId || !isOwnerSelected || !selectedQuarterId) {
       toast({
         title: 'Erro',
         description: 'Preencha todos os campos obrigatórios',
@@ -212,7 +240,6 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
     }
 
     setLoading(true);
-    console.log('Criando objetivo:', { title, selectedCompanyId, selectedUserId, selectedQuarterId });
 
     try {
       // Create objective
@@ -223,7 +250,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
           status: 'not_started',
           weight: 1,
           company_id: selectedCompanyId,
-          user_id: selectedUserId,
+          user_id: ownerType === 'user' ? selectedUserId : selectedTeamId,
           quarter_id: selectedQuarterId,
           created_by: user?.id,
           archived: false,
@@ -243,7 +270,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
             type: kr.type,
             direction: kr.direction,
             unit: null,
-            user_id: kr.user_id || selectedUserId,
+            user_id: (kr.owner_type === 'user' ? kr.user_id : kr.team_id) || (ownerType === 'user' ? selectedUserId : selectedTeamId) || null,
             company_id: selectedCompanyId,
             quarter_id: selectedQuarterId,
             created_by: user?.id,
@@ -270,15 +297,14 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
 
       // Reset form
       setTitle('');
-
       setKeyResults([]);
       setSelectedUserId('');
+      setSelectedTeamId('');
       setOpen(false);
       onSuccess();
     } catch (error) {
       console.error('Erro ao criar objetivo:', error);
       const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
-      console.error('Erro detalhado:', errorMessage);
       toast({
         title: 'Erro ao criar objetivo',
         description: errorMessage,
@@ -309,8 +335,7 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Empresa e Usuário */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="company">Empresa *</Label>
               <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
@@ -328,23 +353,55 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="user">Responsável *</Label>
-              <Select
-                value={selectedUserId}
-                onValueChange={setSelectedUserId}
-                disabled={!selectedCompanyId}
-              >
-                <SelectTrigger id="user" className="bg-background">
-                  <SelectValue placeholder={selectedCompanyId ? "Selecione o usuário" : "Selecione uma empresa primeiro"} />
+              <Label>Tipo de Dono *</Label>
+              <Select value={ownerType} onValueChange={(v: any) => setOwnerType(v)}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover z-50">
-                  {users.map(u => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.full_name} ({u.email})
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="user">Individual</SelectItem>
+                  <SelectItem value="team">Time</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="owner">{ownerType === 'user' ? 'Responsável' : 'Time'} *</Label>
+              {ownerType === 'user' ? (
+                <Select
+                  value={selectedUserId}
+                  onValueChange={setSelectedUserId}
+                  disabled={!selectedCompanyId}
+                >
+                  <SelectTrigger id="user" className="bg-background">
+                    <SelectValue placeholder={selectedCompanyId ? "Selecione o usuário" : "Selecione uma empresa primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {users.map(u => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select
+                  value={selectedTeamId}
+                  onValueChange={setSelectedTeamId}
+                  disabled={!selectedCompanyId}
+                >
+                  <SelectTrigger id="team" className="bg-background">
+                    <SelectValue placeholder={selectedCompanyId ? "Selecione o time" : "Selecione uma empresa primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {teams.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
@@ -475,24 +532,61 @@ export function CreateObjectiveDialog({ onSuccess, currentQuarterId, currentComp
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label>Responsável pelo KR</Label>
-                        <Select
-                          value={kr.user_id}
-                          onValueChange={(v) => updateKeyResult(kr.tempId, 'user_id', v)}
-                          disabled={!selectedCompanyId}
-                        >
-                          <SelectTrigger className="bg-background">
-                            <SelectValue placeholder="Usar responsável do objetivo" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover z-50">
-                            {users.map(u => (
-                              <SelectItem key={u.id} value={u.id}>
-                                {u.full_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Tipo de Dono (KR)</Label>
+                          <Select
+                            value={kr.owner_type}
+                            onValueChange={(v: any) => updateKeyResult(kr.tempId, 'owner_type', v)}
+                          >
+                            <SelectTrigger className="bg-background">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover z-50">
+                              <SelectItem value="user">Individual</SelectItem>
+                              <SelectItem value="team">Time</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Responsável pelo KR</Label>
+                          {kr.owner_type === 'user' ? (
+                            <Select
+                              value={kr.user_id}
+                              onValueChange={(v) => updateKeyResult(kr.tempId, 'user_id', v)}
+                              disabled={!selectedCompanyId}
+                            >
+                              <SelectTrigger className="bg-background">
+                                <SelectValue placeholder="Selecione o usuário" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-popover z-50">
+                                {users.map(u => (
+                                  <SelectItem key={u.id} value={u.id}>
+                                    {u.full_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Select
+                              value={kr.team_id}
+                              onValueChange={(v) => updateKeyResult(kr.tempId, 'team_id', v)}
+                              disabled={!selectedCompanyId}
+                            >
+                              <SelectTrigger className="bg-background">
+                                <SelectValue placeholder="Selecione o time" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-popover z-50">
+                                {teams.map(t => (
+                                  <SelectItem key={t.id} value={t.id}>
+                                    {t.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { Trophy } from 'lucide-react';
+import { Trophy, Users } from 'lucide-react';
 
 const getInitials = (name: string) => {
   if (!name) return '?';
@@ -29,6 +29,13 @@ interface Company {
   name: string;
 }
 
+interface Profile {
+  id: string;
+  full_name: string;
+  position: string | null;
+  avatar_url?: string | null;
+}
+
 interface UserRanking {
   rank: number;
   user_id: string;
@@ -36,6 +43,7 @@ interface UserRanking {
   position: string | null;
   result_percent: number;
   avatar_url?: string | null;
+  is_team: boolean;
 }
 
 export default function Overview() {
@@ -50,7 +58,8 @@ export default function Overview() {
   const [selectedCompany, setSelectedCompany] = useState<string>(selectedCompanyId || '');
   const [selectedQuarter, setSelectedQuarter] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [rankings, setRankings] = useState<UserRanking[]>([]);
+  const [userRankings, setUserRankings] = useState<UserRanking[]>([]);
+  const [viewType, setViewType] = useState<'all' | 'individual' | 'team'>('all');
   const [userCompanyId, setUserCompanyId] = useState<string>(selectedCompanyId || '');
 
   useEffect(() => {
@@ -135,72 +144,59 @@ export default function Overview() {
     if (!selectedCompany || !selectedQuarter) return;
 
     try {
-      const { data: profilesData, error: profilesError } = await supabase
+      // 1. Load Rankings based on viewType
+      let query = supabase
         .from('profiles')
-        .select('id, full_name, position, is_active, avatar_url')
+        .select('id, full_name, position, is_active, avatar_url, is_team')
         .eq('company_id', selectedCompany)
         .eq('is_active', true);
 
+      if (viewType !== 'all') {
+        query = query.eq('is_team', viewType === 'team');
+      }
+
+      const { data: profilesData, error: profilesError } = await query;
+
       if (profilesError) {
         console.error('Erro ao carregar perfis para o ranking:', profilesError);
-        return;
-      }
+      } else if (profilesData && profilesData.length > 0) {
+        const { data: userResultsData, error: userResultsError } = await supabase
+          .from('quarter_results')
+          .select('user_id, result_percent')
+          .eq('company_id', selectedCompany)
+          .eq('quarter_id', selectedQuarter)
+          .not('user_id', 'is', null);
 
-      if (!profilesData || profilesData.length === 0) {
-        setRankings([]);
-        return;
-      }
+        if (userResultsError) {
+          console.error('Erro ao carregar resultados de usuários:', userResultsError);
+        } else {
+          const userResultMap = new Map((userResultsData || []).map(r => [r.user_id, r.result_percent]));
 
-      const { data: resultsData, error } = await supabase
-        .from('quarter_results')
-        .select('user_id, result_percent')
-        .eq('company_id', selectedCompany)
-        .eq('quarter_id', selectedQuarter);
+          let userRankings: UserRanking[] = profilesData.map(profile => {
+            let av = profile.avatar_url;
+            if (av && !av.startsWith('http')) {
+              const { data } = supabase.storage.from('avatars').getPublicUrl(av);
+              av = data.publicUrl;
+            }
 
-      if (error) {
-        console.error('Erro ao carregar rankings:', error);
-        return;
-      }
+            return {
+              rank: 0,
+              user_id: profile.id,
+              full_name: profile.full_name,
+              position: profile.position,
+              result_percent: userResultMap.get(profile.id) || 0,
+              avatar_url: av,
+              is_team: profile.is_team || false
+            };
+          });
 
-      const resultMap = new Map(
-        (resultsData || []).map(r => [r.user_id, r.result_percent])
-      );
-
-      let rankings: UserRanking[] = profilesData.map(profile => {
-        let av = profile.avatar_url;
-        if (av && !av.startsWith('http')) {
-          const { data } = supabase.storage.from('avatars').getPublicUrl(av);
-          av = data.publicUrl;
+          userRankings.sort((a, b) => b.result_percent - a.result_percent);
+          userRankings = userRankings.map((r, index) => ({ ...r, rank: index + 1 }));
+          setUserRankings(userRankings);
         }
-
-        return {
-          rank: 0,
-          user_id: profile.id,
-          full_name: profile.full_name,
-          position: profile.position,
-          result_percent: resultMap.get(profile.id) || 0,
-          avatar_url: av
-        };
-      });
-
-      // Sort by result_percent descending
-      rankings.sort((a, b) => b.result_percent - a.result_percent);
-
-      // Assign ranks after sorting
-      rankings = rankings.map((r, index) => ({
-        ...r,
-        rank: index + 1
-      }));
-
-      setRankings(rankings);
-    } catch (error) {
-      const err = error as Error;
-      const isTransient = err?.message?.includes('Failed to fetch') || err?.message?.includes('AbortError');
-      if (!isTransient) {
-        console.error('Erro ao processar rankings:', error);
-      } else {
-        console.warn('[Overview] Erro transitório ao carregar rankings (ignorado):', err?.message);
       }
+    } catch (error) {
+      console.error('Erro inesperado ao carregar rankings:', error);
     }
   }, [selectedCompany, selectedQuarter]);
 
@@ -208,7 +204,7 @@ export default function Overview() {
     if (selectedCompany && selectedQuarter) {
       loadRankings();
     }
-  }, [selectedCompany, selectedQuarter, loadRankings]);
+  }, [selectedCompany, selectedQuarter, viewType, loadRankings]);
 
   useEffect(() => {
     // Apenas sincroniza quando usuário trocar a empresa ativamente no menu lateral
@@ -281,6 +277,24 @@ export default function Overview() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Filtro de Tipo de Visualização */}
+              <div className="flex-1 min-w-[200px]">
+                <Label>Visualizar por</Label>
+                <Select
+                  value={viewType}
+                  onValueChange={(v: 'individual' | 'team') => setViewType(v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Geral (Colaboradores e Times)</SelectItem>
+                    <SelectItem value="individual">Colaboradores</SelectItem>
+                    <SelectItem value="team">Times</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -291,13 +305,13 @@ export default function Overview() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Trophy className="h-5 w-5" />
-                Ranking de Desempenho
+                Ranking de Desempenho ({viewType === 'individual' ? 'Colaboradores' : 'Times'})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {rankings.length > 0 ? (
+              {userRankings.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                  {rankings.map((ranking, index) => (
+                  {userRankings.map((ranking, index) => (
                     <Card
                       key={ranking.user_id}
                       className="overflow-hidden"
@@ -328,7 +342,8 @@ export default function Overview() {
                         </div>
 
                         <div className="text-center space-y-1">
-                          <p className="font-semibold text-base capitalize">
+                          <p className="font-semibold text-base capitalize flex items-center justify-center gap-1.5">
+                            {ranking.is_team && <Users className="h-4 w-4 text-primary" />}
                             {ranking.full_name.toLowerCase()}
                           </p>
                           {ranking.position && (
@@ -360,6 +375,6 @@ export default function Overview() {
           </Card>
         )}
       </div>
-    </Layout>
+    </Layout >
   );
 }

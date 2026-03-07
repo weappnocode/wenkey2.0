@@ -151,16 +151,27 @@ export default function Objectives() {
 
       let userKrObjIds: string[] = [];
       if (userId !== 'all') {
+        // Buscar times que o usuário faz parte
+        const { data: myTeams } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('is_team', true)
+          .contains('team_member_ids', [userId]);
+
+        const myTeamIds = (myTeams || []).map(t => t.id);
+        const allRelevantUserIds = [userId, ...myTeamIds];
+        const userIdsCsv = allRelevantUserIds.join(',');
+
         const { data: userKrs } = await supabase
           .from('key_results')
           .select('objective_id')
-          .eq('user_id', userId);
+          .in('user_id', allRelevantUserIds);
         userKrObjIds = (userKrs || []).map(kr => kr.objective_id);
 
         if (userKrObjIds.length > 0) {
-          query = query.or(`user_id.eq.${userId},id.in.(${userKrObjIds.join(',')})`);
+          query = query.or(`user_id.in.(${userIdsCsv}),id.in.(${userKrObjIds.join(',')})`);
         } else {
-          query = query.eq('user_id', userId);
+          query = query.in('user_id', allRelevantUserIds);
         }
       }
 
@@ -179,7 +190,14 @@ export default function Objectives() {
         .in('objective_id', objectiveIds);
 
       if (userId !== 'all') {
-        krQuery = krQuery.eq('user_id', userId);
+        // Re-calculate team IDs if not already available in this scope (or use a helper)
+        const { data: myTeamsKR } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('is_team', true)
+          .contains('team_member_ids', [userId]);
+        const myTeamIdsKR = (myTeamsKR || []).map(t => t.id);
+        krQuery = krQuery.in('user_id', [userId, ...myTeamIdsKR]);
       }
 
       const { data: krsData } = await krQuery;

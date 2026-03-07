@@ -240,6 +240,44 @@ export type Database = {
           },
         ]
       }
+      email_schedule_config: {
+        Row: {
+          company_id: string
+          day_of_week: number
+          id: string
+          is_active: boolean
+          send_hour: number
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          day_of_week?: number
+          id?: string
+          is_active?: boolean
+          send_hour?: number
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          day_of_week?: number
+          id?: string
+          is_active?: boolean
+          send_hour?: number
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_schedule_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       key_results: {
         Row: {
           baseline: number | null
@@ -260,7 +298,7 @@ export type Database = {
           type: string | null
           unit: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
           weight: number | null
         }
         Insert: {
@@ -282,7 +320,7 @@ export type Database = {
           type?: string | null
           unit?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           weight?: number | null
         }
         Update: {
@@ -304,7 +342,7 @@ export type Database = {
           type?: string | null
           unit?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           weight?: number | null
         }
         Relationships: [
@@ -485,7 +523,7 @@ export type Database = {
           status: string | null
           title: string
           updated_at: string
-          user_id: string
+          user_id: string | null
           weight: number | null
         }
         Insert: {
@@ -501,7 +539,7 @@ export type Database = {
           status?: string | null
           title: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           weight?: number | null
         }
         Update: {
@@ -517,7 +555,7 @@ export type Database = {
           status?: string | null
           title?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           weight?: number | null
         }
         Relationships: [
@@ -575,9 +613,11 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean
+          is_team: boolean | null
           permission_type: Database["public"]["Enums"]["user_permission"]
           position: string | null
           sector: string | null
+          team_member_ids: string[] | null
           updated_at: string
         }
         Insert: {
@@ -589,9 +629,11 @@ export type Database = {
           full_name: string
           id: string
           is_active?: boolean
+          is_team?: boolean | null
           permission_type?: Database["public"]["Enums"]["user_permission"]
           position?: string | null
           sector?: string | null
+          team_member_ids?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -603,9 +645,11 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean
+          is_team?: boolean | null
           permission_type?: Database["public"]["Enums"]["user_permission"]
           position?: string | null
           sector?: string | null
+          team_member_ids?: string[] | null
           updated_at?: string
         }
         Relationships: [

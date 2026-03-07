@@ -15,6 +15,11 @@ interface EditKRDialogProps {
   trigger?: ReactNode;
 }
 
+interface Team {
+  id: string;
+  name: string;
+}
+
 interface Profile {
   id: string;
   full_name: string;
@@ -25,7 +30,9 @@ interface KRForm {
   type: string;
   direction: string;
   unit: string;
+  owner_type: 'user' | 'team';
   user_id: string;
+  team_id: string;
   code: string;
 }
 
@@ -34,12 +41,15 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [users, setUsers] = useState<Profile[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [form, setForm] = useState<KRForm>({
     title: '',
     type: 'number',
     direction: 'increase',
     unit: '',
+    owner_type: 'user',
     user_id: '',
+    team_id: '',
     code: '',
   });
 
@@ -61,11 +71,41 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
     }
   }, [companyId]);
 
+  const loadTeams = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('company_id', companyId)
+      .eq('is_team', true)
+      .eq('is_active', true)
+      .order('full_name');
+
+    if (error) {
+      toast.error('Erro ao carregar times');
+      return;
+    }
+
+    if (data) {
+      setTeams(data.map(t => ({ id: t.id, name: t.full_name })));
+    }
+  }, [companyId]);
+
   const loadKeyResult = useCallback(async () => {
     setLoading(true);
+    // Buscamos o KR e o perfil do dono para saber se é um time
     const { data, error } = await supabase
       .from('key_results')
-      .select('title, type, direction, unit, user_id, code')
+      .select(`
+        title, 
+        type, 
+        direction, 
+        unit, 
+        user_id, 
+        code,
+        profiles!key_results_user_id_fkey (
+          is_team
+        )
+      `)
       .eq('id', krId)
       .single();
 
@@ -75,12 +115,16 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
       return;
     }
 
+    const isTeam = (data.profiles as any)?.is_team || false;
+
     setForm({
       title: data.title ?? '',
       type: data.type ?? 'number',
       direction: data.direction ?? 'increase',
       unit: data.unit ?? '',
-      user_id: data.user_id ?? '',
+      owner_type: isTeam ? 'team' : 'user',
+      user_id: !isTeam ? (data.user_id ?? '') : '',
+      team_id: isTeam ? (data.user_id ?? '') : '',
       code: data.code ?? '',
     });
     setLoading(false);
@@ -89,9 +133,10 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
   useEffect(() => {
     if (open) {
       loadUsers();
+      loadTeams();
       loadKeyResult();
     }
-  }, [open, loadUsers, loadKeyResult]);
+  }, [open, loadUsers, loadTeams, loadKeyResult]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +146,9 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
       return;
     }
 
-    if (!form.user_id) {
+    const isOwnerSelected = (form.owner_type === 'user' && form.user_id) || (form.owner_type === 'team' && form.team_id);
+
+    if (!isOwnerSelected) {
       toast.error('Selecione o responsável');
       return;
     }
@@ -115,7 +162,7 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
           type: form.type,
           direction: form.direction,
           unit: form.unit || null,
-          user_id: form.user_id,
+          user_id: form.owner_type === 'user' ? form.user_id : form.team_id,
           code: form.code || null,
           updated_at: new Date().toISOString(),
         })
@@ -214,24 +261,62 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Responsável *</Label>
-            <Select
-              value={form.user_id}
-              onValueChange={(value) => setForm({ ...form, user_id: value })}
-              disabled={loading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o responsável" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover z-50">
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Tipo de Dono</Label>
+              <Select
+                value={form.owner_type}
+                onValueChange={(value: 'user' | 'team') => setForm({ ...form, owner_type: value })}
+                disabled={loading}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50">
+                  <SelectItem value="user">Individual</SelectItem>
+                  <SelectItem value="team">Time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Responsável *</Label>
+              {form.owner_type === 'user' ? (
+                <Select
+                  value={form.user_id}
+                  onValueChange={(value) => setForm({ ...form, user_id: value })}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select
+                  value={form.team_id}
+                  onValueChange={(value) => setForm({ ...form, team_id: value })}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o time" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {teams.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

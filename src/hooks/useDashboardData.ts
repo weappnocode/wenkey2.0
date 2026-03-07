@@ -21,6 +21,7 @@ export interface UserProfile {
     sector: string | null;
     avatar_url: string | null;
     is_active: boolean;
+    is_team: boolean;
 }
 
 export interface QuarterPerformance {
@@ -38,6 +39,7 @@ export interface UserRanking {
     sector: string | null;
     avatar_url: string | null;
     result_pct: number;
+    is_team: boolean;
 }
 
 export interface ObjectiveRanking {
@@ -53,6 +55,7 @@ export interface OKRRanking {
     owner_name: string | null;
     owner_sector: string | null;
     owner_avatar_url: string | null;
+    owner_is_team: boolean;
 }
 
 export interface DashboardData {
@@ -110,6 +113,29 @@ const calculateQuarterProgress = async (
         .eq('checkins.quarter_id', quarterId)
         .in('key_result_id', krIds);
 
+    // Lógica 100% igual à KRCheckins (grafico de linha)
+    let activeCheckinId = null;
+    const today = new Date().toISOString().split('T')[0];
+
+    // Sort by date to find active checkin
+    const sortedCheckins = (checkins || [])
+        .map(c => c.checkins).filter(Boolean)
+        .sort((a, b) => new Date(a.checkin_date).getTime() - new Date(b.checkin_date).getTime());
+
+    // Unique checkins since the left join flattens them
+    const uniqueCheckins = Array.from(new Map(sortedCheckins.map(c => [c.checkin_date, c])).values());
+
+    // Encontrar o checkin ativo (mesma lógica do KRCheckins activeCheckinId simplificada para o último antes de/igual hoje)
+    const validCheckins = uniqueCheckins.filter(c => c.checkin_date <= today);
+    if (validCheckins.length > 0) {
+        activeCheckinId = validCheckins[validCheckins.length - 1].checkin_date; // Vamos usar checkin_date para mapear pois o ID não está no inner join explicitamente
+    } else if (uniqueCheckins.length > 0) {
+        activeCheckinId = uniqueCheckins[uniqueCheckins.length - 1].checkin_date;
+    }
+
+    if (!activeCheckinId) return 0;
+
+    // Agrupar e calcular média como KRCheckins
     const objAverages: number[] = [];
 
     objectiveIds.forEach(objId => {
@@ -121,18 +147,15 @@ const calculateQuarterProgress = async (
         let hasData = false;
 
         objKrs.forEach((kr) => {
-            const today = new Date().toISOString().split('T')[0];
-            const krCheckins = (checkins || [])
-                .filter(c => c.key_result_id === kr.id && c.checkins?.checkin_date <= today)
-                .sort((a, b) => new Date(b.checkins?.checkin_date || 0).getTime() - new Date(a.checkins?.checkin_date || 0).getTime());
+            // Pega APENAS o resultado exato daquele checkin (data correspondente)
+            const krCheckin = (checkins || []).find(c => c.key_result_id === kr.id && c.checkins?.checkin_date === activeCheckinId);
 
-            if (krCheckins.length > 0) {
-                const latest = krCheckins[0];
+            if (krCheckin && krCheckin.valor_realizado !== null && krCheckin.meta_checkin !== null && krCheckin.minimo_orcamento !== null) {
                 const type = kr.type as string;
                 const krProgress = calculateKR(
-                    Number(latest.valor_realizado),
-                    Number(latest.minimo_orcamento),
-                    Number(latest.meta_checkin),
+                    Number(krCheckin.valor_realizado),
+                    Number(krCheckin.minimo_orcamento),
+                    Number(krCheckin.meta_checkin),
                     kr.direction as string,
                     type
                 );
@@ -148,21 +171,8 @@ const calculateQuarterProgress = async (
 
         if (hasData && totalWeight > 0) {
             objAverages.push(weightedSum / totalWeight);
-        } else {
-            // Se não tem check-ins, faz média simples dos percent_kr para não zerar
-            let fallbackSum = 0;
-            let fallbackWeight = 0;
-            objKrs.forEach((kr) => {
-                const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
-                fallbackSum += (kr.percent_kr || 0) * weight;
-                fallbackWeight += weight;
-            });
-            if (fallbackWeight > 0) {
-                objAverages.push(fallbackSum / fallbackWeight);
-            } else {
-                objAverages.push(0);
-            }
         }
+        // Se NÃO tem data naquele activeCheckinId, ele ignora. Igual na página KRCheckins!
     });
 
     if (objAverages.length === 0) return 0;
@@ -187,7 +197,7 @@ export function useDashboardData() {
             // 1. Fetch User Profile & Quarters (Basic Data)
             const { data: profile, error: profileError } = await supabase
                 .from('profiles')
-                .select('id, company_id, full_name, sector, avatar_url, is_active')
+                .select('id, company_id, full_name, sector, avatar_url, is_active, is_team')
                 .eq('id', user.id)
                 .maybeSingle();
 
@@ -315,7 +325,7 @@ export function useDashboardData() {
             // Helper: User Rankings
             const { data: profilesData } = await supabase
                 .from('profiles')
-                .select('id, full_name, sector, avatar_url, is_active')
+                .select('id, full_name, sector, avatar_url, is_active, is_team')
                 .eq('company_id', selectedCompanyId)
                 .eq('is_active', true);
 
@@ -341,7 +351,8 @@ export function useDashboardData() {
                         full_name: prof.full_name,
                         sector: prof.sector,
                         avatar_url: av,
-                        result_pct: Math.round(quarterResultsMap.get(prof.id) || 0)
+                        result_pct: Math.round(quarterResultsMap.get(prof.id) || 0),
+                        is_team: prof.is_team || false
                     });
                 });
 
@@ -354,18 +365,35 @@ export function useDashboardData() {
 
             const getKRAttainment = (kr: Record<string, unknown>, quarterId: string) => {
                 const today = new Date().toISOString().split('T')[0];
-                const results = (kr.checkin_results as Record<string, unknown>[] || []).filter((r) =>
-                    r.checkins && (r.checkins as Record<string, unknown>).quarter_id === quarterId && (r.checkins as Record<string, unknown>).checkin_date <= today
-                );
-                const latestResult = [...results].sort((a, b) =>
-                    new Date((b.checkins as Record<string, unknown>)?.checkin_date as string | number || 0).getTime() - new Date((a.checkins as Record<string, unknown>)?.checkin_date as string | number || 0).getTime()
-                )[0];
 
-                if (latestResult) {
+                // Pegar todos os checkins deste quarter
+                const krCheckins = (kr.checkin_results as Record<string, unknown>[] || [])
+                    .filter(r => r.checkins && (r.checkins as Record<string, unknown>).quarter_id === quarterId)
+                    .map(r => r.checkins as Record<string, unknown>);
+
+                // Encontrar o checkin ativo (última data até hoje)
+                let activeCheckinDate = null;
+                const sortedCheckins = [...krCheckins].sort((a, b) => new Date(a.checkin_date as string).getTime() - new Date(b.checkin_date as string).getTime());
+                const validCheckins = sortedCheckins.filter(c => (c.checkin_date as string) <= today);
+
+                if (validCheckins.length > 0) {
+                    activeCheckinDate = validCheckins[validCheckins.length - 1].checkin_date;
+                } else if (sortedCheckins.length > 0) {
+                    activeCheckinDate = sortedCheckins[sortedCheckins.length - 1].checkin_date;
+                }
+
+                if (!activeCheckinDate) return null;
+
+                // Pegar O RESULTADO ESPECÍFICO desta activeCheckinDate
+                const activeResult = (kr.checkin_results as Record<string, unknown>[] || []).find(r =>
+                    r.checkins && (r.checkins as Record<string, unknown>).checkin_date === activeCheckinDate
+                );
+
+                if (activeResult && activeResult.valor_realizado !== null && activeResult.meta_checkin !== null && activeResult.minimo_orcamento !== null) {
                     return calculateKR(
-                        Number((latestResult as Record<string, unknown>).valor_realizado),
-                        Number((latestResult as Record<string, unknown>).minimo_orcamento),
-                        Number((latestResult as Record<string, unknown>).meta_checkin),
+                        Number(activeResult.valor_realizado),
+                        Number(activeResult.minimo_orcamento),
+                        Number(activeResult.meta_checkin),
                         kr.direction as string,
                         kr.type as string
                     );
@@ -396,10 +424,11 @@ export function useDashboardData() {
 
                     let objAttainment = 0;
                     const krs = (obj.key_results as Record<string, unknown>[]) || [];
+                    let hasData = false;
+
                     if (krs.length > 0) {
                         let weightedSum = 0;
                         let totalWeight = 0;
-                        let hasData = false;
 
                         krs.forEach((kr) => {
                             const krPercentage = getKRAttainment(kr, activeQuarter.id);
@@ -414,22 +443,16 @@ export function useDashboardData() {
 
                         if (hasData && totalWeight > 0) {
                             objAttainment = weightedSum / totalWeight;
-                        } else {
-                            let fallbackSum = 0;
-                            let fallbackWeight = 0;
-                            krs.forEach((kr) => {
-                                const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
-                                fallbackSum += ((kr.percent_kr as number) || 0) * weight;
-                                fallbackWeight += weight;
-                            });
-                            objAttainment = fallbackWeight > 0 ? fallbackSum / fallbackWeight : 0;
                         }
+                        // se não tem dados no active checkin, simplesmente não incrementa o userCount (ignora esse obj igual no KRCheckins)
                     }
 
-                    current.totalPct += objAttainment;
-                    current.userCount += 1;
-                    current.krCount += krs.length;
-                    groups.set(title, current);
+                    if (hasData) {
+                        current.totalPct += objAttainment;
+                        current.userCount += 1;
+                        current.krCount += krs.length;
+                        groups.set(title, current);
+                    }
                 });
                 for (const [title, stats] of groups.entries()) {
                     const avg = Math.round(stats.totalPct / stats.userCount);
@@ -453,7 +476,7 @@ export function useDashboardData() {
             const okrRankings: OKRRanking[] = [];
             if (krs && krs.length > 0) {
                 const ownerIds = Array.from(new Set(krs.map(kr => (kr.objectives as Record<string, unknown>)?.user_id as string || kr.user_id).filter(Boolean)));
-                const { data: owners } = await supabase.from('profiles').select('id, full_name, sector, avatar_url').in('id', ownerIds);
+                const { data: owners } = await supabase.from('profiles').select('id, full_name, sector, avatar_url, is_team').in('id', ownerIds);
                 const ownersMap = new Map(owners?.map(o => [o.id, o]) || []);
                 krs.forEach(kr => {
                     const ownerId = (kr.objectives as Record<string, unknown>)?.user_id as string || kr.user_id;
@@ -473,7 +496,8 @@ export function useDashboardData() {
                         result_pct: Math.round(finalPct),
                         owner_name: owner?.full_name ?? null,
                         owner_sector: owner?.sector ?? null,
-                        owner_avatar_url: av ?? null
+                        owner_avatar_url: av ?? null,
+                        owner_is_team: owner?.is_team || false
                     });
                 });
                 okrRankings.sort((a, b) => b.result_pct - a.result_pct);

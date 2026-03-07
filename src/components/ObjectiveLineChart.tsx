@@ -3,11 +3,13 @@ import { useMemo } from 'react';
 interface ObjectiveLineChartProps {
     checkins: { id: string; checkin_date: string }[];
     averages: Record<string, { average: number; hasData: boolean }>;
+    showDates?: boolean;
 }
 
 export function ObjectiveLineChart({
     checkins,
     averages,
+    showDates = false,
 }: ObjectiveLineChartProps) {
     const points = useMemo(() => {
         const count = checkins.length || 1;
@@ -34,9 +36,9 @@ export function ObjectiveLineChart({
         );
     }
 
-    const svgHeight = 80;
+    const svgHeight = showDates ? 100 : 80;
     const padTop = 24; // Space for labels
-    const padBottom = 8;
+    const padBottom = showDates ? 28 : 8; // Extra space for dates
     const chartHeight = svgHeight - padTop - padBottom;
 
     // Map value (0-100) to Y coordinate (inverted: 0% at bottom, 100% at top)
@@ -84,6 +86,7 @@ export function ObjectiveLineChart({
                 {points.map((p) => {
                     if (!p.hasData || p.value === null) return null;
                     const cy = toY(p.value);
+                    const checkin = checkins.find(c => c.id === p.id);
                     return (
                         <g key={p.id}>
                             <text
@@ -105,11 +108,30 @@ export function ObjectiveLineChart({
                                 stroke="#3b82f6"
                                 strokeWidth={2.5}
                             />
+                            {showDates && checkin && (
+                                <text
+                                    x={`${p.xPercent}%`}
+                                    y={svgHeight - 10}
+                                    textAnchor="middle"
+                                    fontSize={11}
+                                    fontWeight={600}
+                                    fill="#64748b"
+                                    className="select-none"
+                                >
+                                    {formatDate(checkin.checkin_date)}
+                                </text>
+                            )}
                         </g>
                     );
                 })}
             </svg>
         </div>
     );
+}
+
+function formatDate(dateString: string) {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
 }
 

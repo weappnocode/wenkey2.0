@@ -38,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, Send, UserPlus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Send, UserPlus, Users as UsersIcon, UserMinus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -59,6 +59,8 @@ interface Profile {
   avatar_url: string | null;
   is_active: boolean;
   company_id: string | null;
+  is_team: boolean | null;
+  team_member_ids: string[] | null;
   companies?: Company | null;
 }
 
@@ -86,12 +88,21 @@ export default function Users() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyMembers, setCompanyMembers] = useState<CompanyMember[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // User Dialogs
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+
+  // Team Dialogs
+  const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<Profile | null>(null);
+  const [isDeleteTeamDialogOpen, setIsDeleteTeamDialogOpen] = useState(false);
+
   const [filterCompanyId, setFilterCompanyId] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -101,6 +112,11 @@ export default function Users() {
     permission_type: 'user' as Permission,
     company_id: '',
     avatar_file: null as File | null,
+  });
+
+  const [teamForm, setTeamForm] = useState({
+    full_name: '',
+    team_member_ids: [] as string[],
   });
 
   useEffect(() => {
@@ -502,6 +518,81 @@ export default function Users() {
     }
   };
 
+  const handleSaveTeam = async () => {
+    try {
+      if (!teamForm.full_name || !selectedCompanyId) {
+        toast.error('Preencha o nome do time');
+        return;
+      }
+
+      const teamData = {
+        id: selectedTeam?.id || crypto.randomUUID(),
+        full_name: teamForm.full_name,
+        team_member_ids: teamForm.team_member_ids,
+        company_id: selectedCompanyId,
+        is_team: true,
+        email: `team_${Date.now()}@virtual.internal`, // Email fictício para manter compatibilidade
+        is_active: true,
+        permission_type: 'user' as const,
+      };
+
+      if (selectedTeam) {
+        const { error } = await supabase
+          .from('profiles')
+          .update(teamData)
+          .eq('id', selectedTeam.id);
+        if (error) throw error;
+        toast.success('Time atualizado com sucesso!');
+      } else {
+        const { error } = await supabase
+          .from('profiles')
+          .insert(teamData);
+        if (error) throw error;
+        toast.success('Time criado com sucesso!');
+      }
+
+      setIsTeamDialogOpen(false);
+      resetTeamForm();
+      loadData();
+    } catch (error: any) {
+      toast.error('Erro ao salvar time: ' + error.message);
+    }
+  };
+
+  const handleDeleteTeam = async () => {
+    try {
+      if (!selectedTeam) return;
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', selectedTeam.id);
+      if (error) throw error;
+      toast.success('Time excluído com sucesso!');
+      setIsDeleteTeamDialogOpen(false);
+      setSelectedTeam(null);
+      loadData();
+    } catch (error: any) {
+      toast.error('Erro ao excluir time: ' + error.message);
+    }
+  };
+
+  const openEditTeamDialog = (team: Profile) => {
+    setSelectedTeam(team);
+    setTeamForm({
+      full_name: team.full_name,
+      team_member_ids: team.team_member_ids || [],
+    });
+    setIsTeamDialogOpen(true);
+  };
+
+  const resetTeamForm = () => {
+    setTeamForm({
+      full_name: '',
+      team_member_ids: [],
+    });
+    setSelectedTeam(null);
+  };
+
   const openEditDialog = (user: Profile) => {
     setSelectedUser(user);
     setFormData({
@@ -545,6 +636,7 @@ export default function Users() {
   };
 
   const filteredUsers = users.filter(user => {
+    if (user.is_team) return false;
     const effectiveCompanyId = selectedCompanyId || profile?.company_id || '';
     const userCompanyId = getUserCompanyId(user);
     const matchesCompany = isAdmin
@@ -561,6 +653,8 @@ export default function Users() {
 
     return matchesCompany && matchesStatus;
   });
+
+  const teamsList = users.filter(u => u.is_team && u.company_id === selectedCompanyId);
 
   return (
     <Layout>
@@ -703,10 +797,159 @@ export default function Users() {
           </CardContent>
         </Card>
 
+
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>{toTitleCase('Gestão de Times')}</CardTitle>
+              {isAdmin && (
+                <Button onClick={() => { resetTeamForm(); setIsTeamDialogOpen(true); }}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo Time
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <p className="text-muted-foreground">Carregando...</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Membros</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teamsList.map(team => (
+                    <TableRow key={team.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarFallback><UsersIcon className="h-4 w-4" /></AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{team.full_name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex -space-x-2">
+                          {(team.team_member_ids || []).slice(0, 5).map(memberId => {
+                            const member = users.find(u => u.id === memberId);
+                            if (!member) return null;
+                            return (
+                              <Avatar key={memberId} className="border-2 border-background w-8 h-8">
+                                <AvatarImage src={member.avatar_url || ''} />
+                                <AvatarFallback className="text-[10px]">{getInitials(member.full_name)}</AvatarFallback>
+                              </Avatar>
+                            );
+                          })}
+                          {(team.team_member_ids || []).length > 5 && (
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border-2 border-background text-[10px] font-medium">
+                              +{(team.team_member_ids || []).length - 5}
+                            </div>
+                          )}
+                          {(team.team_member_ids || []).length === 0 && (
+                            <span className="text-muted-foreground text-sm italic">Nenhum membro</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => openEditTeamDialog(team)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => { setSelectedTeam(team); setIsDeleteTeamDialogOpen(true); }}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {teamsList.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                        Nenhum time cadastrado.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Email Schedule Config – Admin only */}
         {isAdmin && (
           <EmailScheduleCard companyId={selectedCompanyId || profile?.company_id || ''} />
         )}
+
+        {/* Team Dialog */}
+        <Dialog open={isTeamDialogOpen} onOpenChange={setIsTeamDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{selectedTeam ? 'Editar Time' : 'Novo Time'}</DialogTitle>
+              <DialogDescription>Defina o nome do time e selecione os membros.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="team_name">Nome do Time</Label>
+                <Input
+                  id="team_name"
+                  value={teamForm.full_name}
+                  onChange={e => setTeamForm({ ...teamForm, full_name: e.target.value })}
+                  placeholder="Ex: Marketing, Desenvolvimento"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Membros do Time</Label>
+                <div className="border rounded-md p-2 max-h-[200px] overflow-y-auto space-y-1">
+                  {users.filter(u => !u.is_team && u.company_id === selectedCompanyId).map(u => (
+                    <div key={u.id} className="flex items-center space-x-2 p-1 hover:bg-muted/50 rounded cursor-pointer" onClick={() => {
+                      const current = [...teamForm.team_member_ids];
+                      if (current.includes(u.id)) {
+                        setTeamForm({ ...teamForm, team_member_ids: current.filter(id => id !== u.id) });
+                      } else {
+                        setTeamForm({ ...teamForm, team_member_ids: [...current, u.id] });
+                      }
+                    }}>
+                      <div className={`w-4 h-4 border rounded flex items-center justify-center ${teamForm.team_member_ids.includes(u.id) ? 'bg-primary border-primary text-primary-foreground' : 'border-input'}`}>
+                        {teamForm.team_member_ids.includes(u.id) && <Plus className="w-3 h-3" />}
+                      </div>
+                      <span className="text-sm">{u.full_name}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {teamForm.team_member_ids.length} membros selecionados.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsTeamDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSaveTeam}>Salvar Time</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Team Alert */}
+        <AlertDialog open={isDeleteTeamDialogOpen} onOpenChange={setIsDeleteTeamDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Time</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir o time <strong>{selectedTeam?.full_name}</strong>?
+                Os OKRs vinculados a este time perderão sua referência (ou serão apagados se houver cascata).
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteTeam} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Create Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent className="max-w-md">

@@ -1,139 +1,144 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { Plus, X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Plus, Target } from 'lucide-react';
 
-interface AddKRDialogProps {
-  objectiveId: string;
-  companyId: string;
-  quarterId: string;
-  defaultUserId?: string;
-  onSuccess: () => void;
-}
-
-interface Profile {
+interface User {
   id: string;
   full_name: string;
 }
 
-interface KeyResultForm {
+interface Team {
   id: string;
-  title: string;
-  type: string;
-  direction: string;
-  user_id: string;
+  name: string;
 }
 
-export function AddKRDialog({ objectiveId, companyId, quarterId, defaultUserId, onSuccess }: AddKRDialogProps) {
+interface AddKRDialogProps {
+  objectiveId: string;
+  quarterId: string;
+  companyId: string;
+  defaultUserId?: string;
+  onSuccess: () => void;
+}
+
+export function AddKRDialog({ objectiveId, quarterId, companyId, defaultUserId, onSuccess }: AddKRDialogProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [users, setUsers] = useState<Profile[]>([]);
-  const [keyResults, setKeyResults] = useState<KeyResultForm[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+
+  // Form fields
+  const [title, setTitle] = useState('');
+  const [type, setType] = useState('number');
+  const [direction, setDirection] = useState('increase');
+  const [ownerType, setOwnerType] = useState<'user' | 'team'>('user');
+  const [selectedUserId, setSelectedUserId] = useState(defaultUserId || '');
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const [code, setCode] = useState('');
 
   const loadUsers = useCallback(async () => {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('company_id', companyId)
-      .eq('is_active', true)
-      .order('full_name');
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('company_id', companyId)
+        .eq('is_active', true)
+        .order('full_name');
 
-    if (profiles) {
-      setUsers(profiles);
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+    }
+  }, [companyId]);
+
+  const loadTeams = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('company_id', companyId)
+        .eq('is_team', true)
+        .eq('is_active', true)
+        .order('full_name');
+
+      if (error) throw error;
+      setTeams((data || []).map(t => ({ id: t.id, name: t.full_name })));
+    } catch (error) {
+      console.error('Erro ao carregar times:', error);
     }
   }, [companyId]);
 
   useEffect(() => {
-    if (open && companyId) {
+    if (open) {
       loadUsers();
+      loadTeams();
+      if (defaultUserId) setSelectedUserId(defaultUserId);
     }
-  }, [open, companyId, loadUsers]);
-
-  const addKeyResult = () => {
-    setKeyResults([
-      ...keyResults,
-      {
-        id: crypto.randomUUID(),
-        title: '',
-        type: 'number',
-        direction: 'increase',
-        user_id: defaultUserId || '',
-      },
-    ]);
-  };
-
-  const removeKeyResult = (id: string) => {
-    setKeyResults(keyResults.filter((kr) => kr.id !== id));
-  };
-
-  const updateKeyResult = <K extends keyof KeyResultForm>(id: string, field: K, value: KeyResultForm[K]) => {
-    setKeyResults(
-      keyResults.map((kr) => (kr.id === id ? { ...kr, [field]: value } : kr))
-    );
-  };
+  }, [open, loadUsers, loadTeams, defaultUserId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (keyResults.length === 0) {
-      toast.error('Adicione pelo menos um Key Result');
-      return;
-    }
+    const isOwnerSelected = (ownerType === 'user' && selectedUserId) || (ownerType === 'team' && selectedTeamId);
 
-    // Validar campos obrigatórios
-    for (const kr of keyResults) {
-      if (!kr.title.trim()) {
-        toast.error('Preencha o título de todos os Key Results');
-        return;
-      }
-      if (!kr.user_id) {
-        toast.error('Selecione o responsável para todos os Key Results');
-        return;
-      }
+    if (!title || !isOwnerSelected) {
+      toast({
+        title: 'Erro',
+        description: 'Preencha todos os campos obrigatórios',
+        variant: 'destructive',
+      });
+      return;
     }
 
     setLoading(true);
 
     try {
-      // Inserir todos os KRs
-      const krsToInsert = keyResults.map((kr) => ({
-        objective_id: objectiveId,
-        title: kr.title,
-        type: kr.type,
-        direction: kr.direction,
-        unit: null,
-        user_id: kr.user_id,
-        company_id: companyId,
-        quarter_id: quarterId,
-        created_by: user?.id,
-        current: 0,
-        baseline: 0,
-        floor_value: 0,
-        target: 0,
-        weight: 1,
-      }));
-
-      const { error: krError } = await supabase
+      const { error } = await supabase
         .from('key_results')
-        .insert(krsToInsert);
+        .insert({
+          objective_id: objectiveId,
+          title,
+          type,
+          direction,
+          user_id: ownerType === 'user' ? selectedUserId : selectedTeamId,
+          company_id: companyId,
+          quarter_id: quarterId,
+          created_by: user?.id,
+          code: code || null,
+          current: 0,
+          baseline: 0,
+          target: 0,
+          weight: 1,
+        });
 
-      if (krError) throw krError;
+      if (error) throw error;
 
-      toast.success('Key Results adicionados com sucesso!');
+      toast({
+        title: 'Sucesso',
+        description: 'Key Result criado com sucesso!',
+      });
+
+      // Reset form
+      setTitle('');
+      setCode('');
       setOpen(false);
-      setKeyResults([]);
       onSuccess();
-    } catch (error: unknown) {
-      console.error('Erro ao adicionar Key Results:', error);
-      const message = error instanceof Error ? error.message : 'tente novamente';
-      toast.error('Erro ao adicionar Key Results: ' + message);
+    } catch (error) {
+      console.error('Erro ao criar KR:', error);
+      toast({
+        title: 'Erro ao criar Key Result',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -142,126 +147,124 @@ export function AddKRDialog({ objectiveId, companyId, quarterId, defaultUserId, 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar KR
+        <Button size="sm" variant="outline" className="gap-2">
+          <Plus className="h-4 w-4" />
+          Novo KR
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Adicionar Key Results</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Adicionar Key Result
+          </DialogTitle>
+          <DialogDescription>
+            Defina o novo indicador para este objetivo
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Key Results (OKRs)</h3>
-              <Button type="button" onClick={addKeyResult} variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar KR
-              </Button>
-            </div>
-
-            {keyResults.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhum Key Result adicionado. Clique em "Adicionar KR" para criar.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {keyResults.map((kr, index) => (
-                  <div key={kr.id} className="border rounded-lg p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">Key Result #{index + 1}</h4>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeKeyResult(kr.id)}
-                      >
-                        <X className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Título *</Label>
-                        <Input
-                          value={kr.title}
-                          onChange={(e) => updateKeyResult(kr.id, 'title', e.target.value)}
-                          placeholder="Ex: Reduzir tempo de resposta"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Tipo</Label>
-                        <Select
-                          value={kr.type}
-                          onValueChange={(value) => updateKeyResult(kr.id, 'type', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover z-50">
-                            <SelectItem value="number">Número</SelectItem>
-                            <SelectItem value="percentage">Porcentagem</SelectItem>
-                            <SelectItem value="currency">Moeda</SelectItem>
-                            <SelectItem value="date">Data</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Direção</Label>
-                        <Select
-                          value={kr.direction}
-                          onValueChange={(value) => updateKeyResult(kr.id, 'direction', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover z-50">
-                            <SelectItem value="increase">Aumentar</SelectItem>
-                            <SelectItem value="decrease">Diminuir</SelectItem>
-                            <SelectItem value="greater_than">Maior Que</SelectItem>
-                            <SelectItem value="less_than">Menor Que</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Responsável pelo KR *</Label>
-                      <Select
-                        value={kr.user_id}
-                        onValueChange={(value) => updateKeyResult(kr.id, 'user_id', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o responsável" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-popover z-50">
-                          {users.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>
-                              {u.full_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="kr-title">Título *</Label>
+            <Input
+              id="kr-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ex: Aumentar conversão em 20%"
+              required
+            />
           </div>
 
-          <div className="flex justify-end gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="kr-code">Código (opcional)</Label>
+            <Input
+              id="kr-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Ex: KR-01"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50">
+                  <SelectItem value="number">Número</SelectItem>
+                  <SelectItem value="percentage">Percentual</SelectItem>
+                  <SelectItem value="currency">Moeda</SelectItem>
+                  <SelectItem value="date">Data</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Direção</Label>
+              <Select value={direction} onValueChange={setDirection}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50">
+                  <SelectItem value="increase">Aumentar</SelectItem>
+                  <SelectItem value="decrease">Diminuir</SelectItem>
+                  <SelectItem value="greater_than">Maior Que</SelectItem>
+                  <SelectItem value="less_than">Menor Que</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Tipo de Dono</Label>
+              <Select value={ownerType} onValueChange={(v: any) => setOwnerType(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50">
+                  <SelectItem value="user">Individual</SelectItem>
+                  <SelectItem value="team">Time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Responsável *</Label>
+              {ownerType === 'user' ? (
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o usuário" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {users.map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o time" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {teams.map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || keyResults.length === 0}>
-              {loading ? 'Salvando...' : 'Adicionar Key Results'}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Adicionando...' : 'Adicionar Key Result'}
             </Button>
           </div>
         </form>

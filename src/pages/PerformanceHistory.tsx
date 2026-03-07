@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronUp, Trophy, TrendingUp, Target, AlertTriangle, XOctagon } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trophy, TrendingUp, Target, AlertTriangle, XOctagon, Users } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -51,6 +51,7 @@ interface UserProfile {
     sector: string | null;
     is_active: boolean;
     company_id: string;
+    is_team: boolean | null;
 }
 
 interface QuarterResult {
@@ -165,7 +166,7 @@ export default function PerformanceHistory() {
             // 2. Fetch Users
             let usersQuery = supabase
                 .from('profiles')
-                .select('id, full_name, avatar_url, sector, is_active, company_id')
+                .select('id, full_name, avatar_url, sector, is_active, company_id, is_team')
                 .eq('company_id', filterCompanyId)
                 .order('full_name');
 
@@ -366,7 +367,10 @@ export default function PerformanceHistory() {
                                                                     <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
                                                                 </Avatar>
                                                                 <div>
-                                                                    <div className="text-base font-normal">{toTitleCase(user.full_name)}</div>
+                                                                    <div className="text-base font-normal flex items-center gap-1.5">
+                                                                        {user.is_team && <Users className="h-4 w-4 text-primary" />}
+                                                                        {toTitleCase(user.full_name)}
+                                                                    </div>
                                                                     {user.sector && (
                                                                         <div className="text-sm text-black">{toTitleCase(user.sector)}</div>
                                                                     )}

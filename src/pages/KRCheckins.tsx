@@ -643,31 +643,312 @@ export default function KRCheckins() {
     const formatted = cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     return formatted;
   };
-  const openDialog = async (kr: KeyResult, checkin: QuarterCheckin) => {
+
+  const openDialog = (kr: KeyResult, checkin: QuarterCheckin) => {
     setCurrentKR(kr);
     setCurrentCheckin(checkin);
-    const key = `${kr.id}-${checkin.id}`;
-    const existing = checkinResults[key];
 
-    // Fetch the note from the database if it exists
-    let note = existing?.note || '';
-    if (!note && existing?.id) {
-      const { data } = await supabase
-        .from('checkin_results')
-        .select('note')
-        .eq('id', existing.id)
-        .single();
-      note = data?.note || '';
+    const key = `${kr.id}-${checkin.id}`;
+    const result = checkinResults[key];
+
+    if (result) {
+      setFormData({
+        meta: formatInputValue(result.meta_checkin?.toString() || '', kr.type),
+        minimo: formatInputValue(result.minimo_orcamento?.toString() || '', kr.type),
+        realizado: formatInputValue(result.valor_realizado?.toString() || '', kr.type),
+        observacoes: result.note || '',
+      });
+    } else {
+      setFormData({ meta: '', minimo: '', realizado: '', observacoes: '' });
     }
 
-    setFormData({
-      meta: existing?.meta_checkin != null ? formatInputValue(existing.meta_checkin.toString(), kr.type) : '',
-      minimo: existing?.minimo_orcamento != null ? formatInputValue(existing.minimo_orcamento.toString(), kr.type) : '',
-      realizado: existing?.valor_realizado != null ? formatInputValue(existing.valor_realizado.toString(), kr.type) : '',
-      observacoes: note,
-    });
     setIsDialogOpen(true);
   };
+
+  const calculateDeadlineProgress = (target: number, limit: number, realized: number): number => {
+    // If target equals limit, it's an immediate deadline
+    if (target === limit) {
+      return realized <= target ? 100 : 0;
+    }
+
+    const totalDuration = target - limit;
+    const elapsed = realized - limit;
+
+    // Progress = (Elapsed / TotalDuration) * 100
+    // If target > limit (Standard deadline): higher realized is further along
+    // If target < limit (Reverse deadline): lower realized is further along (handled by math)
+    const progress = (elapsed / totalDuration) * 100;
+
+    // Constrain between 0 and 100
+    return Math.max(0, Math.min(100, progress));
+  };
+
+  const calculateSimpleAttainment = (
+    realized: number | null,
+    target: number | null,
+    direction: string | null,
+    type?: string | null
+  ): number | null => {
+    if (target === null || target === undefined || Number.isNaN(Number(target)) || Number(target) === 0) return null;
+    const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
+    if (safeRealized === null) return null;
+
+    const safeTarget = Number(target);
+
+    if (type === 'date' || type === 'data') {
+      return null;
+    }
+
+    if (!direction || direction === 'increase' || direction === 'maior-é-melhor') {
+      return (safeRealized / safeTarget) * 100;
+    } else {
+      if (safeRealized <= safeTarget) return 100;
+      return (safeTarget / safeRealized) * 100;
+    }
+  };
+
+  const calculateKR = (
+    realized: number | null,
+    min: number | null,
+    target: number | null,
+    direction: string | null,
+    type?: string | null
+  ): number | null => {
+    if (target === null || target === undefined || Number.isNaN(Number(target))) return null;
+
+    const safeTarget = Number(target);
+    const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
+    const safeMin = (min !== null && min !== undefined) ? Number(min) : null;
+
+    if (type === 'date' || type === 'data') {
+      if (safeRealized === null) return null;
+      const limit = safeMin !== null ? safeMin : safeTarget;
+      return calculateDeadlineProgress(safeTarget, limit, safeRealized);
+    }
+
+    if (safeRealized === null) return null;
+
+    if (!direction || direction === 'increase' || direction === 'maior-é-melhor') {
+      if (safeMin !== null) {
+        if (safeRealized >= safeTarget) return 100;
+        if (safeRealized < safeMin) return 0;
+        const denominator = safeTarget - safeMin;
+        if (denominator === 0) return 0;
+        const result = ((safeRealized - safeMin) / denominator) * 100;
+        return Math.max(0, Math.min(100, result));
+      }
+      if (safeTarget === 0) return 0;
+      const result = (safeRealized / safeTarget) * 100;
+      return Math.min(100, Math.max(0, result));
+    }
+
+    if (direction === 'decrease' || direction === 'menor-é-melhor') {
+      if (safeRealized <= safeTarget) return 100;
+      if (safeTarget === 0) return 0;
+      const result = ((2 * safeTarget - safeRealized) / safeTarget) * 100;
+      return Math.max(0, result);
+    }
+
+    return 0;
+  };
+
+  const updateStoredProgress = async (kr: KeyResult, newPercent: number | null) => {
+    if (newPercent === null || Number.isNaN(newPercent)) return;
+    try {
+      await supabase
+        .from('key_results')
+        .update({ percent_kr: newPercent })
+        .eq('id', kr.id);
+
+      let objectiveQuery = supabase
+        .from('key_results')
+        .select('percent_kr')
+        .eq('objective_id', kr.objective_id);
+
+      if (kr.company_id) {
+        objectiveQuery = objectiveQuery.eq('company_id', kr.company_id);
+      }
+
+      const { data: objectiveKRs, error: fetchError } = await objectiveQuery;
+      if (fetchError) throw fetchError;
+
+      const validPercents = (objectiveKRs ?? [])
+        .map((item) => item.percent_kr)
+        .filter((value): value is number => typeof value === 'number');
+
+      const objectivePercent =
+        validPercents.length > 0
+          ? Math.round(validPercents.reduce((sum, value) => sum + value, 0) / validPercents.length)
+          : newPercent;
+
+      await supabase
+        .from('objectives')
+        .update({ percent_obj: objectivePercent })
+        .eq('id', kr.objective_id);
+
+    } catch (error) {
+      console.error('Erro ao sincronizar percentuais de objetivo/KR:', error);
+    }
+  };
+
+  const parseDateOnly = useCallback((dateString: string | null | undefined) => {
+    if (!dateString) return null;
+    const [yearStr, monthStr, dayPart] = dateString.split('-');
+    if (!yearStr || !monthStr || !dayPart) return null;
+    const cleanedDay = dayPart.replace(/[^0-9].*$/, '');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const day = Number(cleanedDay);
+    if ([year, month, day].some((value) => Number.isNaN(value))) return null;
+    return new Date(year, month - 1, day);
+  }, []);
+
+  const getCheckinTime = useCallback((dateString: string | null | undefined) => {
+    const parsed = parseDateOnly(dateString);
+    return parsed ? parsed.getTime() : null;
+  }, [parseDateOnly]);
+
+  const groupedObjectives = useMemo(() => {
+    const titleMap = new Map<string, { objectives: Objective[]; keyResults: KeyResult[] }>();
+    const objectiveIdToTitle = new Map<string, string>();
+    objectives.forEach((obj) => {
+      objectiveIdToTitle.set(obj.id, obj.title);
+      if (!titleMap.has(obj.title)) {
+        titleMap.set(obj.title, { objectives: [], keyResults: [] });
+      }
+      titleMap.get(obj.title)!.objectives.push(obj);
+    });
+    keyResults.forEach((kr) => {
+      const title = objectiveIdToTitle.get(kr.objective_id);
+      if (!title) return;
+      titleMap.get(title)?.keyResults.push(kr);
+    });
+    return Array.from(titleMap.entries())
+      .map(([title, data]) => ({ title, ...data }))
+      .filter((group) => group.keyResults.length > 0);
+  }, [objectives, keyResults]);
+
+  const calculateGroupAverage = useCallback((groupKRs: KeyResult[], checkinId: string) => {
+    let weightedSum = 0;
+    let totalWeight = 0;
+    let count = 0;
+    groupKRs.forEach((kr) => {
+      const key = `${kr.id}-${checkinId}`;
+      const result = checkinResults[key];
+      if (result && result.valor_realizado !== null && result.meta_checkin !== null && result.minimo_orcamento !== null) {
+        const krPercentage = calculateKR(result.valor_realizado, result.minimo_orcamento, result.meta_checkin, kr.direction, kr.type);
+        if (krPercentage !== null) {
+          const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
+          weightedSum += krPercentage * weight;
+          totalWeight += weight;
+          count++;
+        }
+      }
+    });
+    return { average: totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0, hasData: count > 0 };
+  }, [checkinResults]);
+
+  const checkinGroupAverages = useMemo(() => {
+    const map: Record<string, Record<string, { average: number; hasData: boolean }>> = {};
+    groupedObjectives.forEach((group) => {
+      map[group.title] = {};
+      quarterCheckins.forEach((checkin) => {
+        map[group.title][checkin.id] = calculateGroupAverage(group.keyResults, checkin.id);
+      });
+    });
+    return map;
+  }, [groupedObjectives, quarterCheckins, calculateGroupAverage]);
+
+  const checkinOverallAverages = useMemo(() => {
+    const map: Record<string, { average: number; hasData: boolean }> = {};
+    quarterCheckins.forEach((checkin) => {
+      let sum = 0;
+      let count = 0;
+      groupedObjectives.forEach((group) => {
+        const stats = checkinGroupAverages[group.title]?.[checkin.id];
+        if (stats?.hasData) {
+          sum += stats.average;
+          count++;
+        }
+      });
+      map[checkin.id] = { average: count > 0 ? Math.round(sum / count) : 0, hasData: count > 0 };
+    });
+    return map;
+  }, [quarterCheckins, groupedObjectives, checkinGroupAverages]);
+
+  const activeCheckinId = useMemo(() => {
+    if (quarterCheckins.length === 0) return null;
+    const sorted = [...quarterCheckins].sort((a, b) => (getCheckinTime(a.checkin_date) ?? Infinity) - (getCheckinTime(b.checkin_date) ?? Infinity));
+    const referenceList = sorted.filter((checkin) => getCheckinTime(checkin.checkin_date) !== null);
+    const orderedList = referenceList.length > 0 ? referenceList : sorted;
+    if (orderedList.length === 0) return null;
+    const now = currentDate.getTime();
+    for (let i = 0; i < orderedList.length; i++) {
+      const start = getCheckinTime(orderedList[i].checkin_date);
+      if (start === null) continue;
+      const nextStart = orderedList[i + 1] ? getCheckinTime(orderedList[i + 1].checkin_date) : null;
+      if (!nextStart && now >= start) return orderedList[i].id;
+      if (nextStart !== null && now >= start && now < nextStart) return orderedList[i].id;
+    }
+    return orderedList[orderedList.length - 1]?.id ?? null;
+  }, [quarterCheckins, currentDate, getCheckinTime]);
+
+  const saveQuarterResult = useCallback(async (userIdOverride?: string) => {
+    if (!user || !selectedQuarter || !activeCheckinId) return;
+
+    const targetCompanyId = filterCompanyId && filterCompanyId !== 'all' ? filterCompanyId : (userProfile?.company_id ?? selectedCompanyId);
+    const targetUserId = userIdOverride || (role === 'user' ? user.id : (filterOwnerId && filterOwnerId !== 'all' ? filterOwnerId : null));
+
+    if (!targetCompanyId || !targetUserId) return;
+
+    if (!userIdOverride && objectives.length > 0) {
+      const hasForeignObjectives = objectives.some(obj => obj.user_id !== targetUserId);
+      if (hasForeignObjectives) return;
+    }
+
+    let stats;
+    if (userIdOverride) {
+      if (userIdOverride === (role === 'user' ? user.id : filterOwnerId)) {
+        stats = checkinOverallAverages[activeCheckinId];
+      } else {
+        const { data: dbStats } = await supabase.from('quarter_results').select('result_percent').eq('user_id', userIdOverride).eq('quarter_id', selectedQuarter).maybeSingle();
+        stats = userIdOverride === (role === 'user' ? user.id : filterOwnerId) ? checkinOverallAverages[activeCheckinId] : null;
+      }
+    } else {
+      stats = checkinOverallAverages[activeCheckinId];
+    }
+
+    if (!stats?.hasData) {
+      if (!userIdOverride) {
+        try {
+          await supabase.from('quarter_results').delete().eq('company_id', targetCompanyId).eq('user_id', targetUserId).eq('quarter_id', selectedQuarter);
+        } catch (err) { console.error('Error clearing:', err); }
+      }
+      return;
+    }
+
+    try {
+      const { data: existingResult } = await supabase.from('quarter_results').select('id').eq('company_id', targetCompanyId).eq('user_id', targetUserId).eq('quarter_id', selectedQuarter).maybeSingle();
+      const payload = { result_percent: stats.average, updated_at: new Date().toISOString() };
+      if (existingResult) {
+        await supabase.from('quarter_results').update(payload).eq('id', existingResult.id);
+      } else {
+        await supabase.from('quarter_results').insert({ company_id: targetCompanyId, user_id: targetUserId, quarter_id: selectedQuarter, result_percent: stats.average, saved_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+      }
+    } catch (error) { console.error('Error saving quarter result:', error); }
+  }, [user, selectedQuarter, activeCheckinId, filterCompanyId, userProfile?.company_id, selectedCompanyId, role, filterOwnerId, objectives, checkinOverallAverages]);
+
+  useEffect(() => {
+    saveQuarterResult();
+  }, [saveQuarterResult]);
+
+  useEffect(() => {
+    if (activeCheckinId && checkinOverallAverages[activeCheckinId]) {
+      setCurrentResult(checkinOverallAverages[activeCheckinId].average);
+    } else {
+      setCurrentResult(0);
+    }
+  }, [activeCheckinId, checkinOverallAverages]);
 
   const closeDialog = () => {
     setIsDialogOpen(false);
@@ -848,6 +1129,9 @@ export default function KRCheckins() {
       await updateStoredProgress(kr, roundedKRProgress);
       // Recarregar os dados para refletir as mudanças
       await loadCheckinResults();
+
+      // Forçar atualização do resultado do quarter para o dono do KR
+      await saveQuarterResult(kr.user_id ?? user?.id);
 
       toast({
         title: 'Sucesso',
@@ -1056,602 +1340,8 @@ export default function KRCheckins() {
   };
 
   const handleKRClick = (kr: KeyResult) => {
-    const text = generateKRExecutiveAnalysis(kr);
-    setAnalysisContent({ title: kr.title, text });
-    setAnalysisDialogOpen(true);
+    openDialog(kr, quarterCheckins[0]); // Fallback or handle appropriately
   };
-
-  const calculateSimpleAttainment = (
-    realized: number | null,
-    target: number | null,
-    direction: string | null,
-    type?: string | null
-  ): number | null => {
-    if (target === null || target === undefined || Number.isNaN(Number(target)) || Number(target) === 0) return null;
-    const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
-    if (safeRealized === null) return null;
-
-    const safeTarget = Number(target);
-
-    // Date/Data logic remains range-based usually, but the user said "realizado / meta"
-    // For dates, it's not a simple division. I'll keep calculateKR for dates unless asked otherwise,
-    // as "realizado/meta" doesn't translate well to timestamps.
-    if (type === 'date' || type === 'data') {
-      return null; // Fallback to calculateKR or skip
-    }
-
-    if (!direction || direction === 'increase' || direction === 'maior-é-melhor') {
-      return (safeRealized / safeTarget) * 100;
-    } else {
-      // Decrease (Menor é melhor): meta / realizado capped at 100? 
-      // User said "realizado / meta", but for decrease that would mean lower is worse.
-      // I'll use target/realized for decrease simple attainment.
-      if (safeRealized <= safeTarget) return 100;
-      return (safeTarget / safeRealized) * 100;
-    }
-  };
-
-  const calculateKR = (
-    realized: number | null,
-    min: number | null,
-    target: number | null,
-    direction: string | null,
-    type?: string | null
-  ): number | null => {
-    // Basic safety
-    if (target === null || target === undefined || Number.isNaN(Number(target))) return null;
-
-    const safeTarget = Number(target);
-    const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
-    const safeMin = (min !== null && min !== undefined) ? Number(min) : null;
-
-    // Lógica específica para DATAS
-    if (type === 'date' || type === 'data') {
-      if (safeRealized === null) return null;
-      const limit = safeMin !== null ? safeMin : safeTarget;
-      return calculateDeadlineProgress(safeTarget, limit, safeRealized);
-    }
-
-    if (safeRealized === null) return null;
-
-    // Logic for "Increase" / "Maior é melhor" (Default)
-    if (!direction || direction === 'increase' || direction === 'maior-é-melhor') {
-
-      // If Minimum Budget (Piso) is defined
-      if (safeMin !== null) {
-        // Realized >= Target -> 100%
-        if (safeRealized >= safeTarget) return 100;
-
-        // Realized < Min -> 0%
-        if (safeRealized < safeMin) return 0;
-
-        // Formula: ((Realized - Min) / (Target - Min)) * 100
-        const denominator = safeTarget - safeMin;
-        if (denominator === 0) return 0; // Avoid division by zero
-
-        const result = ((safeRealized - safeMin) / denominator) * 100;
-        return Math.max(0, Math.min(100, result));
-      }
-
-      // Fallback if no Min is defined (Simple percentage)
-      if (safeTarget === 0) return 0;
-      const result = (safeRealized / safeTarget) * 100;
-      return Math.min(100, Math.max(0, result));
-    }
-
-    // Logic for "Decrease" (Menor é melhor)
-    if (direction === 'decrease' || direction === 'menor-é-melhor') {
-      if (safeRealized <= safeTarget) return 100;
-
-      // Simple linear decay for now as no formula provided for decrease
-      if (safeTarget === 0) return 0; // Prevent div by zero
-      // Example: 200% - (Realized/Target)%
-      const result = ((2 * safeTarget - safeRealized) / safeTarget) * 100;
-      return Math.max(0, result);
-    }
-
-    return 0;
-  };
-
-  const updateStoredProgress = async (kr: KeyResult, newPercent: number | null) => {
-    if (newPercent === null || Number.isNaN(newPercent)) return;
-    try {
-      await supabase
-        .from('key_results')
-        .update({ percent_kr: newPercent })
-        .eq('id', kr.id);
-
-      let objectiveQuery = supabase
-        .from('key_results')
-        .select('percent_kr')
-        .eq('objective_id', kr.objective_id);
-
-      if (kr.company_id) {
-        objectiveQuery = objectiveQuery.eq('company_id', kr.company_id);
-      }
-
-      const { data: objectiveKRs, error: fetchError } = await objectiveQuery;
-
-      if (fetchError) throw fetchError;
-
-      const validPercents = (objectiveKRs ?? [])
-        .map((item) => item.percent_kr)
-        .filter((value): value is number => typeof value === 'number');
-
-      const objectivePercent =
-        validPercents.length > 0
-          ? Math.round(validPercents.reduce((sum, value) => sum + value, 0) / validPercents.length)
-          : newPercent;
-
-      const { data: objInfo } = await supabase
-        .from('objectives')
-        .update({ percent_obj: objectivePercent })
-        .eq('id', kr.objective_id)
-        .select('title, quarter_id, company_id')
-        .single();
-
-      // Atualiza o agregado do grupo (mesmo título em toda a empresa)
-      if (objInfo) {
-        const { data: allSameObjectives } = await supabase
-          .from('objectives')
-          .select('percent_obj, key_results (id)')
-          .eq('company_id', objInfo.company_id)
-          .eq('quarter_id', objInfo.quarter_id)
-          .eq('title', objInfo.title)
-          .eq('archived', false);
-
-        if (allSameObjectives) {
-          /*
-          const totalPct = allSameObjectives.reduce((sum, o) => sum + (o.percent_obj ?? 0), 0);
-          const userCount = allSameObjectives.length;
-          const krCount = allSameObjectives.reduce((sum, o) => sum + ((o.key_results as Array<{ id: string }>)?.length || 0), 0);
-          const avg = Math.round(totalPct / userCount);
-
-          await supabase
-            .from('objective_group_results')
-            .upsert({
-              company_id: objInfo.company_id,
-              quarter_id: objInfo.quarter_id,
-              objective_title: objInfo.title,
-              avg_attainment_pct: avg,
-              kr_count: krCount,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'company_id,quarter_id,objective_title' });
-            */
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao sincronizar percentuais de objetivo/KR:', error);
-    }
-  };
-
-  const parseDateOnly = useCallback((dateString: string | null | undefined) => {
-    if (!dateString) return null;
-
-    const [yearStr, monthStr, dayPart] = dateString.split('-');
-    if (!yearStr || !monthStr || !dayPart) return null;
-
-    const cleanedDay = dayPart.replace(/[^0-9].*$/, '');
-    const year = Number(yearStr);
-    const month = Number(monthStr);
-    const day = Number(cleanedDay);
-
-    if ([year, month, day].some((value) => Number.isNaN(value))) {
-      return null;
-    }
-
-    return new Date(year, month - 1, day);
-  }, []);
-
-  const getCheckinTime = useCallback((dateString: string | null | undefined) => {
-    const parsed = parseDateOnly(dateString);
-    return parsed ? parsed.getTime() : null;
-  }, [parseDateOnly]);
-
-  const handleInputChange = (krId: string, checkinId: string, field: 'meta' | 'minimo' | 'realizado', value: string) => {
-    const key = `${krId}-${checkinId}`;
-    const current = editingData[key] || { meta: '', minimo: '', realizado: '' };
-
-    setEditingData({
-      ...editingData,
-      [key]: {
-        ...current,
-        [field]: value,
-      }
-    });
-  };
-
-  const initializeEditingData = (krId: string, checkinId: string) => {
-    const key = `${krId}-${checkinId}`;
-    if (editingData[key]) return;
-
-    const existing = checkinResults[key];
-    setEditingData({
-      ...editingData,
-      [key]: {
-        meta: existing?.meta_checkin?.toString() || '',
-        minimo: existing?.minimo_orcamento?.toString() || '',
-        realizado: existing?.valor_realizado?.toString() || '',
-      }
-    });
-  };
-
-  const getInputType = (type: string | null) => {
-    if (type === 'moeda' || type === 'currency') return 'text';
-    if (type === 'percentual' || type === 'percentage' || type === 'numero' || type === 'number') return 'number';
-    return 'text';
-  };
-
-  const getInputStep = (type: string | null) => {
-    return type === 'moeda' ? '0.01' : '0.1';
-  };
-
-  const groupedObjectives = useMemo(() => {
-    const titleMap = new Map<string, { objectives: Objective[]; keyResults: KeyResult[] }>();
-    const objectiveIdToTitle = new Map<string, string>();
-
-    objectives.forEach((obj) => {
-      objectiveIdToTitle.set(obj.id, obj.title);
-      if (!titleMap.has(obj.title)) {
-        titleMap.set(obj.title, { objectives: [], keyResults: [] });
-      }
-      titleMap.get(obj.title)!.objectives.push(obj);
-    });
-
-    keyResults.forEach((kr) => {
-      const title = objectiveIdToTitle.get(kr.objective_id);
-      if (!title) return;
-      titleMap.get(title)?.keyResults.push(kr);
-    });
-
-    return Array.from(titleMap.entries())
-      .map(([title, data]) => ({ title, ...data }))
-      .filter((group) => group.keyResults.length > 0);
-  }, [objectives, keyResults]);
-
-  const calculateGroupAverage = useCallback((groupKRs: KeyResult[], checkinId: string) => {
-    let weightedSum = 0;
-    let totalWeight = 0;
-    let count = 0;
-
-    groupKRs.forEach((kr) => {
-      const key = `${kr.id}-${checkinId}`;
-      const result = checkinResults[key];
-
-      if (
-        result &&
-        result.valor_realizado !== null &&
-        result.meta_checkin !== null &&
-        result.minimo_orcamento !== null
-      ) {
-        const krPercentage = calculateKR(
-          result.valor_realizado,
-          result.minimo_orcamento,
-          result.meta_checkin,
-          kr.direction,
-          kr.type
-        );
-
-        if (krPercentage !== null) {
-          const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
-          weightedSum += krPercentage * weight;
-          totalWeight += weight;
-          count++;
-        }
-      }
-    });
-
-    return {
-      average: totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0,
-      hasData: count > 0,
-    };
-  }, [checkinResults]);
-
-  const checkinGroupAverages = useMemo(() => {
-    const map: Record<string, Record<string, { average: number; hasData: boolean }>> = {};
-
-    groupedObjectives.forEach((group) => {
-      map[group.title] = {};
-      quarterCheckins.forEach((checkin) => {
-        map[group.title][checkin.id] = calculateGroupAverage(group.keyResults, checkin.id);
-      });
-    });
-
-    return map;
-  }, [groupedObjectives, quarterCheckins, calculateGroupAverage]);
-
-  const checkinOverallAverages = useMemo(() => {
-    const map: Record<string, { average: number; hasData: boolean }> = {};
-
-    quarterCheckins.forEach((checkin) => {
-      let sum = 0;
-      let count = 0;
-
-      groupedObjectives.forEach((group) => {
-        const stats = checkinGroupAverages[group.title]?.[checkin.id];
-        if (stats?.hasData) {
-          sum += stats.average;
-          count++;
-        }
-      });
-
-      map[checkin.id] = {
-        average: count > 0 ? Math.round(sum / count) : 0,
-        hasData: count > 0,
-      };
-    });
-
-    return map;
-  }, [quarterCheckins, groupedObjectives, checkinGroupAverages]);
-
-  const activeCheckinId = useMemo(() => {
-    if (quarterCheckins.length === 0) return null;
-
-    const sorted = [...quarterCheckins].sort((a, b) => {
-      const timeA = getCheckinTime(a.checkin_date);
-      const timeB = getCheckinTime(b.checkin_date);
-      return (timeA ?? Number.POSITIVE_INFINITY) - (timeB ?? Number.POSITIVE_INFINITY);
-    });
-
-    const referenceList = sorted.filter((checkin) => getCheckinTime(checkin.checkin_date) !== null);
-    const orderedList = referenceList.length > 0 ? referenceList : sorted;
-    if (orderedList.length === 0) return null;
-
-    const now = currentDate.getTime();
-    const firstStart = getCheckinTime(orderedList[0].checkin_date);
-
-    if (firstStart !== null && now < firstStart) {
-      return orderedList[0].id;
-    }
-
-    for (let i = 0; i < orderedList.length; i++) {
-      const start = getCheckinTime(orderedList[i].checkin_date);
-      if (start === null) continue;
-      const nextStart = orderedList[i + 1] ? getCheckinTime(orderedList[i + 1].checkin_date) : null;
-
-      if (!nextStart && now >= start) {
-        return orderedList[i].id;
-      }
-
-      if (nextStart !== null && now >= start && now < nextStart) {
-        return orderedList[i].id;
-      }
-    }
-
-    return orderedList[orderedList.length - 1]?.id ?? null;
-  }, [quarterCheckins, currentDate, getCheckinTime]);
-
-  // Inicializar data selecionada com a mais recente quando quarterCheckins mudar
-  useEffect(() => {
-    if (quarterCheckins.length > 0 && !selectedCheckinDate) {
-      if (activeCheckinId) {
-        setSelectedCheckinDate(activeCheckinId);
-        return;
-      }
-
-      const sortedCheckins = [...quarterCheckins].sort((a, b) => {
-        const timeA = getCheckinTime(a.checkin_date);
-        const timeB = getCheckinTime(b.checkin_date);
-        return (timeB ?? Number.NEGATIVE_INFINITY) - (timeA ?? Number.NEGATIVE_INFINITY);
-      });
-      setSelectedCheckinDate(sortedCheckins[0].id);
-    }
-  }, [quarterCheckins, selectedCheckinDate, activeCheckinId, getCheckinTime]);
-
-  useEffect(() => {
-    if (activeCheckinId && checkinOverallAverages[activeCheckinId]) {
-      setCurrentResult(checkinOverallAverages[activeCheckinId].average);
-    } else {
-      setCurrentResult(0);
-    }
-  }, [activeCheckinId, checkinOverallAverages]);
-
-  useEffect(() => {
-    const saveQuarterResult = async () => {
-      if (!user || !selectedQuarter || !activeCheckinId) return;
-
-      const targetCompanyId =
-        filterCompanyId && filterCompanyId !== 'all'
-          ? filterCompanyId
-          : (userProfile?.company_id ?? selectedCompanyId);
-
-      const targetUserId =
-        role === 'user'
-          ? user.id
-          : (filterOwnerId && filterOwnerId !== 'all' ? filterOwnerId : null);
-
-      if (!targetCompanyId || !targetUserId) return;
-
-      // Prevent race conditions where filters changed but data hasn't loaded yet
-      if (objectives.length > 0) {
-        const hasForeignObjectives = objectives.some(obj => obj.user_id !== targetUserId);
-        if (hasForeignObjectives) return;
-      }
-
-      if (keyResults.length > 0) {
-        const hasForeignKRs = keyResults.some(kr => kr.company_id !== targetCompanyId);
-        if (hasForeignKRs) return;
-      }
-
-      const stats = checkinOverallAverages[activeCheckinId];
-      if (!stats?.hasData) {
-        try {
-          await supabase
-            .from('quarter_results')
-            .delete()
-            .eq('company_id', targetCompanyId)
-            .eq('user_id', targetUserId)
-            .eq('quarter_id', selectedQuarter);
-        } catch (err) {
-          console.error('Erro ao limpar resultado do quarter sem dados:', err);
-        }
-        return;
-      }
-
-      try {
-        const { data: existingResult, error } = await supabase
-          .from('quarter_results')
-          .select('id')
-          .eq('company_id', targetCompanyId)
-          .eq('user_id', targetUserId)
-          .eq('quarter_id', selectedQuarter)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Erro ao carregar resultado do quarter:', error);
-          return;
-        }
-
-        const payload = {
-          result_percent: currentResult,
-          updated_at: new Date().toISOString(),
-        };
-
-        if (existingResult) {
-          await supabase.from('quarter_results').update(payload).eq('id', existingResult.id);
-        } else {
-          await supabase.from('quarter_results').insert({
-            company_id: targetCompanyId,
-            user_id: targetUserId,
-            quarter_id: selectedQuarter,
-            result_percent: currentResult,
-            saved_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-        }
-      } catch (error) {
-        console.error('Erro ao salvar resultado do quarter:', error);
-      }
-    };
-
-    saveQuarterResult();
-  }, [
-    activeCheckinId,
-    checkinOverallAverages,
-    currentResult,
-    selectedQuarter,
-    filterOwnerId,
-    filterCompanyId,
-    selectedCompanyId,
-    role,
-    objectives,
-    keyResults,
-    user,
-    userProfile?.company_id,
-  ]);
-
-  // Auto-save objective averages to DB
-  useEffect(() => {
-    const saveObjectiveAverages = async () => {
-      if (!selectedQuarter || groupedObjectives.length === 0 || quarterCheckins.length === 0) return;
-
-      const targetUserId = filterOwnerId && filterOwnerId !== 'all' ? filterOwnerId : user?.id;
-      const targetCompanyId = filterCompanyId && filterCompanyId !== 'all'
-        ? filterCompanyId
-        : selectedCompanyId ?? userProfile?.company_id;
-
-      if (!targetUserId || !targetCompanyId) return;
-
-      const rows: {
-        company_id: string;
-        user_id: string;
-        quarter_id: string;
-        checkin_id: string;
-        objective_title: string;
-        average_pct: number;
-        updated_at: string;
-      }[] = [];
-
-      groupedObjectives.forEach((group) => {
-        quarterCheckins.forEach((checkin) => {
-          const stat = checkinGroupAverages[group.title]?.[checkin.id];
-          if (stat?.hasData) {
-            rows.push({
-              company_id: targetCompanyId,
-              user_id: targetUserId,
-              quarter_id: selectedQuarter,
-              checkin_id: checkin.id,
-              objective_title: group.title,
-              average_pct: stat.average,
-              updated_at: new Date().toISOString(),
-            });
-          }
-        });
-      });
-
-      if (rows.length === 0) return;
-
-      try {
-        await supabase
-          .from('objective_checkin_averages')
-          .upsert(rows, { onConflict: 'company_id,user_id,quarter_id,checkin_id,objective_title' });
-      } catch (err) {
-        console.error('Erro ao salvar médias de objetivo:', err);
-      }
-    };
-
-    saveObjectiveAverages();
-  }, [
-    checkinGroupAverages,
-    groupedObjectives,
-    quarterCheckins,
-    selectedQuarter,
-    filterOwnerId,
-    filterCompanyId,
-    selectedCompanyId,
-    user,
-    userProfile?.company_id,
-  ]);
-
-  useEffect(() => {
-    const persistCompletedCheckins = async () => {
-      if (!role || role === 'user' || quarterCheckins.length === 0) return;
-
-      const sorted = [...quarterCheckins].sort((a, b) => {
-        const timeA = getCheckinTime(a.checkin_date);
-        const timeB = getCheckinTime(b.checkin_date);
-        return (timeA ?? Number.POSITIVE_INFINITY) - (timeB ?? Number.POSITIVE_INFINITY);
-      });
-      const now = currentDate.getTime();
-      const updates: { id: string; value: number }[] = [];
-
-      for (let i = 0; i < sorted.length - 1; i++) {
-        const current = sorted[i];
-        const nextStart = getCheckinTime(sorted[i + 1].checkin_date);
-        if (nextStart === null) {
-          continue;
-        }
-        const stats = checkinOverallAverages[current.id];
-        const alreadySaved = current.result_percent !== null && current.result_percent !== undefined;
-
-        if (!alreadySaved && stats?.hasData && now >= nextStart) {
-          updates.push({ id: current.id, value: stats.average });
-        }
-      }
-
-      if (updates.length === 0) return;
-
-      try {
-        await Promise.all(
-          updates.map(async (update) => {
-            // result_percent and updated_at were removed as they don't exist on checkins table
-            // They are calculated dynamically or saved in quarter_results
-          })
-        );
-
-        setQuarterCheckins((prev) =>
-          prev.map((checkin) => {
-            const update = updates.find((u) => u.id === checkin.id);
-            return update ? { ...checkin, result_percent: update.value } : checkin;
-          })
-        );
-      } catch (error) {
-        console.error('Erro ao salvar resultado do check-in:', error);
-      }
-    };
-
-    persistCompletedCheckins();
-  }, [quarterCheckins, checkinOverallAverages, currentDate, role, getCheckinTime]);
 
   return (
     <Layout>
