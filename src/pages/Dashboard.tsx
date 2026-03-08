@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode, type CSSProperties } from 'react';
+import { useMemo, useState, useEffect, type ReactNode, type CSSProperties } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -12,6 +12,7 @@ import { Target, Calendar, TrendingUp, Award, Trophy, Users } from 'lucide-react
 import { toTitleCase } from '@/lib/utils';
 import { ActiveQuarterInfo } from '@/components/ActiveQuarterInfo';
 import { DashboardProgressChart } from '@/components/DashboardProgressChart';
+import { OKRAnalysisDialog, type AIAnalysisContextData } from '@/components/OKRAnalysisDialog';
 import { useDashboardData, UserRanking } from '@/hooks/useDashboardData';
 import { getPerformanceColor } from '@/lib/performanceColors';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
@@ -23,6 +24,38 @@ export default function Dashboard() {
 
   // Use the new hook for all data fetching and caching
   const { data, isLoading } = useDashboardData();
+
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [analysisContext, setAnalysisContext] = useState<AIAnalysisContextData | null>(null);
+
+  useEffect(() => {
+    if (data?.active_quarter && data.metrics.objectiveRankings.length > 0) {
+      const sessionKey = `okr-ai-analysis-shown-${data.active_quarter.id}`;
+      if (!sessionStorage.getItem(sessionKey)) {
+        const summaryContext: AIAnalysisContextData = {
+          quarter: data.active_quarter.name,
+          quarter_status: 'ongoing',
+          objetivos: [
+            {
+              nome_objetivo: "Resumo Geral do Quarter",
+              descricao_objetivo: "Visão consolidada dos principais Key Results e Objetivos",
+              key_results: data.metrics.okrRankings.slice(0, 10).map(kr => ({
+                titulo: kr.title,
+                meta: 'Definida',
+                resultado_atual: kr.result_pct + '%',
+                percentual_atingimento: kr.result_pct,
+                historico_checkins: []
+              }))
+            }
+          ]
+        };
+
+        setAnalysisContext(summaryContext);
+        setAnalysisOpen(true);
+        sessionStorage.setItem(sessionKey, 'true');
+      }
+    }
+  }, [data]);
 
   const getProgressStyle = (pct: number): ProgressStyle => ({
     '--progress-color': getPerformanceColor(pct),
@@ -81,6 +114,12 @@ export default function Dashboard() {
 
   return (
     <Layout>
+      <OKRAnalysisDialog
+        open={analysisOpen}
+        onOpenChange={setAnalysisOpen}
+        contextData={analysisContext}
+        autoAnalyze={true}
+      />
       <div className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
           <div className="space-y-1">
@@ -166,7 +205,7 @@ export default function Dashboard() {
                       <div key={index} className="flex flex-col items-center gap-2 min-w-[100px] animate-in zoom-in duration-500 fade-in fill-mode-both" style={{ animationDelay: `${(index + 1) * 150}ms` }}>
                         <CircularProgress percentage={objective.result_pct} size={90} strokeWidth={8} textClassName="text-base" />
                         <span
-                          className={`text-xs font-medium text-center uppercase tracking-wider ${colorClass}`}
+                          className={`text - xs font - medium text - center uppercase tracking - wider ${colorClass}`}
                           style={{ maxWidth: '110px', lineHeight: '1.2' }}
                         >
                           {objective.objective_title}
@@ -197,7 +236,7 @@ export default function Dashboard() {
                   {topRankings.map((ranking, index) => (
                     <div
                       key={ranking.user_id}
-                      className={`flex items-center justify-between rounded-xl border px-3 py-2 animate-in slide-in-from-right-4 fade-in duration-500 fill-mode-both ${ranking.user_id === user?.id ? 'ring-2 ring-primary shadow-md shadow-primary/20 bg-primary/5' : 'hover:bg-muted/50'}`}
+                      className={`flex items - center justify - between rounded - xl border px - 3 py - 2 animate -in slide -in -from - right - 4 fade -in duration - 500 fill - mode - both ${ranking.user_id === user?.id ? 'ring-2 ring-primary shadow-md shadow-primary/20 bg-primary/5' : 'hover:bg-muted/50'}`}
                       style={{ animationDelay: `${index * 150}ms` }}
                     >
                       <div className="flex items-center gap-2">

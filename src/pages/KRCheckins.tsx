@@ -18,6 +18,8 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { toTitleCase } from '@/lib/utils';
 import { calculateDeadlineProgress } from '@/lib/deadlineProgress';
 import { ObjectiveLineChart } from '@/components/ObjectiveLineChart';
+import { Sparkles } from 'lucide-react';
+import { OKRAnalysisDialog, type AIAnalysisContextData } from '@/components/OKRAnalysisDialog';
 
 interface Quarter {
   id: string;
@@ -97,6 +99,10 @@ export default function KRCheckins() {
   const [quarters, setQuarters] = useState<Quarter[]>([]);
   const [selectedQuarter, setSelectedQuarter] = useState<string>('');
   const [quarterCheckins, setQuarterCheckins] = useState<QuarterCheckin[]>([]);
+  const [expandedObjectives, setExpandedObjectives] = useState<Record<string, boolean>>({});
+
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [analysisContext, setAnalysisContext] = useState<AIAnalysisContextData | null>(null);
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [keyResults, setKeyResults] = useState<KeyResult[]>([]);
   const [checkinResults, setCheckinResults] = useState<Record<string, CheckinResult>>({});
@@ -950,6 +956,56 @@ export default function KRCheckins() {
     }
   }, [activeCheckinId, checkinOverallAverages]);
 
+  const handleOpenAnalysis = () => {
+    if (!selectedQuarter) return;
+    const quarterObj = quarters.find(q => q.id === selectedQuarter);
+    if (!quarterObj) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isOngoing = quarterObj.end_date >= todayStr;
+    const sortedCheckins = [...quarterCheckins].sort((a, b) => a.checkin_date.localeCompare(b.checkin_date));
+
+    const mappedObjectives = groupedObjectives.map(group => {
+      return {
+        nome_objetivo: group.title,
+        key_results: group.keyResults.map(kr => {
+          const sortedResults = quarterCheckins
+            .map(c => checkinResults[kr.id + '-' + c.id])
+            .filter(r => r && r.valor_realizado !== null)
+            .sort((a, b) => {
+              const dA = quarterCheckins.find(c => c.id === a?.checkin_id)?.checkin_date || '';
+              const dB = quarterCheckins.find(c => c.id === b?.checkin_id)?.checkin_date || '';
+              return dA.localeCompare(dB);
+            });
+
+          const lastResult = sortedResults[sortedResults.length - 1];
+          const krProgress = lastResult ? calculateKR(lastResult.valor_realizado, lastResult.minimo_orcamento, lastResult.meta_checkin, kr.direction, kr.type) ?? 0 : 0;
+
+          return {
+            titulo: kr.title,
+            meta: lastResult ? formatValue(lastResult.meta_checkin, kr.type, kr.unit) : 'N/A',
+            resultado_atual: lastResult ? formatValue(lastResult.valor_realizado, kr.type, kr.unit) : 'N/A',
+            percentual_atingimento: krProgress + '%',
+            historico_checkins: sortedResults.map(r => {
+              const cdate = quarterCheckins.find(c => c.id === r?.checkin_id)?.checkin_date || '';
+              const cval = calculateKR(r?.valor_realizado, r?.minimo_orcamento, r?.meta_checkin, kr.direction, kr.type) ?? 0;
+              return { data: formatDate(cdate), valor: cval + '%' };
+            })
+          };
+        })
+      };
+    });
+
+    setAnalysisContext({
+      quarter: quarterObj.name,
+      quarter_status: isOngoing ? 'ongoing' : 'closed',
+      data_ultimo_checkin_quarter: sortedCheckins[sortedCheckins.length - 1] ? formatDate(sortedCheckins[sortedCheckins.length - 1].checkin_date) : undefined,
+      data_checkin_atual: activeCheckinId ? formatDate((quarterCheckins.find(c => c.id === activeCheckinId)?.checkin_date) || '') : undefined,
+      objetivos: mappedObjectives
+    });
+    setAnalysisOpen(true);
+  };
+
   const closeDialog = () => {
     setIsDialogOpen(false);
     setCurrentKR(null);
@@ -1043,7 +1099,7 @@ export default function KRCheckins() {
     // O progresso real do KR (com Piso) que sincroniza com rankings e média
     const roundedKRProgress = percentualAtingido === null ? null : Number(percentualAtingido.toFixed(2));
 
-    const key = `${currentKR.id}-${currentCheckin.id}`;
+    const key = currentKR.id + '-' + currentCheckin.id;
     const existingResult = checkinResults[key];
 
     try {
@@ -1178,7 +1234,7 @@ export default function KRCheckins() {
     switch (type) {
       case 'percentual':
       case 'percentage':
-        return `${numValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+        return numValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' %';
       case 'moeda':
       case 'currency':
         return numValue.toLocaleString('pt-BR', {
@@ -1191,7 +1247,7 @@ export default function KRCheckins() {
       case 'data':
         return new Date(numValue).toLocaleDateString('pt-BR');
       default:
-        return `${numValue.toLocaleString('pt-BR')} ${unit || ''}`;
+        return numValue.toLocaleString('pt-BR') + ' ' + (unit || '');
     }
   };
 
@@ -1240,7 +1296,7 @@ export default function KRCheckins() {
   // --- Helpers Expandidos para o Motor de Análise Executiva de KR ---
   const getSeriesString = (values: number[]) => {
     if (values.length === 0) return "";
-    return `(${values.map(v => `${v.toFixed(0)}%`).join(' → ')})`;
+    return '(' + values.map(v => v.toFixed(0) + '%').join(' → ') + ')';
   };
 
   const readTrend = (values: number[]) => {
@@ -1278,7 +1334,7 @@ export default function KRCheckins() {
 
   const generateKRExecutiveAnalysis = (kr: KeyResult) => {
     const results = quarterCheckins
-      .map(c => checkinResults[`${kr.id}-${c.id}`])
+      .map(c => checkinResults[kr.id + '-' + c.id])
       .filter(r => r && r.valor_realizado !== null)
       .sort((a, b) => {
         const dateA = quarterCheckins.find(c => c.id === a?.checkin_id)?.checkin_date || '';
@@ -1314,7 +1370,7 @@ export default function KRCheckins() {
     };
 
     const diagnosis = trendDiagnosis[trend] || trend;
-    p1 = `Os resultados do KR ${kr.code || ''} ${diagnosis} ao longo dos Check-ins ${seriesStr}. A variação observada reflete diretamente a dinâmica de ${kr.direction === 'decrease' ? 'redução' : 'crescimento'} do indicador, que encerrou o último ciclo com o valor realizado de ${formatValue(lastResult?.valor_realizado ?? 0, kr.type, kr.unit)} (progresso de ${lastKRValue.toFixed(1)}%).`;
+    p1 = "Os resultados do KR " + (kr.code || "") + " " + diagnosis + " ao longo dos Check-ins " + seriesStr + ". A variação observada reflete diretamente a dinâmica de " + (kr.direction === 'decrease' ? 'redução' : 'crescimento') + " do indicador, que encerrou o último ciclo com o valor realizado de " + formatValue(lastResult?.valor_realizado ?? 0, kr.type, kr.unit) + " (progresso de " + lastKRValue.toFixed(1) + "%).";
 
     // Parágrafo 2: Interpretação Gerencial (Risco e causas operacionais)
     let p2 = "";
@@ -1334,9 +1390,9 @@ export default function KRCheckins() {
     };
 
     const causeStr = causesMap[trend] || 'A oscilação observada impacta a visibilidade dos resultados.';
-    p2 = `Esse cenário ${riskInterpret[risk]} "${objectiveTitle}". ${causeStr} O gap de ${(100 - lastKRValue).toFixed(1)}% para a meta define a urgência das intervenções para o fechamento do ciclo.`;
+    p2 = 'Esse cenário ' + riskInterpret[risk] + ' "' + objectiveTitle + '". ' + causeStr + ' O gap de ' + (100 - lastKRValue).toFixed(1) + '% para a meta define a urgência das intervenções para o fechamento do ciclo.';
 
-    return `${p1}\n\n${p2}`;
+    return p1 + "\n\n" + p2;
   };
 
   const handleKRClick = (kr: KeyResult) => {
@@ -1345,9 +1401,20 @@ export default function KRCheckins() {
 
   return (
     <Layout>
+      <OKRAnalysisDialog
+        open={analysisOpen}
+        onOpenChange={setAnalysisOpen}
+        contextData={analysisContext}
+      />
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
           <h1 className="text-3xl font-bold">{toTitleCase('Check-ins de Key Results')}</h1>
+          {selectedQuarter && quarterCheckins.length > 0 && objectives.length > 0 && (
+            <Button onClick={handleOpenAnalysis} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shrink-0">
+              <Sparkles className="w-5 h-5" />
+              Análise Estratégica AI
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1450,13 +1517,14 @@ export default function KRCheckins() {
                       {quarterCheckins.map((checkin) => (
                         <TableHead
                           key={checkin.id}
-                          className={`text-center px-4 cursor-pointer transition-colors ${selectedCheckinDate === checkin.id
-                            ? 'bg-primary/10 border-b-2 border-primary'
-                            : 'hover:bg-muted/50'
-                            }`}
+                          className={'text-center px-4 cursor-pointer transition-colors ' + (
+                            selectedCheckinDate === checkin.id
+                              ? 'bg-primary/10 border-b-2 border-primary'
+                              : 'hover:bg-muted/50'
+                          )}
                           onClick={() => setSelectedCheckinDate(checkin.id)}
                         >
-                          <div className={`font-bold ${selectedCheckinDate === checkin.id ? 'text-primary' : ''}`}>
+                          <div className={'font-bold ' + (selectedCheckinDate === checkin.id ? 'text-primary' : '')}>
                             {formatDate(checkin.checkin_date)}
                           </div>
                           {selectedCheckinDate === checkin.id && (
@@ -1520,7 +1588,7 @@ export default function KRCheckins() {
                               </div>
                             </TableCell>
                             {quarterCheckins.map((checkin) => {
-                              const key = `${kr.id}-${checkin.id}`;
+                              const key = kr.id + '-' + checkin.id;
                               const result = checkinResults[key];
 
                               return (
@@ -1560,8 +1628,8 @@ export default function KRCheckins() {
                                           ? krProgress
                                           : (result.percentual_atingido ?? simpleAttainment);
 
-                                        const attainmentText = visualAttainmentValue !== null ? `${visualAttainmentValue.toFixed(2)}%` : '--';
-                                        const krText = krProgress !== null ? `${krProgress.toFixed(2)}%` : '--';
+                                        const attainmentText = visualAttainmentValue !== null ? visualAttainmentValue.toFixed(2) + '%' : '--';
+                                        const krText = krProgress !== null ? krProgress.toFixed(2) + '%' : '--';
 
                                         const progressValue = krProgress ?? 0;
                                         const progressColor = krProgress !== null ? getProgressColor(krProgress) : '#e5e7eb';
@@ -1754,8 +1822,8 @@ export default function KRCheckins() {
                         ? progress
                         : simpleAttainment;
 
-                      const attainmentText = visualAttainmentValue !== null ? `${visualAttainmentValue.toFixed(2)}%` : '--';
-                      const krText = progress !== null ? `${progress.toFixed(2)}%` : '--';
+                      const attainmentText = visualAttainmentValue !== null ? visualAttainmentValue.toFixed(2) + '%' : '--';
+                      const krText = progress !== null ? progress.toFixed(2) + '%' : '--';
 
                       const progressValue = progress ?? 0;
                       const progressColor = progress !== null ? getProgressColor(progress) : '#e5e7eb';
