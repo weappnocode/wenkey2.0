@@ -7,31 +7,37 @@ const corsHeaders = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
+// ── Exact replica of src/lib/utils.ts calculateKR ──────────────────────────
 function calculateKR(
-    realizado: number,
-    minimo: number,
-    meta: number,
-    direction: string,
-    type: string
+    realized: number | null,
+    min: number | null,
+    target: number | null,
+    direction: string | null,
+    type?: string | null
 ): number | null {
-    if (type === "percentage") return Math.min(realizado, 100);
-
-    if (direction === "increase") {
-        if (meta <= minimo) return null;
-        return Math.round(((realizado - minimo) / (meta - minimo)) * 100);
-    } else if (direction === "decrease") {
-        if (minimo <= meta) return null;
-        return Math.round(((minimo - realizado) / (minimo - meta)) * 100);
+    if (target === null || target === undefined || isNaN(Number(target))) return null;
+    const safeTarget = Number(target);
+    const safeRealized = (realized === null || realized === undefined || isNaN(Number(realized))) ? null : Number(realized);
+    const safeMin = (min !== null && min !== undefined && !isNaN(Number(min))) ? Number(min) : null;
+    if (type === 'date' || type === 'data') return null;
+    if (safeRealized === null) return null;
+    if (!direction || direction === 'increase' || direction === 'maior-é-melhor') {
+        if (safeMin !== null) {
+            if (safeRealized >= safeTarget) return 100;
+            if (safeRealized < safeMin) return 0;
+            const den = safeTarget - safeMin;
+            if (den === 0) return 0;
+            return Math.max(0, Math.min(100, ((safeRealized - safeMin) / den) * 100));
+        }
+        if (safeTarget === 0) return 0;
+        return Math.min(100, Math.max(0, (safeRealized / safeTarget) * 100));
     }
-    return null;
-}
-
-function getPerformanceLabel(pct: number): string {
-    if (pct >= 100) return "🟢 No alvo";
-    if (pct >= 70) return "🟡 Em risco";
-    return "🔴 Abaixo do esperado";
+    if (direction === 'decrease' || direction === 'menor-é-melhor') {
+        if (safeRealized <= safeTarget) return 100;
+        if (safeTarget === 0) return 0;
+        return Math.max(0, ((2 * safeTarget - safeRealized) / safeTarget) * 100);
+    }
+    return 0;
 }
 
 function getProgressColor(pct: number): string {
@@ -40,7 +46,11 @@ function getProgressColor(pct: number): string {
     return "#dc2626";
 }
 
-// ─── Main Handler ─────────────────────────────────────────────────────────────
+function getPerformanceLabel(pct: number): string {
+    if (pct >= 100) return "No alvo";
+    if (pct >= 70) return "Em risco";
+    return "Abaixo do esperado";
+}
 
 Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") {
@@ -53,49 +63,119 @@ Deno.serve(async (req: Request) => {
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
         );
 
-        const today = new Date().toISOString().split("T")[0];
+        // Parsing test_user_id from body
+        let testUserId: string | null = null;
+        let testCompanyId: string | null = null;
+        if (req.method === "POST") {
+            try {
+                const body = await req.json();
+                testUserId = body?.user_id || null;
+                console.log("[get-weekly-report-data] Test request for user:", testUserId);
+            } catch (_) { /* ignore */ }
+        }
 
-        // 1. Busca todas as empresas com quarter ativo
-        const { data: activeQuarters } = await supabase
+        const isTest = testUserId !== null;
+
+        if (isTest) {
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("company_id")
+                .eq("id", testUserId)
+                .single();
+            if (profile) testCompanyId = profile.company_id;
+        }
+
+        // Current time in BRT (UTC-3)
+        const nowUTC = new Date();
+        const nowBRT = new Date(nowUTC.getTime() - 3 * 60 * 60 * 1000);
+        const currentDayBRT = nowBRT.getUTCDay();    // 0=Sun...6=Sat
+        const currentHourBRT = nowBRT.getUTCHours(); // 0-23
+
+        const today = nowUTC.toISOString().split("T")[0];
+
+        let query = supabase
             .from("quarters")
             .select("id, name, company_id, start_date, end_date")
             .lte("start_date", today)
             .gte("end_date", today);
 
+        if (isTest && testCompanyId) {
+            query = query.eq("company_id", testCompanyId);
+        }
+
+        const { data: activeQuarters } = await query;
+
         if (!activeQuarters || activeQuarters.length === 0) {
             return new Response(
-                JSON.stringify({ success: true, message: "Nenhum quarter ativo encontrado.", emails: [] }),
+                JSON.stringify({ success: true, message: "Nenhum quarter ativo.", emails: [] }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
+        // Load schedule configs for all companies
+        const { data: scheduleConfigs } = await supabase
+            .from("email_schedule_config")
+            .select("company_id, day_of_week, send_hour, is_active");
+
+        const scheduleMap = new Map<string, { day_of_week: number; send_hour: number; is_active: boolean }>();
+        (scheduleConfigs ?? []).forEach((s) => scheduleMap.set(s.company_id, s));
+
         const emailPayloads = [];
+        const skipped: string[] = [];
 
         for (const quarter of activeQuarters) {
             const companyId = quarter.company_id;
             const quarterId = quarter.id;
 
-            // 2. Busca usuários ativos da empresa (com email via auth.users)
-            const { data: profiles } = await supabase
+            // ── Check schedule (Skip if isTest) ──────────────────────────────────
+            if (!isTest) {
+                const schedule = scheduleMap.get(companyId);
+                if (schedule) {
+                    if (!schedule.is_active) { skipped.push(companyId + "(disabled)"); continue; }
+                    if (schedule.day_of_week !== currentDayBRT || schedule.send_hour !== currentHourBRT) {
+                        skipped.push(companyId + `(wrong time: day=${currentDayBRT}/${schedule.day_of_week} hour=${currentHourBRT}/${schedule.send_hour})`);
+                        continue;
+                    }
+                } else {
+                    // Default: Monday (1) at 9 BRT
+                    if (currentDayBRT !== 1 || currentHourBRT !== 9) {
+                        skipped.push(companyId + "(default schedule not matched)");
+                        continue;
+                    }
+                }
+            }
+            // ────────────────────────────────────────────────────────────
+
+            // Profiles
+            let profileQuery = supabase
                 .from("profiles")
                 .select("id, full_name, sector, avatar_url")
                 .eq("company_id", companyId)
                 .eq("is_active", true);
 
+            if (isTest) {
+                profileQuery = profileQuery.eq("id", testUserId);
+            }
+
+            const { data: profiles } = await profileQuery;
+
             if (!profiles || profiles.length === 0) continue;
 
-            const profileIds = profiles.map((p) => p.id);
+            const profilesWithAvatars = profiles.map(p => {
+                let av = p.avatar_url;
+                if (av && !av.startsWith('http')) {
+                    const { data } = supabase.storage.from('avatars').getPublicUrl(av);
+                    av = data.publicUrl;
+                }
+                return { ...p, avatar_url: av };
+            });
 
-            // 3. Busca emails dos usuários via auth.users (service role)
             const { data: authUsers } = await supabase.auth.admin.listUsers();
             const emailMap = new Map<string, string>();
             if (authUsers?.users) {
-                authUsers.users.forEach((u) => {
-                    emailMap.set(u.id, u.email ?? "");
-                });
+                authUsers.users.forEach((u) => emailMap.set(u.id, u.email ?? ""));
             }
 
-            // 4. Busca objetivos da empresa neste quarter
             const { data: objectives } = await supabase
                 .from("objectives")
                 .select("id, title, user_id")
@@ -105,13 +185,24 @@ Deno.serve(async (req: Request) => {
 
             const objectiveIds = objectives?.map((o) => o.id) ?? [];
 
-            // 5. Busca KRs com checkins
-            const { data: krs } = await supabase
-                .from("key_results")
-                .select("id, title, code, type, direction, percent_kr, weight, objective_id, user_id, checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, checkins(quarter_id, checkin_date))")
-                .in("objective_id", objectiveIds.length > 0 ? objectiveIds : ["00000000-0000-0000-0000-000000000000"]);
+            const krsResult = objectiveIds.length > 0
+                ? await supabase
+                    .from("key_results")
+                    .select("id, title, code, type, direction, percent_kr, weight, objective_id, user_id")
+                    .in("objective_id", objectiveIds)
+                : { data: [] };
+            const krs = krsResult.data ?? [];
+            const krIds = krs.map((kr: Record<string, string>) => kr.id);
 
-            // 6. Busca quarter_results para ranking
+            const checkinResult = krIds.length > 0
+                ? await supabase
+                    .from("checkin_results")
+                    .select("key_result_id, valor_realizado, meta_checkin, minimo_orcamento, checkins!inner(quarter_id, checkin_date)")
+                    .eq("checkins.quarter_id", quarterId)
+                    .in("key_result_id", krIds)
+                : { data: [] };
+            const checkinResults = checkinResult.data ?? [];
+
             const { data: quarterResults } = await supabase
                 .from("quarter_results")
                 .select("user_id, result_percent")
@@ -119,131 +210,90 @@ Deno.serve(async (req: Request) => {
                 .eq("quarter_id", quarterId);
 
             const resultMap = new Map<string, number>();
-            quarterResults?.forEach((r) => {
-                resultMap.set(r.user_id, Math.round(r.result_percent ?? 0));
-            });
+            quarterResults?.forEach((r) => resultMap.set(r.user_id, Math.round(r.result_percent ?? 0)));
 
-            // 7. Monta ranking geral da empresa
-            const companyRanking = profiles
-                .map((p) => ({
-                    user_id: p.id,
-                    full_name: p.full_name,
-                    sector: p.sector,
-                    result_pct: resultMap.get(p.id) ?? 0,
-                }))
+            const companyRanking = profilesWithAvatars
+                .map((p) => ({ user_id: p.id, full_name: p.full_name, sector: p.sector, avatar_url: p.avatar_url, result_pct: resultMap.get(p.id) ?? 0 }))
                 .sort((a, b) => b.result_pct - a.result_pct)
                 .map((r, i) => ({ ...r, rank: i + 1 }));
 
-            // 8. Monta ranking de OKRs da empresa (top 6 por atingimento)
-            const krAttainments: Array<{
-                title: string;
-                code: string | null;
-                result_pct: number;
-                owner_name: string | null;
-            }> = [];
-
-            krs?.forEach((kr) => {
-                const checkins = (kr.checkin_results as Record<string, unknown>[] ?? [])
-                    .filter((c) => (c.checkins as Record<string, unknown>)?.quarter_id === quarterId)
-                    .sort((a, b) =>
-                        new Date((b.checkins as Record<string, unknown>).checkin_date as string).getTime() -
-                        new Date((a.checkins as Record<string, unknown>).checkin_date as string).getTime()
+            function getKRProgress(krId: string, krType: string, krDirection: string, krPercentKr: number): number {
+                const krCheckins = checkinResults
+                    .filter((c: Record<string, unknown>) => c.key_result_id === krId &&
+                        (c.checkins as Record<string, string>)?.checkin_date <= today)
+                    .sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
+                        new Date((b.checkins as Record<string, string>).checkin_date).getTime() -
+                        new Date((a.checkins as Record<string, string>).checkin_date).getTime()
                     );
+                if (krCheckins.length === 0) return krPercentKr ?? 0;
+                const latest = krCheckins[0] as Record<string, number>;
+                const calc = calculateKR(
+                    Number(latest.valor_realizado), Number(latest.minimo_orcamento),
+                    Number(latest.meta_checkin), krDirection, krType
+                );
+                return calc !== null ? calc : (krPercentKr ?? 0);
+            }
 
-                const latest = checkins[0] as Record<string, unknown> | undefined;
-                let pct = kr.percent_kr ?? 0;
-                if (latest) {
-                    const calc = calculateKR(
-                        Number(latest.valor_realizado),
-                        Number(latest.minimo_orcamento),
-                        Number(latest.meta_checkin),
-                        kr.direction as string,
-                        kr.type as string
-                    );
-                    if (calc !== null) pct = calc;
-                }
-
-                const owner = profiles.find((p) => p.id === kr.user_id);
-                krAttainments.push({
-                    title: kr.title,
-                    code: kr.code,
-                    result_pct: Math.round(pct),
-                    owner_name: owner?.full_name ?? null,
+            function getWeightedProgress(krList: Record<string, unknown>[]): number {
+                let weightedSum = 0; let totalWeight = 0; let hasData = false;
+                krList.forEach((kr) => {
+                    const pct = getKRProgress(kr.id as string, kr.type as string, kr.direction as string, kr.percent_kr as number);
+                    const weight = typeof kr.weight === 'number' && !isNaN(kr.weight) ? kr.weight : 1;
+                    const krCheckins = checkinResults.filter((c: Record<string, unknown>) => c.key_result_id === kr.id);
+                    if (krCheckins.length > 0) { weightedSum += pct * weight; totalWeight += weight; hasData = true; }
                 });
-            });
-            krAttainments.sort((a, b) => b.result_pct - a.result_pct);
-            const topOKRs = krAttainments.slice(0, 6);
+                if (hasData && totalWeight > 0) return weightedSum / totalWeight;
+                let fb = 0; let fw = 0;
+                krList.forEach((kr) => {
+                    const w = typeof kr.weight === 'number' && !isNaN(kr.weight) ? kr.weight : 1;
+                    fb += (kr.percent_kr as number ?? 0) * w; fw += w;
+                });
+                return fw > 0 ? fb / fw : 0;
+            }
 
-            // 9. Para cada usuário, monta o payload do email
-            for (const profile of profiles) {
+            for (const profile of profilesWithAvatars) {
                 const email = emailMap.get(profile.id);
                 if (!email) continue;
-
-                const userResult = resultMap.get(profile.id) ?? 0;
                 const userRank = companyRanking.find((r) => r.user_id === profile.id);
-
-                // Objetivos do usuário
                 const userObjectives = objectives?.filter((o) => o.user_id === profile.id) ?? [];
                 const userObjectiveIds = userObjectives.map((o) => o.id);
-                const userKRs = krs?.filter((kr) => userObjectiveIds.includes(kr.objective_id)) ?? [];
+                const userKRs = krs.filter((kr: Record<string, string>) => userObjectiveIds.includes(kr.objective_id));
 
-                // Progresso por objetivo do usuário
                 const objectiveProgress = userObjectives.map((obj) => {
-                    const objKRs = userKRs.filter((kr) => kr.objective_id === obj.id);
-                    let totalPct = 0;
-                    let count = 0;
-                    objKRs.forEach((kr) => {
-                        const checkins = (kr.checkin_results as Record<string, unknown>[] ?? [])
-                            .filter((c) => (c.checkins as Record<string, unknown>)?.quarter_id === quarterId)
-                            .sort((a, b) =>
-                                new Date((b.checkins as Record<string, unknown>).checkin_date as string).getTime() -
-                                new Date((a.checkins as Record<string, unknown>).checkin_date as string).getTime()
-                            );
-                        const latest = checkins[0] as Record<string, unknown> | undefined;
-                        if (latest) {
-                            const calc = calculateKR(
-                                Number(latest.valor_realizado),
-                                Number(latest.minimo_orcamento),
-                                Number(latest.meta_checkin),
-                                kr.direction as string,
-                                kr.type as string
-                            );
-                            totalPct += calc !== null ? calc : (kr.percent_kr ?? 0);
-                        } else {
-                            totalPct += kr.percent_kr ?? 0;
-                        }
-                        count++;
-                    });
-                    const avg = count > 0 ? Math.round(totalPct / count) : 0;
-                    return {
-                        title: obj.title,
-                        result_pct: avg,
-                        color: getProgressColor(avg),
-                        label: getPerformanceLabel(avg),
-                    };
+                    const objKRs = userKRs.filter((kr: Record<string, string>) => kr.objective_id === obj.id);
+                    const avg = Math.round(getWeightedProgress(objKRs as unknown as Record<string, unknown>[]));
+                    return { title: obj.title, result_pct: avg, color: getProgressColor(avg), label: getPerformanceLabel(avg) };
                 });
 
-                // Top 5 ranking (empresa)
-                const top5 = companyRanking.slice(0, 5);
+                const userOKRs = userKRs
+                    .map((kr: Record<string, unknown>) => ({
+                        title: kr.title as string,
+                        result_pct: Math.round(getKRProgress(kr.id as string, kr.type as string, kr.direction as string, kr.percent_kr as number)),
+                    }))
+                    .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (b.result_pct as number) - (a.result_pct as number))
+                    .slice(0, 6);
 
                 emailPayloads.push({
                     to_email: email,
                     to_name: profile.full_name,
+                    user_id: profile.id,
                     quarter_name: quarter.name,
-                    user_progress: userResult,
+                    user_progress: userRank?.result_pct ?? 0,
                     user_rank: userRank?.rank ?? 0,
                     active_objectives: userObjectives.length,
                     active_okrs: userKRs.length,
                     objective_progress: objectiveProgress,
-                    top5_ranking: top5,
-                    top_okrs: topOKRs,
+                    top5_ranking: companyRanking.slice(0, 5),
+                    user_okrs: userOKRs,
                     dashboard_url: "https://wenkey.com.br/dashboard",
                 });
             }
         }
 
+        console.log(`[get-weekly-report-data] Sending ${emailPayloads.length} emails. Skipped: ${skipped.join(', ')}`);
+
         return new Response(
-            JSON.stringify({ success: true, count: emailPayloads.length, emails: emailPayloads }),
+            JSON.stringify({ success: true, count: emailPayloads.length, is_test: isTest, skipped, emails: emailPayloads }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     } catch (error) {

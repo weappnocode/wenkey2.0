@@ -232,11 +232,11 @@ export default function Dashboard() {
               {topRankings.length === 0 ? (
                 <p className="text-center text-muted-foreground">Nenhum resultado disponível.</p>
               ) : (
-                <div className="space-y-2 px-1 py-1">
+                <div className="space-y-3 px-3 py-3">
                   {topRankings.map((ranking, index) => (
                     <div
                       key={ranking.user_id}
-                      className={`flex items - center justify - between rounded - xl border px - 3 py - 2 animate -in slide -in -from - right - 4 fade -in duration - 500 fill - mode - both ${ranking.user_id === user?.id ? 'ring-2 ring-primary shadow-md shadow-primary/20 bg-primary/5' : 'hover:bg-muted/50'}`}
+                      className={`flex items-center justify-between rounded-2xl border px-4 py-3.5 animate-in slide-in-from-right-4 fade-in duration-500 fill-mode-both ${ranking.user_id === user?.id ? 'ring-2 ring-primary border-primary/30 shadow-lg shadow-primary/20 bg-primary/10 scale-[1.02]' : 'hover:bg-muted/50 shadow-sm'}`}
                       style={{ animationDelay: `${index * 150}ms` }}
                     >
                       <div className="flex items-center gap-2">
@@ -258,7 +258,7 @@ export default function Dashboard() {
                           <p className="text-xs text-muted-foreground">{ranking.sector ?? 'Sem setor'}</p>
                         </div>
                       </div>
-                      <span className="text-sm font-medium">{ranking.result_pct}%</span>
+                      <span className="text-base font-semibold pr-4 text-primary">{ranking.result_pct}%</span>
                     </div>
                   ))}
                 </div>
@@ -370,11 +370,13 @@ function RankingList({
   icon,
   data,
   emptyMessage,
+  currentUserId,
 }: {
   title: string;
   icon: ReactNode;
   data: UserRanking[];
   emptyMessage: string;
+  currentUserId?: string;
 }) {
   return (
     <Card className="h-full">
@@ -388,9 +390,9 @@ function RankingList({
         {data.length === 0 ? (
           <p className="text-center text-muted-foreground">{emptyMessage}</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4 px-3 py-3">
             {data.map(ranking => (
-              <div key={ranking.user_id} className="flex items-center justify-between rounded-xl border px-4 py-3">
+              <div key={ranking.user_id} className={`flex items-center justify-between rounded-2xl border px-6 py-4 transition-all duration-200 ${ranking.user_id === currentUserId ? 'ring-2 ring-primary border-primary/30 shadow-lg bg-primary/10' : 'hover:bg-muted/50 shadow-sm'}`}>
                 <div className="flex items-center gap-3">
                   <Badge variant="outline" className="font-normal px-1.5 h-6 min-w-[2rem] flex justify-center text-[11px]">
                     #{ranking.rank}
@@ -410,7 +412,7 @@ function RankingList({
                     <p className="text-sm text-black">{toTitleCase(ranking.sector ?? 'Sem setor')}</p>
                   </div>
                 </div>
-                <span className="text-base font-normal">{ranking.result_pct}%</span>
+                <span className="text-lg font-bold pr-2 text-primary">{ranking.result_pct}%</span>
               </div>
             ))}
           </div>

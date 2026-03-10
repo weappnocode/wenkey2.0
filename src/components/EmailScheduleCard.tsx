@@ -207,14 +207,13 @@ export function EmailScheduleCard({ companyId }: EmailScheduleCardProps) {
                         {/* Salvar */}
                         <Button
                             onClick={handleSave}
-                            disabled={saving}
+                            disabled={saving || loading}
                             size="sm"
                             className="h-9 flex items-center gap-2"
                         >
                             <Save className="h-4 w-4" />
                             {saving ? 'Salvando...' : 'Salvar'}
                         </Button>
-
                     </div>
                 )}
             </CardContent>

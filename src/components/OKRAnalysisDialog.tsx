@@ -94,7 +94,7 @@ export function OKRAnalysisDialog({ open, onOpenChange, contextData, autoAnalyze
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px] h-[85vh] flex flex-col p-6">
+            <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col p-6">
                 <DialogHeader className="pb-4 border-b shrink-0 flex flex-row items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -127,7 +127,7 @@ export function OKRAnalysisDialog({ open, onOpenChange, contextData, autoAnalyze
                             </p>
                         </div>
                     ) : analysisText ? (
-                        <div className="prose prose-sm text-xs prose-p:leading-relaxed prose-p:mb-5 prose-headings:mt-10 prose-headings:mb-3 dark:prose-invert max-w-none pb-6">
+                        <div className="prose prose-sm text-sm prose-p:leading-relaxed prose-p:mb-5 prose-headings:mt-6 prose-headings:mb-3 dark:prose-invert max-w-none pb-6">
                             <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                                 {analysisText}
                             </ReactMarkdown>

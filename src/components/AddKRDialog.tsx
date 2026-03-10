@@ -208,10 +208,8 @@ export function AddKRDialog({ objectiveId, quarterId, companyId, defaultUserId, 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover z-50">
-                  <SelectItem value="increase">Aumentar</SelectItem>
-                  <SelectItem value="decrease">Diminuir</SelectItem>
-                  <SelectItem value="greater_than">Maior Que</SelectItem>
-                  <SelectItem value="less_than">Menor Que</SelectItem>
+                  <SelectItem value="increase">Maior ou Igual</SelectItem>
+                  <SelectItem value="decrease">Menor ou Igual</SelectItem>
                 </SelectContent>
               </Select>
             </div>

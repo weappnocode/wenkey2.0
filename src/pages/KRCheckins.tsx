@@ -1279,15 +1279,13 @@ export default function KRCheckins() {
       case 'increase':
       case 'crescente':
       case 'maior-é-melhor':
-        return 'crescente';
+      case 'greater_than':
+        return 'Maior ou Igual';
       case 'decrease':
       case 'decrescente':
       case 'menor-é-melhor':
-        return 'decrescente';
-      case 'greater_than':
-        return 'maior que';
       case 'less_than':
-        return 'menor que';
+        return 'Menor ou Igual';
       default:
         return direction;
     }

@@ -823,50 +823,70 @@ export default function Users() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {teamsList.map(team => (
-                    <TableRow key={team.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarFallback><UsersIcon className="h-4 w-4" /></AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{team.full_name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex -space-x-2">
-                          {(team.team_member_ids || []).slice(0, 5).map(memberId => {
-                            const member = users.find(u => u.id === memberId);
-                            if (!member) return null;
-                            return (
-                              <Avatar key={memberId} className="border-2 border-background w-8 h-8">
-                                <AvatarImage src={member.avatar_url || ''} />
-                                <AvatarFallback className="text-[10px]">{getInitials(member.full_name)}</AvatarFallback>
-                              </Avatar>
-                            );
-                          })}
-                          {(team.team_member_ids || []).length > 5 && (
-                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border-2 border-background text-[10px] font-medium">
-                              +{(team.team_member_ids || []).length - 5}
+                  {teamsList.map(team => {
+                    const memberSectors = (team.team_member_ids || [])
+                      .map(id => users.find(u => u.id === id)?.sector)
+                      .filter(Boolean) as string[];
+                    const uniqueSectors = Array.from(new Set(memberSectors));
+
+                    return (
+                      <TableRow key={team.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarFallback><UsersIcon className="h-4 w-4" /></AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">{team.full_name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-2">
+                            <div className="flex -space-x-2">
+                              {(team.team_member_ids || []).slice(0, 5).map(memberId => {
+                                const member = users.find(u => u.id === memberId);
+                                if (!member) return null;
+                                return (
+                                  <Avatar key={memberId} className="border-2 border-background w-8 h-8">
+                                    <AvatarImage src={member.avatar_url || ''} />
+                                    <AvatarFallback className="text-[10px]">{getInitials(member.full_name)}</AvatarFallback>
+                                  </Avatar>
+                                );
+                              })}
+                              {(team.team_member_ids || []).length > 5 && (
+                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border-2 border-background text-[10px] font-medium">
+                                  +{(team.team_member_ids || []).length - 5}
+                                </div>
+                              )}
+                              {(team.team_member_ids || []).length === 0 && (
+                                <span className="text-muted-foreground text-sm italic">Nenhum membro</span>
+                              )}
+                            </div>
+                            {uniqueSectors.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {uniqueSectors.map(sector => (
+                                  <Badge key={sector} variant="secondary" className="text-[10px] py-0 px-1.5 font-normal opacity-70">
+                                    {sector}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {isAdmin && (
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => openEditTeamDialog(team)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="text-destructive" onClick={() => { setSelectedTeam(team); setIsDeleteTeamDialogOpen(true); }}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           )}
-                          {(team.team_member_ids || []).length === 0 && (
-                            <span className="text-muted-foreground text-sm italic">Nenhum membro</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => openEditTeamDialog(team)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => { setSelectedTeam(team); setIsDeleteTeamDialogOpen(true); }}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {teamsList.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
