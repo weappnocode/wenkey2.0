@@ -205,8 +205,8 @@ export default function Dashboard() {
                       <div key={index} className="flex flex-col items-center gap-2 min-w-[100px] animate-in zoom-in duration-500 fade-in fill-mode-both" style={{ animationDelay: `${(index + 1) * 150}ms` }}>
                         <CircularProgress percentage={objective.result_pct} size={90} strokeWidth={8} textClassName="text-base" />
                         <span
-                          className={`text - xs font - medium text - center uppercase tracking - wider ${colorClass}`}
-                          style={{ maxWidth: '110px', lineHeight: '1.2' }}
+                          className={`text-[10px] font-medium text-center uppercase tracking-wider ${colorClass}`}
+                          style={{ maxWidth: '100px', lineHeight: '1.1' }}
                         >
                           {objective.objective_title}
                         </span>

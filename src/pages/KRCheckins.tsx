@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
@@ -1596,73 +1597,93 @@ export default function KRCheckins() {
                                   onClick={() => openDialog(kr, checkin)}
                                 >
                                   {result ? (
-                                    <div className="space-y-2">
-                                      <div>
-                                        <p className="text-xs text-muted-foreground">META:</p>
-                                        <p className="font-medium">{formatValue(result.meta_checkin, kr.type, kr.unit)}</p>
-                                      </div>
+                                    (() => {
+                                      const cellContent = (
+                                        <div className="space-y-2">
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">META:</p>
+                                            <p className="font-medium">{formatValue(result.meta_checkin, kr.type, kr.unit)}</p>
+                                          </div>
 
-                                      <div>
-                                        <p className="text-xs text-muted-foreground">MIN. ORÇAM:</p>
-                                        <p className="font-medium">{formatValue(result.minimo_orcamento, kr.type, kr.unit)}</p>
-                                      </div>
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">MIN. ORÇAM:</p>
+                                            <p className="font-medium">{formatValue(result.minimo_orcamento, kr.type, kr.unit)}</p>
+                                          </div>
 
-                                      {(() => {
-                                        const krProgress = calculateKR(
-                                          result.valor_realizado,
-                                          result.minimo_orcamento,
-                                          result.meta_checkin,
-                                          kr.direction,
-                                          kr.type
-                                        );
-                                        const simpleAttainment = calculateSimpleAttainment(
-                                          result.valor_realizado,
-                                          result.meta_checkin,
-                                          kr.direction,
-                                          kr.type
-                                        );
+                                          {(() => {
+                                            const krProgress = calculateKR(
+                                              result.valor_realizado,
+                                              result.minimo_orcamento,
+                                              result.meta_checkin,
+                                              kr.direction,
+                                              kr.type
+                                            );
+                                            const simpleAttainment = calculateSimpleAttainment(
+                                              result.valor_realizado,
+                                              result.meta_checkin,
+                                              kr.direction,
+                                              kr.type
+                                            );
 
-                                        const visualAttainmentValue = (kr.type === 'date' || kr.type === 'data')
-                                          ? krProgress
-                                          : (result.percentual_atingido ?? simpleAttainment);
+                                            const visualAttainmentValue = (kr.type === 'date' || kr.type === 'data')
+                                              ? krProgress
+                                              : (result.percentual_atingido ?? simpleAttainment);
 
-                                        const attainmentText = visualAttainmentValue !== null ? visualAttainmentValue.toFixed(2) + '%' : '--';
-                                        const krText = krProgress !== null ? krProgress.toFixed(2) + '%' : '--';
+                                            const attainmentText = visualAttainmentValue !== null ? visualAttainmentValue.toFixed(2) + '%' : '--';
+                                            const krText = krProgress !== null ? krProgress.toFixed(2) + '%' : '--';
 
-                                        const progressValue = krProgress ?? 0;
-                                        const progressColor = krProgress !== null ? getProgressColor(krProgress) : '#e5e7eb';
+                                            const progressValue = krProgress ?? 0;
+                                            const progressColor = krProgress !== null ? getProgressColor(krProgress) : '#e5e7eb';
 
-                                        return (
-                                          <>
-                                            <div className="flex justify-between items-center">
-                                              <span className="text-muted-foreground">REALIZADO:</span>
-                                              <div className="text-right">
-                                                <div className="font-bold">{formatValue(result.valor_realizado, kr.type, kr.unit)}</div>
-                                                <div className="text-[10px] font-semibold text-[#0d3a8c]">
-                                                  <span>Atingimento:</span>
-                                                  <span className="ml-1">{attainmentText}</span>
+                                            return (
+                                              <>
+                                                <div className="flex justify-between items-center">
+                                                  <span className="text-muted-foreground">REALIZADO:</span>
+                                                  <div className="text-right">
+                                                    <div className="font-bold">{formatValue(result.valor_realizado, kr.type, kr.unit)}</div>
+                                                    <div className="text-[10px] font-semibold text-[#0d3a8c]">
+                                                      <span>Atingimento:</span>
+                                                      <span className="ml-1">{attainmentText}</span>
+                                                    </div>
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            </div>
-                                            <div className="space-y-1">
-                                              <Progress
-                                                value={progressValue}
-                                                className="h-2"
-                                                style={{
-                                                  '--progress-color': progressColor
-                                                } as React.CSSProperties}
-                                              />
-                                              <div className="flex justify-between items-center text-[10px]">
-                                                <span className="text-muted-foreground">KR:</span>
-                                                <span className="font-semibold text-primary text-sm">
-                                                  {krText}
-                                                </span>
-                                              </div>
-                                            </div>
-                                          </>
+                                                <div className="space-y-1">
+                                                  <Progress
+                                                    value={progressValue}
+                                                    className="h-2"
+                                                    style={{
+                                                      '--progress-color': progressColor
+                                                    } as React.CSSProperties}
+                                                  />
+                                                  <div className="flex justify-between items-center text-[10px]">
+                                                    <span className="text-muted-foreground">KR:</span>
+                                                    <span className="font-semibold text-primary text-sm">
+                                                      {krText}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </>
+                                            );
+                                          })()}
+                                        </div>
+                                      );
+
+                                      if (result.note) {
+                                        return (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              {cellContent}
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-[300px] break-words p-3 shadow-lg">
+                                              <p className="font-bold text-primary mb-1 uppercase text-[10px] tracking-wider">Observação:</p>
+                                              <p className="text-sm whitespace-pre-wrap">{result.note}</p>
+                                            </TooltipContent>
+                                          </Tooltip>
                                         );
-                                      })()}
-                                    </div>
+                                      }
+
+                                      return cellContent;
+                                    })()
                                   ) : (
                                     <Button size="sm" variant="outline" className="w-full">
                                       Cadastrar Meta
