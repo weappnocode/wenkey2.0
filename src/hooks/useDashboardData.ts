@@ -304,21 +304,8 @@ export function useDashboardData() {
                     currentQuarterProgress = (await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, user.id)) ?? 0;
                 }
             } else {
-                const { data: allQuarterResults } = await supabase
-                    .from('quarter_results')
-                    .select('result_percent')
-                    .eq('company_id', selectedCompanyId)
-                    .eq('quarter_id', activeQuarter.id);
-
-                if (allQuarterResults && allQuarterResults.length > 0) {
-                    const validResults = allQuarterResults
-                        .map(r => r.result_percent)
-                        .filter((val): val is number => val !== null);
-                    if (validResults.length > 0) {
-                        const avg = validResults.reduce((sum, val) => sum + val, 0) / validResults.length;
-                        currentQuarterProgress = Math.round(avg);
-                    }
-                }
+                // Admin/manager: calcula em tempo real para pegar o check-in mais recente
+                currentQuarterProgress = (await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, null)) ?? 0;
             }
 
             // Rankings Calculation (Inline or helper)
