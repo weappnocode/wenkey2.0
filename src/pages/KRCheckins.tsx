@@ -1635,19 +1635,13 @@ export default function KRCheckins() {
                                             const progressValue = krProgress ?? 0;
                                             const progressColor = krProgress !== null ? getProgressColor(krProgress) : '#e5e7eb';
 
-                                            return (
+                                                                      return (
                                               <>
-                                                <div className="flex justify-between items-center">
-                                                  <span className="text-muted-foreground text-xs">REALIZADO:</span>
-                                                  <div className="text-right">
-                                                    <div className="font-bold text-xs">{formatValue(result.valor_realizado, kr.type, kr.unit)}</div>
-                                                    <div className="text-[10px] font-semibold text-[#0d3a8c]">
-                                                      <span>Atingimento:</span>
-                                                      <span className="ml-1">{attainmentText}</span>
-                                                    </div>
-                                                  </div>
+                                                <div>
+                                                  <p className="text-xs font-bold">REALIZADO:</p>
+                                                  <p className="text-xs font-bold">{formatValue(result.valor_realizado, kr.type, kr.unit)}</p>
                                                 </div>
-                                                <div className="space-y-1">
+                                                <div className="space-y-1 mt-1">
                                                   <Progress
                                                     value={progressValue}
                                                     className="h-2"
@@ -1655,11 +1649,11 @@ export default function KRCheckins() {
                                                       '--progress-color': progressColor
                                                     } as React.CSSProperties}
                                                   />
-                                                  <div className="flex justify-between items-center text-[10px]">
-                                                    <span className="text-muted-foreground">KR:</span>
-                                                    <span className="font-semibold text-primary text-xs">
-                                                      {krText}
-                                                    </span>
+                                                  <div className="flex justify-end text-[10px]">
+                                                    <span className="font-semibold text-primary text-xs">{krText}</span>
+                                                  </div>
+                                                  <div className="text-[10px] font-semibold text-[#0d3a8c] text-right">
+                                                    Atingimento: {attainmentText}
                                                   </div>
                                                 </div>
                                               </>
