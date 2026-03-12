@@ -1602,12 +1602,12 @@ export default function KRCheckins() {
                                         <div className="space-y-2">
                                           <div>
                                             <p className="text-xs text-muted-foreground">META:</p>
-                                            <p className="font-medium">{formatValue(result.meta_checkin, kr.type, kr.unit)}</p>
+                                            <p className="font-medium text-xs">{formatValue(result.meta_checkin, kr.type, kr.unit)}</p>
                                           </div>
 
                                           <div>
                                             <p className="text-xs text-muted-foreground">MIN. ORÇAM:</p>
-                                            <p className="font-medium">{formatValue(result.minimo_orcamento, kr.type, kr.unit)}</p>
+                                            <p className="font-medium text-xs">{formatValue(result.minimo_orcamento, kr.type, kr.unit)}</p>
                                           </div>
 
                                           {(() => {
@@ -1638,9 +1638,9 @@ export default function KRCheckins() {
                                             return (
                                               <>
                                                 <div className="flex justify-between items-center">
-                                                  <span className="text-muted-foreground">REALIZADO:</span>
+                                                  <span className="text-muted-foreground text-xs">REALIZADO:</span>
                                                   <div className="text-right">
-                                                    <div className="font-bold">{formatValue(result.valor_realizado, kr.type, kr.unit)}</div>
+                                                    <div className="font-bold text-xs">{formatValue(result.valor_realizado, kr.type, kr.unit)}</div>
                                                     <div className="text-[10px] font-semibold text-[#0d3a8c]">
                                                       <span>Atingimento:</span>
                                                       <span className="ml-1">{attainmentText}</span>
@@ -1657,7 +1657,7 @@ export default function KRCheckins() {
                                                   />
                                                   <div className="flex justify-between items-center text-[10px]">
                                                     <span className="text-muted-foreground">KR:</span>
-                                                    <span className="font-semibold text-primary text-sm">
+                                                    <span className="font-semibold text-primary text-xs">
                                                       {krText}
                                                     </span>
                                                   </div>
