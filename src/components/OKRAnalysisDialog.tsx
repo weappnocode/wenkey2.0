@@ -127,8 +127,35 @@ export function OKRAnalysisDialog({ open, onOpenChange, contextData, autoAnalyze
                             </p>
                         </div>
                     ) : analysisText ? (
-                        <div className="prose prose-sm text-sm prose-p:leading-relaxed prose-p:mb-5 prose-headings:mt-6 prose-headings:mb-3 dark:prose-invert max-w-none pb-6">
-                            <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                        <div className="max-w-none pb-6">
+                            <ReactMarkdown
+                                remarkPlugins={[remarkGfm, remarkBreaks]}
+                                components={{
+                                    h2: ({ children }) => (
+                                        <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'inherit', marginTop: '24px', marginBottom: '8px' }}>
+                                            {children}
+                                        </h2>
+                                    ),
+                                    h3: ({ children }) => (
+                                        <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'inherit', marginTop: '24px', marginBottom: '8px' }}>
+                                            {children}
+                                        </h3>
+                                    ),
+                                    h4: ({ children }) => (
+                                        <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#3b82f6', marginTop: '16px', marginBottom: '4px' }}>
+                                            {children}
+                                        </h4>
+                                    ),
+                                    p: ({ children }) => (
+                                        <p style={{ fontSize: '14px', fontWeight: 400, color: '#111827', marginBottom: '12px', lineHeight: '1.7' }}>
+                                            {children}
+                                        </p>
+                                    ),
+                                    strong: ({ children }) => (
+                                        <strong style={{ fontWeight: 700 }}>{children}</strong>
+                                    ),
+                                }}
+                            >
                                 {analysisText}
                             </ReactMarkdown>
                         </div>

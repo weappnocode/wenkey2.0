@@ -8,67 +8,48 @@ const corsHeaders = {
 const SYSTEM_PROMPT = `
 Você é um Analista experiente e mentor de liderança, com forte visão estratégica de negócios, execução e desenvolvimento de equipes.
 
-Sua função é analisar resultados de OKRs (Objectives and Key Results) para compreender o desempenho do objetivo e ajudar líderes e equipes a evoluírem na execução.
-
-Você não deve agir como um avaliador crítico ou julgador. Seu papel é compreender o progresso, identificar padrões de execução e orientar decisões que ajudem o time a alcançar os resultados.
+Sua função é analisar resultados de OKRs (Objectives and Key Results) para compreender o desempenho e ajudar líderes e equipes a evoluírem na execução.
 
 A análise deve sempre ter um tom estratégico, construtivo e orientado ao aprendizado.
 
 ------------------------------------------------------------
 
-INFORMAÇÕES RECEBIDAS
+ESTRUTURA OBRIGATÓRIA DE SAÍDA
 
-Você receberá dados como:
-- Quarter
-- Status do Quarter (quarter_status)
-- Data do check-in atual
-- Data do último check-in do quarter
-- Nome do Objetivo
-- Descrição do Objetivo
-- Lista de Key Results (Meta, Resultado atual, Percentual, Histórico)
+Para cada Objetivo fornecido, siga EXATAMENTE esta estrutura de Markdown:
+
+## [Nome do Objetivo]
+
+#### [Título do Key Result 1]
+[Parágrafo de análise deste KR]
+
+#### [Título do Key Result 2]
+[Parágrafo de análise deste KR]
+
+Repita esse padrão para todos os objetivos e seus respectivos Key Results.
 
 ------------------------------------------------------------
 
 LÓGICA DE ANÁLISE
 
-Antes de iniciar a análise, verifique o campo: quarter_status
+SE quarter_status = "ongoing":
+- Seja conciso. Foque em: progresso atual, consistência de execução, tendência e probabilidade de atingimento.
 
-SE quarter_status = "ongoing"
+SE quarter_status = "closed":
+- Seja mais completo. Analise o desempenho final de cada KR, possíveis causas e aprendizados.
 
-Significa que o quarter ainda está em andamento.
-Nesse caso, gere apenas UMA única seção de Markdown com o exato título (em negrito de cabeçalho nível 3 sem números):
-### **Classificação do Objetivo**
+------------------------------------------------------------
 
-A análise deve ser curta e focada no acompanhamento da evolução do objetivo.
-Considere progresso atual, consistência, tendência e probabilidade de atingimento. Evite diagnósticos completos.
+ESTILO DE FORMATAÇÃO
 
-SE quarter_status = "closed"
-
-Significa que o quarter foi encerrado.
-Nesse caso, gere uma análise estratégica contendo as exatas seções de Markdown (em negrito de cabeçalho nível 3 sem números):
-### **Classificação do Objetivo**
-### **Análise dos Key Results** (Analise cada KR individualmente sem julgamentos)
-### **Possíveis Causas ou Pontos de Atenção** (Gargalos, dependências, priorização - como hipóteses)
-### **Oportunidades de Melhoria** (Caminhos práticos, ajustes de processo, liderança)
-### **Perguntas que um Analista faria ao Time** (2 a 4 perguntas estratégicas)
-### **Classificação do Objetivo**
-
-Na seção "Classificação do Objetivo", produza APENAS parágrafos (sem listas ou bullets) usando a seguinte estrutura exata para cada KR/Objetivo avaliado:
-Nome do Avaliado: [Emoji Visual 🟢 🟡 🔴] [Título Curto da Classificação]
-[Uma análise interpretativa profunda do desempenho observado em um único parágrafo fluido longo, sem usar marcadores]
-
-(MUITO IMPORTANTE: Pressione ENTER DUAS VEZES após terminar a análise de um KR para garantir que haja uma linha vazia antes de começar o próximo KR)
-
-ESTILO DA RESPOSTA E FORMATAÇÃO
-- Utilize linguagem clara, estratégica, construtiva e orientada ao aprendizado.
-- O resultado DEVE ser ricamente formatado em Markdown, porém É ESTRITAMENTE PROIBIDO USAR listas (bullet points, marcadores como -, * ou números 1., 2.).
-- **NUNCA use tags HTML (como <br> ou <p>).**
-- **ATENÇÃO AO ESPAÇAMENTO:** Antes de iniciar a seção \`### **Classificação do Objetivo**\`, insira SEMPRE duas quebras de linha em branco (newlines puro do markdown, sem usar HTML) para criar um distanciamento visual maior.
-- A estrutura de texto para cada item avaliado na Classificação deve ser: Nome do Item seguido de dois pontos, texto na mesma linha ou na linha de baixo, formando um parágrafo limpo.
-- **ESPAÇAMENTO ENTRE OS ITENS**: É OBRIGATÓRIO pular uma linha (pressionar Enter duas vezes) toda vez que você terminar a análise de um KR e for começar a falar de outro. Eles NUNCA podem ficar colados.
-- Use **negrito** apenas em cabeçalhos Markdown (###) e nos nomes dos KRs/Objetivos no início de um parágrafo. Não use negrito excessivo no meio do texto.
-- Quebre os textos em parágrafos separados e limpos ao invés de grandes blocos. Nunca use bullets.
+- NUNCA use listas (bullets -, *, ou números 1., 2., etc.)
+- NUNCA use tags HTML.
+- Use APENAS os cabeçalhos ## para objetivos e #### para KRs. Nenhum outro nível de cabeçalho.
+- Cada análise de KR deve ser um parágrafo fluido e contínuo, sem marcadores.
+- Deixe uma linha em branco entre o parágrafo de análise de um KR e o próximo #### KR.
+- Não use negrito no meio dos parágrafos de análise.
 `;
+
 
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
@@ -85,32 +66,26 @@ serve(async (req) => {
             );
         }
 
-        const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-        if (!GEMINI_API_KEY) {
-            throw new Error('GEMINI_API_KEY not configured');
+        const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+        if (!OPENAI_API_KEY) {
+            throw new Error('OPENAI_API_KEY not configured');
         }
 
-        const userMessage = `Por favor, analise os seguintes dados do OKR com base no seu papel de CEO:\n\n${JSON.stringify(contextData, null, 2)}`;
+        const userMessage = `Por favor, analise os seguintes dados do OKR com base no seu papel de Analista:\n\n${JSON.stringify(contextData, null, 2)}`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${OPENAI_API_KEY}`,
             },
             body: JSON.stringify({
-                contents: [
-                    {
-                        role: 'user',
-                        parts: [{ text: userMessage }]
-                    }
+                model: 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'user', content: userMessage }
                 ],
-                systemInstruction: {
-                    role: 'system',
-                    parts: [{ text: SYSTEM_PROMPT }]
-                },
-                generationConfig: {
-                    temperature: 0.7,
-                }
+                temperature: 0.7,
             }),
         });
 
@@ -121,21 +96,14 @@ serve(async (req) => {
             );
         }
 
-        if (response.status === 400 || response.status === 401 || response.status === 403) {
-            return new Response(
-                JSON.stringify({ error: 'Chave da API Gemini inválida ou permissão negada.' }),
-                { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('AI gateway error:', response.status, errorText);
+            console.error('OpenAI API error:', response.status, errorText);
             throw new Error(`Erro na IA: ${response.status}`);
         }
 
         const data = await response.json();
-        const analysis = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        const analysis = data.choices?.[0]?.message?.content?.trim();
 
         if (!analysis) {
             throw new Error('Nenhuma análise gerada pela IA.');

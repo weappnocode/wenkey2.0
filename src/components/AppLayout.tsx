@@ -128,7 +128,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                                 onClick={() => navigate(item.path)}
                             >
                                 <Icon className="w-5 h-5 flex-shrink-0" />
-                                {!collapsed && <span className="text-base font-normal">{toTitleCase(item.label)}</span>}
+                                {!collapsed && <span className="text-sm font-normal">{toTitleCase(item.label)}</span>}
                             </Button>
                         );
                     })}
@@ -147,7 +147,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                                 </AvatarFallback>
                             </Avatar>
                             <div className="text-center space-y-0.5">
-                                <p className="text-base font-normal text-sidebar-foreground">{toTitleCase(profile.full_name)}</p>
+                                <p className="text-sm font-normal text-sidebar-foreground">{toTitleCase(profile.full_name)}</p>
                                 {profile.position && (
                                     <p className="text-sm text-sidebar-foreground/60">{toTitleCase(profile.position)}</p>
                                 )}
@@ -180,7 +180,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                         onClick={signOut}
                     >
                         <LogOut className="w-5 h-5" />
-                        {!collapsed && <span className="text-base font-normal">{toTitleCase('Sair')}</span>}
+                        {!collapsed && <span className="text-sm font-normal">{toTitleCase('Sair')}</span>}
                     </Button>
                 </div>
             </aside>

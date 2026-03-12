@@ -147,7 +147,7 @@ export default function Dashboard() {
           <Card className="md:col-span-2 xl:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
-                <p className="text-base text-black">{toTitleCase('OKRs por Objetivo')}</p>
+                <p className="text-sm text-black">{toTitleCase('OKRs por Objetivo')}</p>
                 <p className="text-sm text-muted-foreground mt-1">Key Results por objetivo</p>
               </div>
               <div className="rounded-full bg-muted p-3 text-primary">
@@ -258,7 +258,7 @@ export default function Dashboard() {
                           <p className="text-xs text-muted-foreground">{ranking.sector ?? 'Sem setor'}</p>
                         </div>
                       </div>
-                      <span className="text-base font-semibold pr-4 text-primary">{ranking.result_pct}%</span>
+                      <span className="text-sm font-semibold pr-4 text-primary">{ranking.result_pct}%</span>
                     </div>
                   ))}
                 </div>
@@ -274,7 +274,7 @@ export default function Dashboard() {
               <Award className="h-5 w-5" />
               {toTitleCase('OKRs em Destaque')}
             </CardTitle>
-            <p className="text-base text-muted-foreground">{toTitleCase('Key Results ordenados pelo percentual de atingimento.')}</p>
+            <p className="text-sm text-muted-foreground">{toTitleCase('Key Results ordenados pelo percentual de atingimento.')}</p>
           </CardHeader>
           <CardContent className="h-[500px] overflow-y-auto pr-2 custom-scrollbar">
             {metrics.okrRankings.length === 0 ? (
@@ -286,7 +286,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
                         {okr.code && <span className="text-xs text-muted-foreground">{okr.code}</span>}
-                        <span className="text-base font-normal">
+                        <span className="text-sm font-normal">
                           {toTitleCase(okr.title)}
                           {okr.owner_name && (
                             <span className="ml-2 text-sm text-muted-foreground font-normal inline-flex items-center gap-1.5 align-middle">
@@ -304,7 +304,7 @@ export default function Dashboard() {
                           )}
                         </span>
                       </div>
-                      <span className="text-base font-normal">{okr.result_pct}%</span>
+                      <span className="text-sm font-normal">{okr.result_pct}%</span>
                     </div>
                     <Progress
                       value={okr.result_pct}
