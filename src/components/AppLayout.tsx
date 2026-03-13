@@ -79,7 +79,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     return (
         <div className="flex h-screen bg-background">
             {/* Sidebar */}
-            <aside className={cn(collapsed ? 'w-16' : 'w-64', 'bg-sidebar border-r border-sidebar-border flex flex-col transition-[width] duration-300 h-screen sticky top-0')}>
+            <aside className={cn(collapsed ? 'w-16' : 'w-64', 'bg-sidebar border-r border-sidebar-border flex flex-col transition-[width] duration-300')}>
                 <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
@@ -110,7 +110,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </div>
                 )}
 
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto min-h-0">
+                <nav className="flex-1 p-4 space-y-1">
                     {filteredNavItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = location.pathname === item.path;
@@ -177,10 +177,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                             'w-full bg-transparent border-2 border-primary text-sidebar-foreground hover:bg-primary/10 hover:text-sidebar-foreground transition-all rounded-full',
                             collapsed ? 'px-0 justify-center' : 'justify-start gap-3'
                         )}
-                        onClick={() => {
-                            console.log("[AppLayout] Sair clicado");
-                            signOut();
-                        }}
+                        onClick={signOut}
                     >
                         <LogOut className="w-5 h-5" />
                         {!collapsed && <span className="text-sm font-normal">{toTitleCase('Sair')}</span>}
