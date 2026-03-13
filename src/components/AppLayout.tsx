@@ -110,7 +110,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </div>
                 )}
 
-                <nav className="flex-1 p-4 space-y-1">
+                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
                     {filteredNavItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = location.pathname === item.path;

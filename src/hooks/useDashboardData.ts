@@ -81,19 +81,18 @@ export const calculateQuarterProgress = async (
     quarterId: string,
     userId: string | null
 ): Promise<number | null> => {
-    let query = supabase
+    let objectivesQuery = supabase
         .from('objectives')
-        .select('id')
+        .select('id, title')
         .eq('company_id', companyId)
         .eq('quarter_id', quarterId)
         .eq('archived', false);
 
     if (userId) {
-        query = query.eq('user_id', userId);
+        objectivesQuery = objectivesQuery.eq('user_id', userId);
     }
 
-    const { data: objectives } = await query;
-
+    const { data: objectives } = await objectivesQuery;
     if (!objectives || objectives.length === 0) return null;
 
     const objectiveIds = objectives.map(o => o.id);
@@ -113,51 +112,53 @@ export const calculateQuarterProgress = async (
         .eq('checkins.quarter_id', quarterId)
         .in('key_result_id', krIds);
 
-    // Lógica 100% igual à KRCheckins (grafico de linha)
-    let activeCheckinId = null;
+    // Find active checkin (most recent checkin date <= today)
     const today = new Date().toISOString().split('T')[0];
 
-    // Sort by date to find active checkin
-    const sortedCheckins = (checkins || [])
-        .map(c => c.checkins).filter(Boolean)
-        .sort((a, b) => new Date(a.checkin_date).getTime() - new Date(b.checkin_date).getTime());
+    const sortedCheckinDates = Array.from(new Set(
+        (checkins || []).map(c => c.checkins?.checkin_date).filter(Boolean)
+    )).sort() as string[];
 
-    // Unique checkins since the left join flattens them
-    const uniqueCheckins = Array.from(new Map(sortedCheckins.map(c => [c.checkin_date, c])).values());
+    const validDates = sortedCheckinDates.filter(d => d <= today);
+    const activeCheckinDate = validDates.length > 0
+        ? validDates[validDates.length - 1]
+        : sortedCheckinDates.length > 0
+            ? sortedCheckinDates[sortedCheckinDates.length - 1]
+            : null;
 
-    // Encontrar o checkin ativo (mesma lógica do KRCheckins activeCheckinId simplificada para o último antes de/igual hoje)
-    const validCheckins = uniqueCheckins.filter(c => c.checkin_date <= today);
-    if (validCheckins.length > 0) {
-        activeCheckinId = validCheckins[validCheckins.length - 1].checkin_date; // Vamos usar checkin_date para mapear pois o ID não está no inner join explicitamente
-    } else if (uniqueCheckins.length > 0) {
-        activeCheckinId = uniqueCheckins[uniqueCheckins.length - 1].checkin_date;
-    }
+    if (!activeCheckinDate) return 0;
 
-    if (!activeCheckinId) return 0;
+    // Build objective title map for grouping (same logic as useDashboardChartData)
+    const objectiveIdToTitle = new Map<string, string>(objectives.map(o => [o.id, o.title]));
 
-    // Agrupar e calcular média como KRCheckins
-    const objAverages: number[] = [];
+    // Group KRs by objective title
+    const titleToKRs = new Map<string, typeof krs>();
+    krs.forEach(kr => {
+        const title = objectiveIdToTitle.get(kr.objective_id) ?? kr.objective_id;
+        if (!titleToKRs.has(title)) titleToKRs.set(title, []);
+        titleToKRs.get(title)!.push(kr);
+    });
 
-    objectiveIds.forEach(objId => {
-        const objKrs = krs.filter(kr => kr.objective_id === objId);
-        if (objKrs.length === 0) return;
+    // Calculate weighted average per title group, then average across groups
+    const groupAverages: number[] = [];
 
+    titleToKRs.forEach((groupKRs) => {
         let weightedSum = 0;
         let totalWeight = 0;
         let hasData = false;
 
-        objKrs.forEach((kr) => {
-            // Pega APENAS o resultado exato daquele checkin (data correspondente)
-            const krCheckin = (checkins || []).find(c => c.key_result_id === kr.id && c.checkins?.checkin_date === activeCheckinId);
+        groupKRs.forEach((kr) => {
+            const krCheckin = (checkins || []).find(
+                c => c.key_result_id === kr.id && c.checkins?.checkin_date === activeCheckinDate
+            );
 
             if (krCheckin && krCheckin.valor_realizado !== null && krCheckin.meta_checkin !== null && krCheckin.minimo_orcamento !== null) {
-                const type = kr.type as string;
                 const krProgress = calculateKR(
                     Number(krCheckin.valor_realizado),
                     Number(krCheckin.minimo_orcamento),
                     Number(krCheckin.meta_checkin),
                     kr.direction as string,
-                    type
+                    kr.type as string
                 );
 
                 if (krProgress !== null) {
@@ -170,14 +171,13 @@ export const calculateQuarterProgress = async (
         });
 
         if (hasData && totalWeight > 0) {
-            objAverages.push(weightedSum / totalWeight);
+            groupAverages.push(weightedSum / totalWeight);
         }
-        // Se NÃO tem data naquele activeCheckinId, ele ignora. Igual na página KRCheckins!
     });
 
-    if (objAverages.length === 0) return 0;
+    if (groupAverages.length === 0) return 0;
 
-    const avg = objAverages.reduce((sum, val) => sum + val, 0) / objAverages.length;
+    const avg = groupAverages.reduce((sum, val) => sum + val, 0) / groupAverages.length;
     return Math.round(avg);
 };
 
