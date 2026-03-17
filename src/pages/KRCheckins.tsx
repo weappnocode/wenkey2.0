@@ -1750,6 +1750,7 @@ export default function KRCheckins() {
                           value={formData.meta}
                           onChange={(e) => setFormData({ ...formData, meta: e.target.value })}
                           className="text-right"
+                          disabled={role !== 'admin'}
                         />
                       ) : (
                         <Input
@@ -1773,6 +1774,7 @@ export default function KRCheckins() {
                           }}
                           onBlur={() => setFormData({ ...formData, meta: formatInputValue(formData.meta, currentKR.type) })}
                           className="text-right"
+                          disabled={role !== 'admin'}
                         />
                       )}
                     </div>
@@ -1790,6 +1792,7 @@ export default function KRCheckins() {
                           value={formData.minimo}
                           onChange={(e) => setFormData({ ...formData, minimo: e.target.value })}
                           className="text-right"
+                          disabled={role !== 'admin'}
                         />
                       ) : (
                         <Input
@@ -1813,6 +1816,7 @@ export default function KRCheckins() {
                           }}
                           onBlur={() => setFormData({ ...formData, minimo: formatInputValue(formData.minimo, currentKR.type) })}
                           className="text-right"
+                          disabled={role !== 'admin'}
                         />
                       )}
                     </div>
