@@ -79,10 +79,20 @@ export default function Dashboard() {
     '--progress-color': getPerformanceColor(pct),
   });
 
-  const topRankings = useMemo(() =>
-    data?.metrics.userRankings.slice(0, 5) || [],
-    [data?.metrics.userRankings]
-  );
+  const topRankings = useMemo(() => {
+    if (!data?.metrics.userRankings) return [];
+    
+    const top5 = data.metrics.userRankings.slice(0, 5);
+    
+    if (filterOwnerId && filterOwnerId !== 'all') {
+      const selectedUserRank = data.metrics.userRankings.find(r => r.user_id === filterOwnerId);
+      if (selectedUserRank && !top5.some(r => r.user_id === filterOwnerId)) {
+        return [...top5, selectedUserRank];
+      }
+    }
+    
+    return top5;
+  }, [data?.metrics.userRankings, filterOwnerId]);
 
   // 1. Not Logged In
   if (!user) {
@@ -182,7 +192,7 @@ export default function Dashboard() {
         )}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <DashboardProgressChart />
+          <DashboardProgressChart filterOwnerId={filterOwnerId === 'all' ? null : filterOwnerId} />
           <Card className="md:col-span-2 xl:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
@@ -272,10 +282,12 @@ export default function Dashboard() {
                 <p className="text-center text-muted-foreground">Nenhum resultado disponível.</p>
               ) : (
                 <div className="space-y-3 px-3 py-3">
-                  {topRankings.map((ranking, index) => (
+                  {topRankings.map((ranking, index) => {
+                    const isHighlighted = ranking.user_id === (filterOwnerId !== 'all' ? filterOwnerId : user?.id);
+                    return (
                     <div
                       key={ranking.user_id}
-                      className={`flex items-center justify-between rounded-2xl border px-4 py-3.5 animate-in slide-in-from-right-4 fade-in duration-500 fill-mode-both ${ranking.user_id === user?.id ? 'ring-2 ring-primary border-primary/30 shadow-lg shadow-primary/20 bg-primary/10 scale-[1.02]' : 'hover:bg-muted/50 shadow-sm'}`}
+                      className={`flex items-center justify-between rounded-2xl border px-4 py-3.5 animate-in slide-in-from-right-4 fade-in duration-500 fill-mode-both ${isHighlighted ? 'ring-2 ring-primary border-primary/30 shadow-lg shadow-primary/20 bg-primary/10 scale-[1.02]' : 'hover:bg-muted/50 shadow-sm'}`}
                       style={{ animationDelay: `${index * 150}ms` }}
                     >
                       <div className="flex items-center gap-2">
@@ -299,7 +311,8 @@ export default function Dashboard() {
                       </div>
                       <span className="text-sm font-semibold pr-4 text-primary">{ranking.result_pct}%</span>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

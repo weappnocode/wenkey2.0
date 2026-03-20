@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserRole } from '@/hooks/useUserRole';
 
-export function useDashboardChartData() {
+export function useDashboardChartData(filterUserId?: string | null) {
     const { user } = useAuth();
     const { selectedCompanyId: company_id } = useCompany();
     const { role, loading: roleLoading } = useUserRole();
@@ -13,7 +13,7 @@ export function useDashboardChartData() {
     const enabled = !!user && !!company_id && !roleLoading;
 
     return useQuery({
-        queryKey: ['dashboard-chart', company_id, user?.id, role],
+        queryKey: ['dashboard-chart', company_id, user?.id, role, filterUserId],
         queryFn: async () => {
             if (!user || !company_id || !role) return { checkins: [], averages: {} };
 
@@ -40,7 +40,14 @@ export function useDashboardChartData() {
             if (!checkins || checkins.length === 0) return { checkins: [], averages: {} };
 
             // 3. Get Objectives & KRs
-            const userIdFilter = (role === 'admin' || role === 'manager') ? null : user.id;
+            let userIdFilter: string | null = null;
+            if (role === 'user') {
+                userIdFilter = user.id;
+            } else if (role === 'admin') {
+                userIdFilter = (filterUserId && filterUserId !== 'all') ? filterUserId : null;
+            } else if (role === 'manager') {
+                userIdFilter = null;
+            }
 
             let objectivesQuery = supabase
                 .from('objectives')

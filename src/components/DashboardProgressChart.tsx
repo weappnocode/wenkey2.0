@@ -4,8 +4,8 @@ import { useDashboardChartData } from '@/hooks/useDashboardChartData';
 import { ObjectiveLineChart } from '@/components/ObjectiveLineChart';
 import { toTitleCase } from '@/lib/utils';
 
-export function DashboardProgressChart() {
-    const { data, isLoading } = useDashboardChartData();
+export function DashboardProgressChart({ filterOwnerId }: { filterOwnerId?: string | null }) {
+    const { data, isLoading } = useDashboardChartData(filterOwnerId);
 
     return (
         <Card className="md:col-span-2 xl:col-span-2 flex flex-col h-full">
