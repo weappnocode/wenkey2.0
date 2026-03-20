@@ -200,7 +200,7 @@ export default function KRCheckins() {
     setCompanies(data || []);
   }, [role, userProfile, toast]);
 
-  const loadUsers = useCallback(async (autoSelectFirst = false) => {
+  const loadUsers = useCallback(async () => {
     if (!filterCompanyId) return;
 
     const { data, error } = await supabase
@@ -223,11 +223,6 @@ export default function KRCheckins() {
     }
 
     setUsers(data || []);
-
-    // Para admin: auto-selecionar o primeiro usuário em ordem alfabética
-    if (autoSelectFirst && data && data.length > 0) {
-      setFilterOwnerId(data[0].id);
-    }
   }, [filterCompanyId, toast]);
 
   const loadQuarters = useCallback(async (companyId: string) => {
@@ -468,7 +463,7 @@ export default function KRCheckins() {
 
     if (selectedCompanyId && filterCompanyId !== selectedCompanyId) {
       setFilterCompanyId(selectedCompanyId);
-      // Não reseta o usuário para 'all' - loadUsers vai auto-selecionar o primeiro
+      setFilterOwnerId('all');
     } else if (!selectedCompanyId && filterCompanyId !== 'all') {
       setFilterCompanyId('all');
       setFilterOwnerId('all');
@@ -479,7 +474,7 @@ export default function KRCheckins() {
   useEffect(() => {
     if (selectedCompanyId && filterCompanyId !== selectedCompanyId) {
       setFilterCompanyId(selectedCompanyId);
-      // Não reseta filterOwnerId: loadUsers vai auto-selecionar o primeiro usuário
+      setFilterOwnerId('all');
     }
   }, [selectedCompanyId, filterCompanyId]);
 
@@ -519,9 +514,7 @@ export default function KRCheckins() {
 
   useEffect(() => {
     if (filterCompanyId && filterCompanyId !== 'all') {
-      // Para admin: auto-selecionar o primeiro usuário alfabético
-      const autoSelect = role === 'admin';
-      loadUsers(autoSelect);
+      loadUsers();
     } else {
       setUsers([]);
       if (role !== 'user') {

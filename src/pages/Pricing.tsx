@@ -1,28 +1,24 @@
 import React, { useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-// Define your pricing plans here. In a real scenario, fetch these IDs from your database or env.
-const PRICING_PLANS = [
-    {
-        id: "basic",
-        name: "Básico",
-        description: "Perfeito para indivíduos ou pequenas equipes começando com OKRs.",
-        price: "R$ 49",
-        period: "/mês",
-        features: ["Até 10 usuários", "OKRs ilimitados", "Suporte por email", "Dashboard Básico"],
-        priceId: "price_1XYZ", // Replace with actual Stripe Price ID
-        highlight: false,
-    },
-    {
-        id: "pro",
+export default function Pricing() {
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isAnnual, setIsAnnual] = useState<boolean>(false);
+    const { toast } = useToast();
+
+    const plan = {
         name: "Pro",
         description: "Ideal para empresas em crescimento precisando de recursos avançados.",
-        price: "R$ 149",
-        period: "/mês",
+        monthlyPrice: "R$ 24,90",
+        annualPrice: "R$ 238,80",
+        monthlyEquivalent: "R$ 19,90",
+        monthlyPeriod: "/mês",
+        annualPeriod: "/ano",
         features: [
             "Usuários ilimitados",
             "Suporte prioritário 24/7",
@@ -30,18 +26,17 @@ const PRICING_PLANS = [
             "Análise Preditiva de KRs",
             "Treinamento dedicado",
         ],
-        priceId: "price_2XYZ", // Replace with actual Stripe Price ID
-        highlight: true,
-    },
-];
+        monthlyPriceId: "price_mensal_1XYZ", // Replace with actual Stripe Price ID
+        annualPriceId: "price_anual_2XYZ",   // Replace with actual Stripe Price ID
+    };
 
-export default function Pricing() {
-    const [isLoading, setIsLoading] = useState<string | null>(null);
-    const { toast } = useToast();
+    const currentPrice = isAnnual ? plan.annualPrice : plan.monthlyPrice;
+    const currentPeriod = isAnnual ? plan.annualPeriod : plan.monthlyPeriod;
+    const currentPriceId = isAnnual ? plan.annualPriceId : plan.monthlyPriceId;
 
     const handleSubscribe = async (priceId: string) => {
         try {
-            setIsLoading(priceId);
+            setIsLoading(true);
 
             const returnUrl = `${window.location.origin}/checkout-success`;
 
@@ -62,7 +57,7 @@ export default function Pricing() {
                 description: error instanceof Error ? error.message : "Ocorreu um erro ao processar o pagamento.",
                 variant: "destructive",
             });
-            setIsLoading(null);
+            setIsLoading(false);
         }
     };
 
@@ -74,51 +69,79 @@ export default function Pricing() {
                     Escolha o plano que melhor atende às necessidades da sua empresa e comece a alcançar seus objetivos hoje.
                 </p>
             </div>
-            <div className="mx-auto grid justify-center gap-8 sm:grid-cols-2 md:max-w-[64rem] md:grid-cols-2 lg:gap-12 mt-12">
-                {PRICING_PLANS.map((plan) => (
-                    <Card
-                        key={plan.id}
-                        className={`flex flex-col justify-between ${plan.highlight ? "border-primary shadow-lg scale-105 relative" : ""
-                            }`}
-                    >
-                        {plan.highlight && (
-                            <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2">
-                                <span className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                                    Mais Popular
-                                </span>
+
+            <div className="mt-12 flex justify-center items-center gap-4">
+                <span className={`text-sm font-semibold transition-colors ${!isAnnual ? 'text-[#2563eb]' : 'text-muted-foreground'}`}>
+                    Mensal
+                </span>
+                <Switch 
+                    checked={isAnnual} 
+                    onCheckedChange={setIsAnnual} 
+                    className="data-[state=checked]:bg-gray-400 data-[state=unchecked]:bg-gray-200"
+                />
+                <span className={`text-sm font-semibold transition-colors ${isAnnual ? 'text-[#2563eb]' : 'text-muted-foreground'}`}>
+                    Anual
+                </span>
+            </div>
+
+            <div className="mx-auto w-full max-w-[380px] mt-10">
+                <Card className="relative border-2 shadow-sm rounded-xl">
+                    {isAnnual && (
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                            <span className="bg-[#2563eb] text-white text-xs font-bold px-4 py-1.5 rounded-[0.4rem] tracking-wide">
+                                Mais Popular
+                            </span>
+                        </div>
+                    )}
+
+                    <CardHeader className="pt-10 pb-2 text-left px-8">
+                        <CardTitle className="text-2xl font-medium tracking-tight text-foreground">
+                            {plan.name}
+                        </CardTitle>
+                        <div className="flex items-baseline mt-3">
+                            <span className="text-[3rem] leading-none font-medium text-foreground tracking-tight">
+                                {currentPrice}
+                            </span>
+                            <span className="text-lg text-muted-foreground ml-2 font-normal">
+                                {currentPeriod}
+                            </span>
+                        </div>
+                        {isAnnual && (
+                            <div className="text-sm font-medium text-[#2563eb] mt-2">
+                                Equivalente a {plan.monthlyEquivalent} /mês
                             </div>
                         )}
-                        <CardHeader className="text-center pb-2">
-                            <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                            <CardDescription className="pt-1.5 h-10">{plan.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col items-center flex-1">
-                            <div className="mb-6 flex items-baseline text-5xl font-extrabold">
-                                {plan.price}
-                                <span className="text-xl font-medium text-muted-foreground ml-1">{plan.period}</span>
-                            </div>
-                            <ul className="w-full space-y-2 text-sm">
-                                {plan.features.map((feature) => (
-                                    <li key={feature} className="flex items-center">
-                                        <Check className="mr-2 h-4 w-4 text-primary" />
-                                        {feature}
-                                    </li>
-                                ))}
-                            </ul>
-                        </CardContent>
-                        <CardFooter>
-                            <Button
-                                className="w-full"
-                                variant={plan.highlight ? "default" : "outline"}
-                                disabled={!!isLoading}
-                                onClick={() => handleSubscribe(plan.priceId)}
-                            >
-                                {isLoading === plan.priceId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {isLoading === plan.priceId ? "Processando..." : "Assinar Agora"}
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                ))}
+                        <p className="text-base text-muted-foreground mt-3">
+                            O melhor valor para a sua empresa
+                        </p>
+                    </CardHeader>
+
+                    <CardContent className="px-8 pb-6">
+                        <ul className="space-y-4 mt-2">
+                            {plan.features.map((feature) => (
+                                <li key={feature} className="flex items-start gap-3">
+                                    <Check className="h-5 w-5 text-[#2563eb] shrink-0 mt-0.5" strokeWidth={2.5} />
+                                    <span className="text-foreground text-base">{feature}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </CardContent>
+
+                    <CardFooter className="flex flex-col gap-4 px-8 pb-8 pt-2">
+                        <Button
+                            className="w-full h-12 text-base font-medium bg-white text-black border border-gray-200 hover:bg-gray-50 shadow-sm rounded-lg"
+                            disabled={isLoading}
+                            onClick={() => handleSubscribe(currentPriceId)}
+                        >
+                            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            Assinar {currentPrice}
+                        </Button>
+                        <p className="text-[13px] text-muted-foreground text-center leading-relaxed">
+                            {currentPrice} por usuário cobrado {isAnnual ? "anualmente" : "mensalmente"}.<br />
+                            Cancele a qualquer momento.
+                        </p>
+                    </CardFooter>
+                </Card>
             </div>
         </div>
     );
