@@ -57,7 +57,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
     const navItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-        { icon: Building2, label: 'Empresas', path: '/companies' },
+        { icon: Building2, label: 'Empresas', path: '/companies', adminOnly: true },
         { icon: Users, label: 'Usuários', path: '/users' },
         { icon: Calendar, label: 'Quarter/Check-ins', path: '/quarters' },
         { icon: Target, label: 'Objetivos', path: '/objectives' },
@@ -128,7 +128,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                                 onClick={() => navigate(item.path)}
                             >
                                 <Icon className="w-5 h-5 flex-shrink-0" />
-                                {!collapsed && <span className="text-sm font-normal">{toTitleCase(item.label)}</span>}
+                                {!collapsed && <span className={cn("font-normal", role === 'admin' ? "text-[13px]" : "text-sm")}>{toTitleCase(item.label)}</span>}
                             </Button>
                         );
                     })}

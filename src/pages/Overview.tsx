@@ -320,40 +320,40 @@ export default function Overview() {
                   {userRankings.map((ranking, index) => (
                     <Card
                       key={ranking.user_id}
-                      className={`overflow-hidden w-full max-w-[280px] mx-auto ${ranking.user_id === user?.id ? 'ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5' : ''}`}
+                      className={`overflow-hidden w-full mx-auto ${ranking.user_id === user?.id ? 'ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5' : ''} ${index >= 5 ? 'max-w-[238px]' : 'max-w-[280px]'}`}
                       style={{
                         animation: `rankCardIn 0.5s ease-out ${index * 150}ms both`,
                       }}
                     >
-                      <CardHeader className="pb-3 bg-muted/50">
-                        <CardTitle className="text-center text-lg font-bold">
+                      <CardHeader className={`bg-muted/50 ${index >= 5 ? 'p-4 pb-2' : 'pb-3'}`}>
+                        <CardTitle className={`text-center font-bold ${index >= 5 ? 'text-base' : 'text-lg'}`}>
                           {getRankingLabel(ranking.rank)}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="pt-6 pb-6 flex flex-col items-center space-y-4 relative">
+                      <CardContent className={`flex flex-col items-center relative ${index >= 5 ? 'pt-4 pb-4 space-y-3' : 'pt-6 pb-6 space-y-4'}`}>
                         <CircularProgress
                           percentage={ranking.result_percent}
-                          size={140}
-                          strokeWidth={12}
+                          size={index >= 5 ? 119 : 140}
+                          strokeWidth={index >= 5 ? 10 : 12}
                         />
 
-                        <div className="absolute top-4 left-4">
-                          <Avatar className="h-12 w-12 border-2 border-border shadow-md">
+                        <div className={`absolute ${index >= 5 ? 'top-3 left-3' : 'top-4 left-4'}`}>
+                          <Avatar className={`border-2 border-border shadow-md ${index >= 5 ? 'h-10 w-10' : 'h-12 w-12'}`}>
                             {ranking.avatar_url ? (
                               <AvatarImage src={ranking.avatar_url} alt={ranking.full_name} className="object-cover" />
                             ) : (
-                              <AvatarFallback className="text-lg">{getInitials(ranking.full_name)}</AvatarFallback>
+                              <AvatarFallback className={index >= 5 ? 'text-base' : 'text-lg'}>{getInitials(ranking.full_name)}</AvatarFallback>
                             )}
                           </Avatar>
                         </div>
 
                         <div className="text-center space-y-1">
-                          <p className="font-semibold text-base capitalize flex items-center justify-center gap-1.5">
-                            {ranking.is_team && <Users className="h-4 w-4 text-primary" />}
+                          <p className={`font-semibold capitalize flex items-center justify-center gap-1.5 ${index >= 5 ? 'text-sm' : 'text-base'}`}>
+                            {ranking.is_team && <Users className={`text-primary ${index >= 5 ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />}
                             {ranking.full_name.toLowerCase()}
                           </p>
                           {ranking.position && (
-                            <p className="text-sm text-muted-foreground capitalize">
+                            <p className={`text-muted-foreground capitalize ${index >= 5 ? 'text-xs' : 'text-sm'}`}>
                               {ranking.position.toLowerCase()}
                             </p>
                           )}

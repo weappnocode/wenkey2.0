@@ -733,24 +733,38 @@ export default function Users() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="p-0 h-auto hover:bg-transparent"
-                          onClick={() => toggleUserStatus(user.id, user.is_active)}
-                        >
-                          {(() => {
+                        {isAdmin ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="p-0 h-auto hover:bg-transparent"
+                            onClick={() => toggleUserStatus(user.id, user.is_active)}
+                          >
+                            {(() => {
+                              const isUserActive = Boolean(user.is_active && getUserCompanyId(user));
+                              return (
+                                <Badge
+                                  variant={isUserActive ? 'default' : 'secondary'}
+                                  className={!isUserActive ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200' : ''}
+                                >
+                                  {isUserActive ? toTitleCase('Ativo') : toTitleCase('Pendente')}
+                                </Badge>
+                              );
+                            })()}
+                          </Button>
+                        ) : (
+                          (() => {
                             const isUserActive = Boolean(user.is_active && getUserCompanyId(user));
                             return (
                               <Badge
                                 variant={isUserActive ? 'default' : 'secondary'}
-                                className={!isUserActive ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200' : ''}
+                                className={!isUserActive ? 'bg-amber-100 text-amber-700 border-amber-200' : ''}
                               >
                                 {isUserActive ? toTitleCase('Ativo') : toTitleCase('Pendente')}
                               </Badge>
                             );
-                          })()}
-                        </Button>
+                          })()
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         {isAdmin && (
