@@ -182,7 +182,7 @@ export const calculateQuarterProgress = async (
 };
 
 // Hook Principal
-export function useDashboardData() {
+export function useDashboardData(filterUserId?: string | null) {
     const { user } = useAuth();
     const { selectedCompanyId } = useCompany();
     const { role, loading: roleLoading } = useUserRole();
@@ -190,7 +190,7 @@ export function useDashboardData() {
     const enabled = !!user && !!selectedCompanyId && !roleLoading;
 
     return useQuery({
-        queryKey: ['dashboard', user?.id, selectedCompanyId, role],
+        queryKey: ['dashboard', user?.id, selectedCompanyId, role, filterUserId],
         queryFn: async (): Promise<DashboardData | null> => {
             if (!user || !selectedCompanyId || !role) return null;
 
@@ -260,7 +260,14 @@ export function useDashboardData() {
             const activeQuarter = quarters.find(q => q.start_date <= today && q.end_date >= today) || quarters[0];
 
             // 2. Fetch Metrics (Role Dependent)
-            const userIdFilter = (role === 'admin' || role === 'manager') ? null : user.id;
+            let userIdFilter: string | null = null;
+            if (role === 'user') {
+                userIdFilter = user.id;
+            } else if (role === 'admin') {
+                userIdFilter = (filterUserId && filterUserId !== 'all') ? filterUserId : null;
+            } else if (role === 'manager') {
+                userIdFilter = null;
+            }
 
             // ... (Metrics calculation logic migrated from Dashboard.tsx)
             // Active Objectives Count
@@ -305,7 +312,7 @@ export function useDashboardData() {
                 }
             } else {
                 // Admin/manager: calcula em tempo real para pegar o check-in mais recente
-                currentQuarterProgress = (await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, null)) ?? 0;
+                currentQuarterProgress = (await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, userIdFilter)) ?? 0;
             }
 
             // Rankings Calculation (Inline or helper)
@@ -542,8 +549,8 @@ export function useDashboardData() {
                     if (qResult && qResult.result_percent !== null) result_pct = Math.round(qResult.result_percent);
                     else if (status === 'current') result_pct = await calculateQuarterProgress(selectedCompanyId, q.id, user.id);
                 } else { // Admin (Company wide)
-                    // Logic simplified for history - using calculateQuarterProgress(null) for simplicity or existing results
-                    result_pct = await calculateQuarterProgress(selectedCompanyId, q.id, null);
+                    // Logic simplified for history - using calculateQuarterProgress with userIdFilter
+                    result_pct = await calculateQuarterProgress(selectedCompanyId, q.id, userIdFilter);
                 }
 
                 quarterPerformance.push({

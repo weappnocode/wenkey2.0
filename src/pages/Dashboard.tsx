@@ -10,6 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Target, Calendar, TrendingUp, Award, Trophy, Users } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
 import { ActiveQuarterInfo } from '@/components/ActiveQuarterInfo';
 import { DashboardProgressChart } from '@/components/DashboardProgressChart';
 import { OKRAnalysisDialog, type AIAnalysisContextData } from '@/components/OKRAnalysisDialog';
@@ -22,8 +25,23 @@ export default function Dashboard() {
   const { role } = useUserRole();
   const { selectedCompanyId } = useCompany();
 
+  const [filterOwnerId, setFilterOwnerId] = useState<string>('all');
+  const [usersInfo, setUsersInfo] = useState<{id: string, full_name: string}[]>([]);
+
   // Use the new hook for all data fetching and caching
-  const { data, isLoading } = useDashboardData();
+  const { data, isLoading } = useDashboardData(filterOwnerId === 'all' ? null : filterOwnerId);
+
+  useEffect(() => {
+    if (role === 'admin' && selectedCompanyId) {
+      supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('company_id', selectedCompanyId)
+        .eq('is_active', true)
+        .order('full_name')
+        .then(({ data }) => setUsersInfo(data || []));
+    }
+  }, [role, selectedCompanyId]);
 
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [analysisContext, setAnalysisContext] = useState<AIAnalysisContextData | null>(null);
@@ -141,6 +159,27 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+
+        {role === 'admin' && (
+          <div className="flex justify-end -mt-2">
+            <div className="w-full sm:w-[300px]">
+              <Label htmlFor="user" className="mb-1.5 block text-sm font-medium">{toTitleCase('Usuário')}</Label>
+              <Select value={filterOwnerId || 'all'} onValueChange={setFilterOwnerId}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Todos os usuários" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50">
+                  <SelectItem value="all">Todos os usuários</SelectItem>
+                  {usersInfo.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {toTitleCase(u.full_name)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <DashboardProgressChart />
