@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, TrendingUp, Sparkles, RefreshCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -115,7 +114,7 @@ export function OKRAnalysisDialog({ open, onOpenChange, contextData, autoAnalyze
                     )}
                 </DialogHeader>
 
-                <ScrollArea className="flex-1 pr-4 mt-4">
+                <div className="flex-1 pr-2 mt-4 overflow-y-auto custom-scrollbar min-h-0">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center space-y-4">
                             <div className="relative">
@@ -176,7 +175,7 @@ export function OKRAnalysisDialog({ open, onOpenChange, contextData, autoAnalyze
                             </div>
                         </div>
                     )}
-                </ScrollArea>
+                </div>
             </DialogContent>
         </Dialog>
     );
