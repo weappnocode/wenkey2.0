@@ -99,6 +99,7 @@ export default function Users() {
   const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Profile | null>(null);
   const [isDeleteTeamDialogOpen, setIsDeleteTeamDialogOpen] = useState(false);
+  const [showTeams, setShowTeams] = useState(false);
 
   const [filterCompanyId, setFilterCompanyId] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
@@ -772,22 +773,6 @@ export default function Users() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              title="Testar email de Novo Cadastro (Admin)"
-                              onClick={() => handleTestNewUserWebhook(user)}
-                            >
-                              <UserPlus className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Testar email de Ativação (Usuário)"
-                              onClick={() => handleTestWebhook(user)}
-                            >
-                              <Send className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
                               onClick={() => openEditDialog(user)}
                             >
                               <Pencil className="h-4 w-4" />
@@ -812,18 +797,24 @@ export default function Users() {
         </Card>
 
 
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>{toTitleCase('Gestão de Times')}</CardTitle>
-              {isAdmin && (
-                <Button onClick={() => { resetTeamForm(); setIsTeamDialogOpen(true); }}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Novo Time
-                </Button>
-              )}
-            </div>
-          </CardHeader>
+        {showTeams ? (
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>{toTitleCase('Gestão de Times')}</CardTitle>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setShowTeams(false)}>
+                    Ocultar
+                  </Button>
+                  {isAdmin && (
+                    <Button onClick={() => { resetTeamForm(); setIsTeamDialogOpen(true); }}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Novo Time
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
           <CardContent>
             {loading ? (
               <p className="text-muted-foreground">Carregando...</p>
@@ -913,6 +904,14 @@ export default function Users() {
             )}
           </CardContent>
         </Card>
+        ) : (
+          <div className="flex justify-center py-4">
+            <Button variant="outline" onClick={() => setShowTeams(true)}>
+              <UsersIcon className="mr-2 h-4 w-4" />
+              Mostrar Gestão de Times
+            </Button>
+          </div>
+        )}
 
         {/* Email Schedule Config – Admin only */}
         {isAdmin && (

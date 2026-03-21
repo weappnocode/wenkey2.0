@@ -1,14 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, Loader2, Sparkles as SparklesIcon, Target, Info } from 'lucide-react';
+import { Wand2, Loader2, Sparkles as SparklesIcon, Target, Info, BookOpen, Filter, ArrowUpRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+interface OKRBenchmark {
+    id: string;
+    strategic_category: string;
+    industry: string;
+    objective_text: string;
+    key_results: string[];
+    impact_description: string;
+}
 
 interface GeneratedOKR {
     objective: string;
@@ -28,6 +38,61 @@ export default function Prototypes() {
     const [prompt, setPrompt] = useState('');
     const [answers, setAnswers] = useState({ area: '', problema: '', metrica: '', baseline: '', meta: '', prazo: '' });
     const [generatedOKR, setGeneratedOKR] = useState<GeneratedOKR | null>(null);
+    const [activeTab, setActiveTab] = useState<'questionnaire' | 'free'>('questionnaire');
+
+    const [benchmarks, setBenchmarks] = useState<OKRBenchmark[]>([]);
+    const [loadingBenchmarks, setLoadingBenchmarks] = useState(true);
+    const [categoryFilter, setCategoryFilter] = useState<string>('all');
+    const [industryFilter, setIndustryFilter] = useState<string>('all');
+
+    useEffect(() => {
+        fetchBenchmarks();
+    }, []);
+
+    const fetchBenchmarks = async () => {
+        setLoadingBenchmarks(true);
+        try {
+            const { data, error } = await supabase
+                .from('okr_benchmarks' as any)
+                .select('*')
+                .order('strategic_category');
+            if (error) throw error;
+            setBenchmarks((data as any[]) || []);
+        } catch (error) {
+            console.error('Error fetching benchmarks:', error);
+        } finally {
+            setLoadingBenchmarks(false);
+        }
+    };
+
+    const handleUseBenchmark = (benchmark: OKRBenchmark) => {
+        const text = `Gostaria de criar um OKR focado em "${benchmark.strategic_category}" para meu setor.
+Como inspiração, quero atingir algo parecido com o seguinte objetivo: "${benchmark.objective_text}".
+
+Meus KRs devem focar nas diretrizes abaixo:
+${benchmark.key_results.map(kr => `- ${kr}`).join('\n')}
+
+Adapte este benchmark para a realidade da minha empresa com metas realistas e métricas claras.`;
+        
+        setPrompt(text);
+        setActiveTab('free');
+        
+        toast({
+            title: "Template Copiado!",
+            description: "O benchmark foi copiado para a IA. Ajuste o que precisar e gere os OKRs.",
+        });
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const filteredBenchmarks = benchmarks.filter(b => {
+        const matchCat = categoryFilter === 'all' || b.strategic_category === categoryFilter;
+        const matchInd = industryFilter === 'all' || b.industry === industryFilter;
+        return matchCat && matchInd;
+    });
+
+    const uniqueCategories = Array.from(new Set(benchmarks.map(b => b.strategic_category)));
+    const uniqueIndustries = Array.from(new Set(benchmarks.map(b => b.industry)));
 
     const handleGenerate = async (mode: 'free' | 'questionnaire') => {
         setLoading(true);
@@ -83,7 +148,7 @@ export default function Prototypes() {
                         </div>
                     </CardHeader>
                     <CardContent className="p-4">
-                        <Tabs defaultValue="questionnaire" className="space-y-4">
+                        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
                             <TabsList className="grid w-full grid-cols-2 h-8 text-xs">
                                 <TabsTrigger value="questionnaire" className="text-xs">Questionário Guiado</TabsTrigger>
                                 <TabsTrigger value="free" className="text-xs">Texto Livre</TabsTrigger>
@@ -213,6 +278,117 @@ export default function Prototypes() {
                                         OKRs gerados por IA. Use como ponto de partida e ajuste conforme a realidade do seu negócio.
                                     </p>
                                 </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Benchmarks Section */}
+                <Card className="overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50 dark:bg-slate-900/50 py-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-emerald-500 rounded-lg shrink-0">
+                                    <BookOpen className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-base">Biblioteca Estratégica</CardTitle>
+                                    <CardDescription className="text-xs">
+                                        Inspire-se em OKRs de alta performance. Clique em "Usar como Base" para enviar para a IA.
+                                    </CardDescription>
+                                </div>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-4">
+                        <div className="flex gap-4 mb-4">
+                            <div className="flex-1 space-y-1">
+                                <label className="text-xs font-medium text-muted-foreground uppercase">Categoria Estratégica</label>
+                                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                                    <SelectTrigger className="h-8 text-sm">
+                                        <SelectValue placeholder="Todas" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todas as Categorias</SelectItem>
+                                        {uniqueCategories.map(c => (
+                                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex-1 space-y-1">
+                                <label className="text-xs font-medium text-muted-foreground uppercase">Setor</label>
+                                <Select value={industryFilter} onValueChange={setIndustryFilter}>
+                                    <SelectTrigger className="h-8 text-sm">
+                                        <SelectValue placeholder="Todos" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todos os Setores</SelectItem>
+                                        {uniqueIndustries.map(i => (
+                                            <SelectItem key={i} value={i}>{i}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        {loadingBenchmarks ? (
+                            <div className="flex justify-center items-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {filteredBenchmarks.map(benchmark => (
+                                    <div key={benchmark.id} className="flex flex-col p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-800 transition-all bg-white dark:bg-slate-950/50 shadow-sm">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex gap-2 flex-wrap">
+                                                <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-none font-medium px-2 py-0.5 text-[10px] uppercase">
+                                                    {benchmark.industry}
+                                                </Badge>
+                                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-[10px] uppercase">
+                                                    {benchmark.strategic_category}
+                                                </Badge>
+                                            </div>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                className="h-7 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+                                                onClick={() => handleUseBenchmark(benchmark)}
+                                            >
+                                                Usar como Base
+                                                <ArrowUpRight className="ml-1 h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                        
+                                        <div className="flex-1 space-y-4">
+                                            <div>
+                                                <h4 className="font-bold text-sm text-foreground line-clamp-2 leading-tight">
+                                                    {benchmark.objective_text}
+                                                </h4>
+                                                <p className="text-xs text-muted-foreground mt-1.5 italic line-clamp-2">
+                                                    "{benchmark.impact_description}"
+                                                </p>
+                                            </div>
+                                            
+                                            <div className="space-y-1.5 bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800/60">
+                                                <p className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Key Results Típicos</p>
+                                                <ul className="space-y-1.5">
+                                                    {benchmark.key_results.map((kr, idx) => (
+                                                        <li key={idx} className="text-xs text-slate-700 dark:text-slate-300 flex items-start gap-1.5 leading-snug">
+                                                            <Target className="h-3.5 w-3.5 mt-0.5 text-slate-400 shrink-0" />
+                                                            <span>{kr}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {filteredBenchmarks.length === 0 && (
+                                    <div className="col-span-1 md:col-span-2 text-center py-8 text-muted-foreground text-sm border-2 border-dashed rounded-xl border-slate-200 dark:border-slate-800">
+                                        Nenhum benchmark encontrado para os filtros selecionados.
+                                    </div>
+                                )}
                             </div>
                         )}
                     </CardContent>
