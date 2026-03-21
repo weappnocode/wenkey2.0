@@ -472,18 +472,19 @@ export function useDashboardData(filterUserId?: string | null) {
                         if (hasData && totalWeight > 0) {
                             objAttainment = weightedSum / totalWeight;
                         }
-                        // se não tem dados no active checkin, simplesmente não incrementa o userCount (ignora esse obj igual no KRCheckins)
                     }
 
                     if (hasData) {
                         current.totalPct += objAttainment;
                         current.userCount += 1;
-                        current.krCount += krs.length;
-                        groups.set(title, current);
                     }
+                    
+                    // Sempre consideramos a contagem de KRs para o agrupamento
+                    current.krCount += krs.length;
+                    groups.set(title, current);
                 });
                 for (const [title, stats] of groups.entries()) {
-                    const avg = Math.round(stats.totalPct / stats.userCount);
+                    const avg = stats.userCount > 0 ? Math.round(stats.totalPct / stats.userCount) : 0;
                     objectiveRankings.push({
                         objective_title: title,
                         result_pct: avg,

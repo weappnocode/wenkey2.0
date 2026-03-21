@@ -134,7 +134,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     })}
                 </nav>
 
-                <div className="p-4 border-t border-sidebar-border space-y-3">
+                <div className="p-4 pb-12 border-t border-sidebar-border space-y-3">
                     {!collapsed && profile && (
                         <div
                             className="flex flex-col items-center space-y-2 py-2 cursor-pointer hover:opacity-80 transition-opacity"

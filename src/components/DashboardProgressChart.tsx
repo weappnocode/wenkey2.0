@@ -8,7 +8,7 @@ export function DashboardProgressChart({ filterOwnerId }: { filterOwnerId?: stri
     const { data, isLoading } = useDashboardChartData(filterOwnerId);
 
     return (
-        <Card className="md:col-span-2 xl:col-span-2 flex flex-col h-full">
+        <Card className="md:col-span-2 xl:col-span-2 flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div>
                     <p className="text-base text-black">{toTitleCase('Progresso no Quarter')}</p>
@@ -18,7 +18,7 @@ export function DashboardProgressChart({ filterOwnerId }: { filterOwnerId?: stri
                     <TrendingUp className="h-5 w-5" />
                 </div>
             </CardHeader>
-            <CardContent className="pt-4 pb-4 flex-1 flex flex-col justify-end min-h-[140px]">
+            <CardContent className="pt-2 pb-2 flex-1 flex flex-col justify-end min-h-[100px]">
                 {isLoading ? (
                     <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                         Carregando gráfico...

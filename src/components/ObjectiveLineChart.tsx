@@ -36,9 +36,9 @@ export function ObjectiveLineChart({
         );
     }
 
-    const svgHeight = showDates ? 100 : 80;
-    const padTop = 24; // Space for labels
-    const padBottom = showDates ? 28 : 8; // Extra space for dates
+    const svgHeight = showDates ? 80 : 60;
+    const padTop = 20; // Space for labels
+    const padBottom = showDates ? 24 : 8; // Extra space for dates
     const chartHeight = svgHeight - padTop - padBottom;
 
     // Map value (0-100) to Y coordinate (inverted: 0% at bottom, 100% at top)

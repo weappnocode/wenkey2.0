@@ -127,10 +127,12 @@ export default function Quarters() {
 
         // Group check-ins by quarter
         const grouped = (checkInsData || []).reduce((acc, checkIn) => {
-          if (!acc[checkIn.quarter_id]) {
-            acc[checkIn.quarter_id] = [];
+          const qId = checkIn.quarter_id;
+          if (!qId) return acc;
+          if (!acc[qId]) {
+            acc[qId] = [];
           }
-          acc[checkIn.quarter_id].push(checkIn);
+          acc[qId].push(checkIn as unknown as CheckIn);
           return acc;
         }, {} as Record<string, CheckIn[]>);
 

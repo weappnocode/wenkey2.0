@@ -467,16 +467,6 @@ export default function PerformanceHistory() {
                                                                                     fill="hsl(var(--primary))"
                                                                                     radius={[0, 4, 4, 0]}
                                                                                     barSize={20}
-                                                                                    style={{ cursor: 'pointer' }}
-                                                                                    onClick={(data: Record<string, unknown>) => {
-                                                                                        console.log('Bar clicked:', data);
-                                                                                        const qId = data?.quarterId as string || (data?.payload as Record<string, unknown>)?.quarterId as string;
-                                                                                        if (qId) {
-                                                                                            fetchQuarterObjectives(qId, user.id);
-                                                                                        } else {
-                                                                                            console.warn('quarterId not found in Recharts onClick payload');
-                                                                                        }
-                                                                                    }}
                                                                                 />
                                                                             </BarChart>
                                                                         </ResponsiveContainer>

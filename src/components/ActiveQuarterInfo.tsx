@@ -67,7 +67,7 @@ export function ActiveQuarterInfo({ quarter }: ActiveQuarterInfoProps) {
     }
 
     return (
-        <div className="flex flex-col w-full h-full font-sans bg-background/50 p-4 rounded-xl gap-3 justify-center">
+        <div className="flex flex-col w-full h-full font-sans bg-background/50 py-3 px-4 rounded-xl gap-2 justify-center">
             <div className="flex items-center justify-between w-full">
                 {/* Left Section: Icon & Title */}
                 <div className="flex items-center gap-4">
@@ -128,7 +128,7 @@ export function ActiveQuarterInfo({ quarter }: ActiveQuarterInfoProps) {
                     </div>
                 </div>
                 {/* Spacer for the DIA label */}
-                <div className="h-4"></div>
+                <div className="h-2"></div>
             </div>
         </div>
     );

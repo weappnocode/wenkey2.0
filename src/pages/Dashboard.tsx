@@ -150,46 +150,46 @@ export default function Dashboard() {
       />
       <div className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{toTitleCase('Dashboard')}</p>
-            <h1 className="text-3xl font-bold tracking-tight text-black">{toTitleCase('Bem-vindo')}, {toTitleCase(userProfile?.full_name ?? 'Usuário')}</h1>
-            <p className="text-muted-foreground">
-              {toTitleCase('Acompanhe a evolução dos objetivos e resultados-chave da empresa.')}
-            </p>
+          <div className="flex flex-col gap-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">{toTitleCase('Dashboard')}</p>
+              <h1 className="text-2xl font-bold tracking-tight text-black">{toTitleCase('Bem-vindo')}, {toTitleCase(userProfile?.full_name ?? 'Usuário')}</h1>
+              <p className="text-sm text-muted-foreground">
+                {toTitleCase('Acompanhe a evolução dos objetivos e resultados-chave da empresa.')}
+              </p>
+            </div>
+            
+            {role === 'admin' && (
+              <div className="w-full sm:w-[280px]">
+                <Label htmlFor="user" className="mb-1.5 block text-xs font-medium text-muted-foreground">{toTitleCase('Filtrar por Usuário')}</Label>
+                <Select value={filterOwnerId || 'all'} onValueChange={setFilterOwnerId}>
+                  <SelectTrigger className="bg-background h-9 text-sm">
+                    <SelectValue placeholder="Todos os usuários" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    <SelectItem value="all">Todos os usuários</SelectItem>
+                    {usersInfo.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {toTitleCase(u.full_name)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <div className="bg-white rounded-xl shadow-sm border w-full h-full">
             {active_quarter ? (
               <ActiveQuarterInfo quarter={active_quarter} />
             ) : (
-              <div className="flex flex-col items-center justify-center w-full h-full min-h-[120px] p-6 text-center text-muted-foreground">
+              <div className="flex flex-col items-center justify-center w-full h-full min-h-[100px] p-6 text-center text-muted-foreground">
                 <Calendar className="w-8 h-8 mb-2 opacity-20" />
-                <p>Nenhum quarter com período ativo.</p>
+                <p className="text-sm">Nenhum quarter com período ativo.</p>
                 <p className="text-xs mt-1">Crie um novo quarter nas configurações se você for administrador.</p>
               </div>
             )}
           </div>
         </div>
-
-        {role === 'admin' && (
-          <div className="flex justify-end -mt-2">
-            <div className="w-full sm:w-[300px]">
-              <Label htmlFor="user" className="mb-1.5 block text-sm font-medium">{toTitleCase('Usuário')}</Label>
-              <Select value={filterOwnerId || 'all'} onValueChange={setFilterOwnerId}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Todos os usuários" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover z-50">
-                  <SelectItem value="all">Todos os usuários</SelectItem>
-                  {usersInfo.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {toTitleCase(u.full_name)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <DashboardProgressChart filterOwnerId={filterOwnerId === 'all' ? null : filterOwnerId} />
@@ -208,11 +208,14 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground">Nenhum objetivo.</p>
               ) : (
                 <div className="animate-in zoom-in-95 fade-in duration-700 fill-mode-both" style={{ animationDelay: '100ms' }}>
-                  <ResponsiveContainer width="100%" height={100}>
-                    <BarChart data={metrics.objectiveRankings.map(o => ({
-                      name: toTitleCase(o.objective_title),
-                      krs: o.kr_count,
-                    }))}>
+                  <ResponsiveContainer width="100%" height={75}>
+                    <BarChart 
+                      data={metrics.objectiveRankings.map(o => ({
+                        name: toTitleCase(o.objective_title),
+                        krs: o.kr_count,
+                      }))}
+                      margin={{ top: 20, right: 0, left: 0, bottom: 0 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 20% 90%)" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} />
                       <YAxis hide allowDecimals={false} />
@@ -220,7 +223,7 @@ export default function Dashboard() {
                         contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                         formatter={(value: number) => [value, 'Key Results']}
                       />
-                      <Bar dataKey="krs" fill="hsl(221 83% 53%)" radius={[4, 4, 0, 0]} barSize={28} label={{ position: 'top', fontSize: 11, fontWeight: 600, fill: 'hsl(221 83% 53%)' }} />
+                      <Bar dataKey="krs" fill="hsl(221 83% 53%)" radius={[4, 4, 0, 0]} barSize={20} label={{ position: 'top', fontSize: 11, fontWeight: 600, fill: 'hsl(221 83% 53%)' }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

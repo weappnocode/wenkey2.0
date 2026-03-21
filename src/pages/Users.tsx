@@ -83,7 +83,7 @@ type ProfileWithCompany = Profile & { companies?: Company | null };
 export default function Users() {
   const { user, profile } = useAuth();
   const { selectedCompanyId, selectedCompany } = useCompany();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isManager } = useUserRole();
   const [users, setUsers] = useState<Profile[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyMembers, setCompanyMembers] = useState<CompanyMember[]>([]);
@@ -904,14 +904,14 @@ export default function Users() {
             )}
           </CardContent>
         </Card>
-        ) : (
+        ) : isManager ? (
           <div className="flex justify-center py-4">
             <Button variant="outline" onClick={() => setShowTeams(true)}>
               <UsersIcon className="mr-2 h-4 w-4" />
               Mostrar Gestão de Times
             </Button>
           </div>
-        )}
+        ) : null}
 
         {/* Email Schedule Config – Admin only */}
         {isAdmin && (
