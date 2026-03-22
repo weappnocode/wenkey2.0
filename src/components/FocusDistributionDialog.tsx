@@ -101,10 +101,10 @@ export function FocusDistributionDialog({ open, onOpenChange, contextData, autoA
     };
 
     const prepareChartData = () => {
-        if (!analysisData) return [];
+        if (!analysisData || !analysisData.estatisticas) return [];
         return Object.entries(analysisData.estatisticas).map(([name, value]) => ({
             name,
-            value: Number(value)
+            value: Number(value) || 0
         })).filter(item => item.value > 0);
     };
 
@@ -148,7 +148,7 @@ export function FocusDistributionDialog({ open, onOpenChange, contextData, autoA
                         <div className="max-w-none pb-6 space-y-8 pr-2">
                             <div>
                                 <h3 className="text-lg font-bold text-primary mb-2">Perfil Estratégico</h3>
-                                <p className="text-sm text-foreground leading-relaxed">{analysisData.perfil_estrategico}</p>
+                                <p className="text-sm text-foreground leading-relaxed">{analysisData.perfil_estrategico || 'Nenhum perfil estratégico gerado.'}</p>
                             </div>
 
                             <div>
@@ -164,13 +164,13 @@ export function FocusDistributionDialog({ open, onOpenChange, contextData, autoA
                                                 outerRadius={100}
                                                 fill="#8884d8"
                                                 dataKey="value"
-                                                label={({ name, percent }) => \`\${name} \${(percent * 100).toFixed(0)}%\`}
+                                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                                             >
                                                 {chartData.map((entry, index) => (
-                                                    <Cell key={\`cell-\${index}\`} fill={COLORS[index % COLORS.length]} />
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Pie>
-                                            <RechartsTooltip formatter={(value) => \`\${value}%\`} />
+                                            <RechartsTooltip formatter={(value) => `${value}%`} />
                                             <Legend verticalAlign="bottom" height={36}/>
                                         </PieChart>
                                     </ResponsiveContainer>
@@ -181,19 +181,19 @@ export function FocusDistributionDialog({ open, onOpenChange, contextData, autoA
                                 <div className="p-5 rounded-2xl border flex flex-col text-center bg-red-500/5 border-red-200">
                                     <h4 className="font-bold text-red-700 flex items-center justify-center gap-1 mb-3 text-sm">🔴 Foco Forte {">"} 20%</h4>
                                     <div className="flex flex-col gap-2">
-                                        {analysisData.resumo_foco.forte?.length > 0 ? analysisData.resumo_foco.forte.map(c => <span key={c} className="text-sm font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma categoria</span>}
+                                        {analysisData.resumo_foco?.forte?.length > 0 ? analysisData.resumo_foco.forte.map(c => <span key={c} className="text-sm font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma categoria</span>}
                                     </div>
                                 </div>
                                 <div className="p-5 rounded-2xl border flex flex-col text-center bg-yellow-500/5 border-yellow-200">
                                     <h4 className="font-bold text-yellow-700 flex items-center justify-center gap-1 mb-3 text-sm">🟡 Foco Médio 10-20%</h4>
                                     <div className="flex flex-col gap-2">
-                                        {analysisData.resumo_foco.medio?.length > 0 ? analysisData.resumo_foco.medio.map(c => <span key={c} className="text-sm font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma categoria</span>}
+                                        {analysisData.resumo_foco?.medio?.length > 0 ? analysisData.resumo_foco.medio.map(c => <span key={c} className="text-sm font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma categoria</span>}
                                     </div>
                                 </div>
                                 <div className="p-5 rounded-2xl border flex flex-col text-center bg-blue-500/5 border-blue-200">
                                     <h4 className="font-bold text-blue-700 flex items-center justify-center gap-1 mb-3 text-sm">🔵 Foco Fraco {"<"} 10%</h4>
                                     <div className="flex flex-col gap-2">
-                                        {analysisData.resumo_foco.fraco?.length > 0 ? analysisData.resumo_foco.fraco.map(c => <span key={c} className="text-sm font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma categoria</span>}
+                                        {analysisData.resumo_foco?.fraco?.length > 0 ? analysisData.resumo_foco.fraco.map(c => <span key={c} className="text-sm font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma categoria</span>}
                                     </div>
                                 </div>
                             </div>
