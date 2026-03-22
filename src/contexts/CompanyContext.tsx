@@ -8,6 +8,7 @@ export interface Company {
   id: string;
   name: string;
   is_active?: boolean;
+  business_segment?: string | null;
 }
 
 interface CompanyContextType {
@@ -90,7 +91,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       try {
         const { data, error } = await supabase
           .from('companies')
-          .select('id, name, is_active')
+          .select('id, name, is_active, business_segment')
           .eq('id', targetCompanyId)
           .maybeSingle();
 
@@ -101,6 +102,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
             id: data.id,
             name: data.name,
             is_active: data.is_active,
+            business_segment: data.business_segment ?? null,
           });
         }
       } catch (err) {

@@ -58,6 +58,7 @@ serve(async (req) => {
 
     try {
         const { contextData } = await req.json();
+        const company_segment: string | undefined = contextData?.company_segment;
 
         if (!contextData) {
             return new Response(
@@ -71,7 +72,11 @@ serve(async (req) => {
             throw new Error('OPENAI_API_KEY not configured');
         }
 
-        const userMessage = `Por favor, analise os seguintes dados do OKR com base no seu papel de Analista:\n\n${JSON.stringify(contextData, null, 2)}`;
+        const companyCtx = company_segment
+            ? `\n\nCONTEXTO DA EMPRESA:\n"${company_segment}"\n\nConsidere este contexto para personalizar a análise e tornar os insights mais relevantes para este modelo de negócio.\n`
+            : '';
+
+        const userMessage = `Por favor, analise os seguintes dados do OKR com base no seu papel de Analista:${companyCtx}\n\n${JSON.stringify(contextData, null, 2)}`;
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',

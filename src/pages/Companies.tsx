@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
   Plus,
@@ -15,6 +16,7 @@ import {
   Users as UsersIcon,
   MapPin,
   Trash2,
+  Briefcase,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -40,6 +42,7 @@ interface Company {
   state: string | null;
   is_active: boolean;
   sectors: string[];
+  business_segment: string | null;
 }
 
 export default function Companies() {
@@ -60,6 +63,7 @@ export default function Companies() {
     city: '',
     state: '',
     sectors: '',
+    business_segment: '',
   });
 
   const fetchCompanies = async () => {
@@ -109,6 +113,7 @@ export default function Companies() {
           city: formData.city || null,
           state: formData.state || null,
           sectors,
+          business_segment: formData.business_segment || null,
         })
         .select()
         .single();
@@ -135,6 +140,7 @@ export default function Companies() {
         city: '',
         state: '',
         sectors: '',
+        business_segment: '',
       });
       fetchCompanies();
     } catch (error) {
@@ -160,6 +166,7 @@ export default function Companies() {
           city: formData.city || null,
           state: formData.state || null,
           sectors,
+          business_segment: formData.business_segment || null,
         })
         .eq('id', editingCompany.id);
 
@@ -176,6 +183,7 @@ export default function Companies() {
         city: '',
         state: '',
         sectors: '',
+        business_segment: '',
       });
       fetchCompanies();
     } catch (error) {
@@ -217,6 +225,7 @@ export default function Companies() {
       city: company.city || '',
       state: company.state || '',
       sectors: company.sectors.join(', '),
+      business_segment: company.business_segment || '',
     });
     setIsEditDialogOpen(true);
   };
@@ -305,6 +314,19 @@ export default function Companies() {
                         value={formData.sectors}
                         onChange={(e) => setFormData({ ...formData, sectors: e.target.value })}
                         placeholder="Tecnologia, Marketing, Vendas"
+                      />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label htmlFor="business_segment" className="flex items-center gap-1.5">
+                        <Briefcase className="w-3.5 h-3.5" />
+                        Atividade &amp; Segmentação <span className="text-xs text-muted-foreground">(usado pela IA para personalizar análises)</span>
+                      </Label>
+                      <Textarea
+                        id="business_segment"
+                        value={formData.business_segment}
+                        onChange={(e) => setFormData({ ...formData, business_segment: e.target.value })}
+                        placeholder="Ex: Empresa multifranquias (Boticário, Melissa, Usaflex) com 18 lojas físicas, 1 Hub Logístico com distribuição para revendedoras..."
+                        rows={3}
                       />
                     </div>
                   </div>
@@ -403,6 +425,16 @@ export default function Companies() {
                     </p>
                   </div>
                 )}
+                {company.business_segment && (
+                  <div className="pt-3 border-t">
+                    <span className="text-[10px] uppercase font-medium text-muted-foreground tracking-wider mb-1 flex items-center gap-1">
+                      <Briefcase className="w-3 h-3" /> Atividade &amp; Segmentação (IA)
+                    </span>
+                    <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2" title={company.business_segment}>
+                      {company.business_segment}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -488,6 +520,19 @@ export default function Companies() {
                     value={formData.sectors}
                     onChange={(e) => setFormData({ ...formData, sectors: e.target.value })}
                     placeholder="Tecnologia, Marketing, Vendas"
+                  />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label htmlFor="edit-business_segment" className="flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5" />
+                    Atividade &amp; Segmentação <span className="text-xs text-muted-foreground">(usado pela IA)</span>
+                  </Label>
+                  <Textarea
+                    id="edit-business_segment"
+                    value={formData.business_segment}
+                    onChange={(e) => setFormData({ ...formData, business_segment: e.target.value })}
+                    placeholder="Ex: Empresa multifranquias (Boticário, Melissa, Usaflex) com 18 lojas físicas..."
+                    rows={3}
                   />
                 </div>
               </div>

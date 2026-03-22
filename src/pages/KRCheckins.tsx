@@ -997,7 +997,8 @@ export default function KRCheckins() {
       quarter_status: isOngoing ? 'ongoing' : 'closed',
       data_ultimo_checkin_quarter: sortedCheckins[sortedCheckins.length - 1] ? formatDate(sortedCheckins[sortedCheckins.length - 1].checkin_date) : undefined,
       data_checkin_atual: activeCheckinId ? formatDate((quarterCheckins.find(c => c.id === activeCheckinId)?.checkin_date) || '') : undefined,
-      objetivos: mappedObjectives
+      objetivos: mappedObjectives,
+      company_segment: selectedCompany?.business_segment ?? undefined,
     });
     return true;
   };
