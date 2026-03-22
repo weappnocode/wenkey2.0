@@ -35,8 +35,17 @@ serve(async (req) => {
 
         for (const b of benchmarks) {
             try {
-                // Montar o texto para gerar o embedding
-                const textToEmbed = `Área: ${b.strategic_category || b.industry}. Objetivo: ${b.objective_text}. KRs: ${typeof b.key_results === 'string' ? b.key_results : JSON.stringify(b.key_results)}. Impacto: ${b.impact_description}`;
+                // Mapeamento flexível de colunas (Suporta template e planilha sem cabeçalho)
+                const category = b.strategic_category || b.Categoria || b[3] || b['Categoria Estratégica'] || 'Geral';
+                const industry = b.industry || b.Setor || b[0] || 'Varejo';
+                const objective = b.objective_text || b.Objetivo || b[1] || b['Objetivo Estratégico'];
+                const krText = b.key_results || b.KR || b[2] || b['KRs ciclo Q1'];
+                const impact = b.impact_description || b.Impacto || b[4] || '';
+
+                if (!objective || !krText) continue; // Pular linhas vazias
+
+                // Montar o texto para gerar o embedding (foco no raciocínio e contexto)
+                const textToEmbed = `Indústria/Setor: ${industry}. Categoria: ${category}. Objetivo: ${objective}. KR de referência: ${typeof krText === 'string' ? krText : JSON.stringify(krText)}.`;
                 
                 const embedResponse = await fetch("https://api.openai.com/v1/embeddings", {
                     method: 'POST',
@@ -50,46 +59,64 @@ serve(async (req) => {
                     }),
                 });
 
-                if (!embedResponse.ok) throw new Error("Falha ao gerar embedding na OpenAI");
+                if (!embedResponse.ok) throw new Error(`Falha embedding OpenAI: ${embedResponse.status}`);
                 
                 const embedData = await embedResponse.json();
                 const embedding = embedData.data?.[0]?.embedding;
 
-                if (!embedding) throw new Error("A OpenAI não retornou um vetor válido");
+                if (!embedding) throw new Error("Vetor nulo retornado pela OpenAI");
 
-                // Converter KRs se vieram como string no Excel
-                let parsedKRs = b.key_results;
+                // Converter KR para array (o banco espera JSONB)
+                let parsedKRs = krText;
                 if (typeof parsedKRs === 'string') {
                     try {
-                        parsedKRs = JSON.parse(parsedKRs);
+                        // Tentar parsear se for JSON literal
+                        if (parsedKRs.startsWith('[') || parsedKRs.startsWith('{')) {
+                            parsedKRs = JSON.parse(parsedKRs);
+                        } else {
+                            parsedKRs = [parsedKRs];
+                        }
                     } catch (e) {
-                        // fallback to array with 1 item
                         parsedKRs = [parsedKRs];
                     }
                 }
 
+                // Normalização da Categoria para o Enum do Banco
+                const validCategories = ['Receita', 'Eficiência Operacional', 'Cliente', 'Crescimento', 'Pessoas', 'Inovação / Digital'];
+                let finalCategory = category;
+                if (!validCategories.includes(category)) {
+                    // Mapeamento de sinonimos comuns
+                    if (category.includes('Financeiro') || category.includes('Vendas')) finalCategory = 'Receita';
+                    else if (category.includes('Processo') || category.includes('Custo')) finalCategory = 'Eficiência Operacional';
+                    else if (category.includes('Sucesso') || category.includes('NPS')) finalCategory = 'Cliente';
+                    else if (category.includes('Expansão')) finalCategory = 'Crescimento';
+                    else if (category.includes('Cultura') || category.includes('RH')) finalCategory = 'Pessoas';
+                    else if (category.includes('Tecnologia')) finalCategory = 'Inovação / Digital';
+                    else finalCategory = 'Crescimento'; // Default
+                }
+
                 const { error: insertError } = await supabase.from('okr_benchmarks').insert({
-                    strategic_category: b.strategic_category,
-                    industry: b.industry,
-                    objective_text: b.objective_text,
-                    key_results: parsedKRs,
-                    impact_description: b.impact_description,
-                    metric_type: b.metric_type || 'outros',
+                    strategic_category: finalCategory,
+                    industry: industry,
+                    objective_text: objective,
+                    key_results: Array.isArray(parsedKRs) ? parsedKRs : [parsedKRs],
+                    impact_description: impact,
+                    metric_type: b.metric_type || 'unidades',
                     goal_direction: b.goal_direction || 'increase',
                     complexity: b.complexity || 'medium',
                     embedding: embedding
                 });
 
                 if (insertError) {
-                    console.error("DB Error on row:", b.objective_text, insertError);
-                    errors.push({ row: b.objective_text, error: insertError.message });
+                    console.error("Erro DB no Objetivo:", objective, insertError);
+                    errors.push({ row: objective, error: insertError.message });
                 } else {
                     successCount++;
                 }
 
             } catch (err: any) {
-                console.error("Loop error:", err);
-                errors.push({ row: b.objective_text, error: err.message });
+                console.error("Erro no processamento da linha:", err);
+                errors.push({ error: err.message });
             }
         }
 

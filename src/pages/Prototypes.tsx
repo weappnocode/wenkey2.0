@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as xlsx from 'xlsx';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface GeneratedOKR {
     objective: string;
@@ -26,6 +27,7 @@ interface GeneratedOKR {
 
 export default function Prototypes() {
     const { toast } = useToast();
+    const { selectedCompany } = useCompany();
     const [loading, setLoading] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [answers, setAnswers] = useState({ area: '', problema: '', metrica: '', baseline: '', meta: '', prazo: '' });
@@ -62,7 +64,18 @@ export default function Prototypes() {
             const data = await file.arrayBuffer();
             const workbook = xlsx.read(data);
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = xlsx.utils.sheet_to_json(sheet);
+            
+            // Tentar ler com cabeçalho primeiro, se não encontrar colunas esperadas, tenta modo array (header: 1)
+            let jsonData: any[] = xlsx.utils.sheet_to_json(sheet);
+            const firstRow: any = jsonData[0] || {};
+            const hasExpectedHeader = firstRow.strategic_category || firstRow.objective_text || firstRow.objective;
+
+            if (!hasExpectedHeader) {
+                console.log("Detectada planilha sem cabeçalho ou formato customizado. Usando mapeamento por índice.");
+                jsonData = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+                // Remover linhas vazias no início se houver
+                jsonData = jsonData.filter(row => Array.isArray(row) && row.length > 0);
+            }
 
             if (jsonData.length === 0) throw new Error("A planilha está vazia.");
 
@@ -95,7 +108,10 @@ export default function Prototypes() {
         setGeneratedOKR(null);
         setAnalysisResult(null);
         try {
-            const body = mode === 'free' ? { prompt } : { answers };
+            const body = mode === 'free' 
+                ? { prompt, company_segment: selectedCompany?.business_segment } 
+                : { answers, company_segment: selectedCompany?.business_segment };
+            
             const { data: okrData, error: okrError } = await supabase.functions.invoke('generate-okr', { body });
 
             if (okrError) throw okrError;
@@ -103,7 +119,11 @@ export default function Prototypes() {
             
             setAnalysisLoading(true);
             const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-okr-intelligence', {
-                body: { generatedOKR: okrData, answers: mode === 'free' ? { problema: prompt } : answers }
+                body: { 
+                    generatedOKR: okrData, 
+                    answers: mode === 'free' ? { problema: prompt } : answers,
+                    company_segment: selectedCompany?.business_segment 
+                }
             });
 
             if (analysisError) {

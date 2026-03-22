@@ -14,7 +14,7 @@ serve(async (req) => {
         console.log("Request received to analyze-okr-intelligence");
         const jsonBody = await req.json().catch(() => ({}));
         
-        const { generatedOKR, answers } = jsonBody;
+        const { generatedOKR, answers, company_segment } = jsonBody;
 
         if (!generatedOKR) {
             throw new Error('O OKR gerado é obrigatório para a análise.');
@@ -76,7 +76,9 @@ O RESULTADO DEVE SER OBRIGATORIAMENTE ESTE JSON ESTRUTURADO:
 
         const userMessage = `OKR Gerado (Para Análise):\n${JSON.stringify(generatedOKR, null, 2)}
         
-\n\nContexto Original do Usuário (Sua intenção):\n${JSON.stringify(answers || {}, null, 2)}`;
+\n\nContexto Original do Usuário (Sua intenção):\n${JSON.stringify(answers || {}, null, 2)}
+
+\n\nContexto da Empresa (Atividade/Segmento):\n${company_segment || "Não informado"}`;
 
         console.log("Calling OpenAI for Intelligent Analysis...");
         const response = await fetch("https://api.openai.com/v1/chat/completions", {

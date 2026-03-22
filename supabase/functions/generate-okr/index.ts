@@ -14,7 +14,7 @@ serve(async (req) => {
     try {
         console.log("Request received to generate-okr with RAG");
         const jsonBody = await req.json().catch(() => ({}));
-        const { prompt, answers } = jsonBody;
+        const { prompt, answers, company_segment } = jsonBody;
 
         const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
         const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
@@ -53,10 +53,12 @@ Valor atual (baseline): ${baseline || 'Não informado'}
 Meta desejada: ${meta || 'Não informado'}
 Prazo: ${prazo || 'Não informado'}${hint}`;
 
-            embeddingText = `Área: ${area}. Problema: ${problema}. Métrica: ${metrica}.`;
+            embeddingText = `Área: ${area}. Problema: ${problema}. Métrica: ${metrica}. Segmento: ${company_segment || ''}`;
         } else {
             throw new Error('Forneça um texto ou preencha o questionário.');
         }
+
+        const companyContext = company_segment ? `\n\nCONTEXTO DA EMPRESA (ATIVIDADE/SEGMENTO):\n${company_segment}\n` : "";
 
         console.log("Generating embedding for RAG...");
         const embedResponse = await fetch("https://api.openai.com/v1/embeddings", {
@@ -108,7 +110,12 @@ REGRAS RÍGIDAS PARA OS KEY RESULTS:
 - Devem representar alavancas que, se puxadas, garantem que o Objetivo será atingido.
 
 TIPOS DE KR: 'percentual' (unidade: %), 'moeda' (unidade: R$), 'numero', 'data'
-DIREÇÕES: 'increase', 'decrease'${contextSection}
+DIREÇÕES: 'increase', 'decrease'${companyContext}${contextSection}
+
+SUA MISSÃO DE RACIOCÍNIO ESTRATÉGICO:
+1. Analise o segmento e atividade da empresa para entender os desafios típicos.
+2. Observe os BENCHMARKS acima: não os copie, mas aprenda a *lógica de mensuração* e o *nível de ambição* que eles utilizam.
+3. Gere um OKR que pareça ter sido criado por um consultor de elite, unindo o problema do usuário com padrões globais de sucesso.
 
 FORMATO DE RESPOSTA OBRIGATÓRIO (APENAS ESTE JSON VÁLIDO):
 {
