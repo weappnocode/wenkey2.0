@@ -77,10 +77,10 @@ export function AppLayout({ children }: AppLayoutProps) {
     });
 
     return (
-        <div className="flex h-screen bg-background">
+        <div className="flex h-screen bg-background overflow-hidden">
             {/* Sidebar */}
             <aside className={cn(collapsed ? 'w-16' : 'w-64', 'bg-sidebar border-r border-sidebar-border flex flex-col transition-[width] duration-300')}>
-                <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
+                <div className="p-4 border-b border-sidebar-border flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
                             <Target className="w-6 h-6 text-white" />
@@ -105,12 +105,12 @@ export function AppLayout({ children }: AppLayoutProps) {
 
                 {/* Company Selector */}
                 {!collapsed && (
-                    <div className="px-4 pt-4">
+                    <div className="px-4 pt-4 shrink-0">
                         <CompanySelector />
                     </div>
                 )}
 
-                <nav className="flex-1 p-4 space-y-1">
+                <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar min-h-0">
                     {filteredNavItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = location.pathname === item.path;
@@ -134,7 +134,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     })}
                 </nav>
 
-                <div className="p-4 pb-12 border-t border-sidebar-border space-y-3">
+                <div className="p-4 pb-12 border-t border-sidebar-border space-y-3 shrink-0">
                     {!collapsed && profile && (
                         <div
                             className="flex flex-col items-center space-y-2 py-2 cursor-pointer hover:opacity-80 transition-opacity"
