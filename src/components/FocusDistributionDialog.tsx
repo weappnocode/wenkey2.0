@@ -153,25 +153,43 @@ export function FocusDistributionDialog({ open, onOpenChange, contextData, autoA
 
                             <div>
                                 <h3 className="text-lg font-bold text-primary mb-4">Estatísticas de Foco (Distribuição)</h3>
-                                <div className="h-[300px] w-full bg-muted/10 rounded-xl border p-4">
+                                <div className="h-[380px] w-full bg-muted/10 rounded-xl border p-4">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
+                                        <PieChart margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
                                             <Pie
                                                 data={chartData}
                                                 cx="50%"
-                                                cy="50%"
-                                                labelLine={true}
-                                                outerRadius={100}
+                                                cy="45%"
+                                                labelLine={false}
+                                                outerRadius={110}
+                                                innerRadius={50}
                                                 fill="#8884d8"
                                                 dataKey="value"
-                                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                                label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                                                    const RADIAN = Math.PI / 180;
+                                                    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                                    return percent > 0.05 ? (
+                                                        <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700}>
+                                                            {`${(percent * 100).toFixed(0)}%`}
+                                                        </text>
+                                                    ) : null;
+                                                }}
                                             >
                                                 {chartData.map((entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Pie>
-                                            <RechartsTooltip formatter={(value) => `${value}%`} />
-                                            <Legend verticalAlign="bottom" height={36}/>
+                                            <RechartsTooltip formatter={(value, name) => [`${value}%`, name]} />
+                                            <Legend
+                                                layout="vertical"
+                                                align="right"
+                                                verticalAlign="middle"
+                                                iconType="circle"
+                                                iconSize={10}
+                                                formatter={(value) => <span style={{ fontSize: '12px' }}>{value}</span>}
+                                            />
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </div>
