@@ -64,12 +64,15 @@ export function AppLayout({ children }: AppLayoutProps) {
         { icon: TrendingUp, label: 'Check-ins KR', path: '/kr-checkins' },
         { icon: History, label: 'Histórico', path: '/performance-history' },
         { icon: Eye, label: 'Visão Geral', path: '/overview' },
-        { icon: Beaker, label: 'Laboratório', path: '/prototypes', adminOnly: true },
+        { icon: Beaker, label: 'Laboratório', path: '/prototypes', superAdminOnly: true },
         { icon: CreditCard, label: 'Assinatura', path: '/pricing', adminOnly: true },
     ];
 
     // Filter navigation items based on role
     const filteredNavItems = navItems.filter(item => {
+        if (item.superAdminOnly) {
+            return user?.email === 'weappnocode@gmail.com';
+        }
         if (item.adminOnly) {
             return role === 'admin';
         }
