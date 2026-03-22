@@ -6,6 +6,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
+export interface RecomendacaoItem {
+    categoria: string;
+    percentual: number;
+    sugestoes: string[];
+}
+
 export interface AnalysisResult {
     estatisticas: Record<string, number>;
     resumo_foco: {
@@ -16,7 +22,7 @@ export interface AnalysisResult {
     };
     perfil_estrategico: string;
     insights: string[];
-    recomendacoes: string[];
+    recomendacoes: RecomendacaoItem[] | string[];
 }
 
 export interface ObjectiveData {
@@ -240,14 +246,35 @@ export function FocusDistributionDialog({ open, onOpenChange, contextData, autoA
                                     <h3 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
                                         <Target className="w-5 h-5 text-green-600" /> Recomendações Práticas
                                     </h3>
-                                    <ul className="space-y-3">
-                                        {analysisData.recomendacoes?.map((rec: string, idx: number) => (
-                                            <li key={idx} className="text-sm text-foreground flex items-start gap-3 bg-green-500/5 p-3 rounded-lg border border-green-100">
-                                                <span className="text-green-600 font-bold mt-0.5">✓</span>
-                                                <span className="leading-relaxed">{rec}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    {Array.isArray(analysisData.recomendacoes) && analysisData.recomendacoes.length > 0 && typeof analysisData.recomendacoes[0] === 'object' ? (
+                                        <div className="space-y-4">
+                                            {(analysisData.recomendacoes as RecomendacaoItem[]).map((rec, idx) => (
+                                                <div key={idx} className="rounded-xl border border-green-100 bg-green-500/5 overflow-hidden">
+                                                    <div className="flex items-center justify-between px-4 py-2 bg-green-500/10 border-b border-green-100">
+                                                        <span className="text-sm font-bold text-green-800">{rec.categoria}</span>
+                                                        <span className="text-xs font-semibold text-green-700 bg-green-200 px-2 py-0.5 rounded-full">{rec.percentual}%</span>
+                                                    </div>
+                                                    <ul className="px-4 py-3 space-y-2">
+                                                        {rec.sugestoes?.map((s, i) => (
+                                                            <li key={i} className="text-sm text-foreground flex items-start gap-2">
+                                                                <span className="text-green-600 font-bold mt-0.5">✓</span>
+                                                                <span>{s}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <ul className="space-y-3">
+                                            {(analysisData.recomendacoes as string[])?.map((rec: string, idx: number) => (
+                                                <li key={idx} className="text-sm text-foreground flex items-start gap-3 bg-green-500/5 p-3 rounded-lg border border-green-100">
+                                                    <span className="text-green-600 font-bold mt-0.5">✓</span>
+                                                    <span className="leading-relaxed">{rec}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                                 </div>
                             </div>
                         </div>

@@ -39,6 +39,17 @@ Médio (🟡): Categorias entre 10% e 20%.
 Fraco (🔵): Categorias abaixo de 10% e acima de 0%.
 Ausente: Categorias com 0% NÃO devem aparecer em forte, medio ou fraco. Categorias com 0% devem aparecer em "ausentes".
 
+MOTOR DE RECOMENDAÇÕES (obrigatório):
+Para CADA categoria com percentual ABAIXO de 15% (incluindo 0%), gere um objeto de recomendação com o nome da categoria e 3 a 4 sugestões estratégicas práticas e específicas. Use os exemplos abaixo como referência de qualidade:
+- Crescimento: "Criar estratégia de geração de leads", "Expandir canais digitais de aquisição", "Definir meta de CAC e taxa de conversão", "Estruturar programa de parcerias comerciais"
+- Cliente: "Implantar pesquisa de NPS trimestral", "Criar fluxo de onboarding do cliente", "Definir SLA de atendimento e monitorar FRT", "Reduzir churn com programa de sucesso do cliente"
+- Inovação / Digital: "Criar roadmap de produto para o próximo ciclo", "Definir uma PoC de IA", "Reduzir dívida técnica com sprint dedicado", "Lançar MVP de nova funcionalidade"
+- Receita: "Criar estratégia de upsell para base existente", "Definir meta de MRR mensal", "Mapear oportunidades de cross-sell", "Aumentar LTV médio da carteira"
+- Pessoas: "Criar PDI para líderes", "Implantar pesquisa de eNPS", "Revisar onboarding de novos colaboradores", "Definir plano de retenção de talentos"
+- Eficiência Operacional: "Mapear gargalos de processo e eliminar desperdícios", "Definir SLA por área operacional", "Automatizar tarefas manuais recorrentes", "Reduzir OPEX com análise de despesas"
+- ESG & Sustentabilidade: "Criar relatório de impacto social", "Definir meta de redução de pegada de carbono", "Implementar política de diversidade e inclusão", "Mapear cadeia de suprimentos ética"
+- Risco, Qualidade e Governança: "Realizar auditoria interna de processos", "Revisar conformidade com LGPD", "Criar protocolo de resposta a incidentes", "Monitorar uptime e definir SLA técnico"
+
 Passo 4: Formato de Resposta Esperado (JSON)
 Retorne APENAS UM OBJETO JSON VÁLIDO. Nenhuma marcação Markdown.
 {
@@ -55,7 +66,9 @@ Retorne APENAS UM OBJETO JSON VÁLIDO. Nenhuma marcação Markdown.
   "resumo_foco": { "forte": [], "medio": [], "fraco": [], "ausentes": [] },
   "perfil_estrategico": "Descrição curta do momento da empresa",
   "insights": ["Insight 1", "Insight 2"],
-  "recomendacoes": ["Recomendação 1", "Recomendação 2"]
+  "recomendacoes": [
+    { "categoria": "Nome da Categoria", "percentual": 0, "sugestoes": ["Sugestão 1", "Sugestão 2", "Sugestão 3"] }
+  ]
 }`;
 
 serve(async (req) => {
