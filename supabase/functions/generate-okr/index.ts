@@ -82,7 +82,7 @@ Prazo: ${prazo || 'Não informado'}${hint}`;
             const { data: matchedOKRs, error: matchError } = await supabase.rpc('match_okr_benchmarks', {
                 query_embedding,
                 match_threshold: 0.1, // Aceita resultados bem variados
-                match_count: 3
+                match_count: 5
             });
 
             if (matchError) {
