@@ -1404,7 +1404,7 @@ export default function KRCheckins() {
           {selectedQuarter && quarterCheckins.length > 0 && objectives.length > 0 && (
             <Button onClick={handleOpenAnalysis} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shrink-0">
               <Sparkles className="w-5 h-5" />
-              Análise Estratégica AI
+              Distribuição de Foco
             </Button>
           )}
         </div>
