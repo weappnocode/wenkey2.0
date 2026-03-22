@@ -12,6 +12,7 @@ export interface AnalysisResult {
         forte: string[];
         medio: string[];
         fraco: string[];
+        ausentes?: string[];
     };
     perfil_estrategico: string;
     insights: string[];
@@ -105,7 +106,7 @@ export function FocusDistributionDialog({ open, onOpenChange, contextData, autoA
         return Object.entries(analysisData.estatisticas).map(([name, value]) => ({
             name,
             value: Number(value) || 0
-        })).filter(item => item.value > 0);
+        }));
     };
 
     const chartData = prepareChartData();
@@ -193,28 +194,32 @@ export function FocusDistributionDialog({ open, onOpenChange, contextData, autoA
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="p-5 rounded-2xl border flex flex-col text-center bg-red-500/5 border-red-200">
-                                    <h4 className="font-bold text-red-700 flex items-center justify-center gap-1 mb-3 text-sm">🔴 Foco Forte {">"} 20%</h4>
-                                    <div className="flex flex-col gap-2">
-                                        {analysisData.resumo_foco?.forte?.length > 0 ? analysisData.resumo_foco.forte.map(c => <span key={c} className="text-sm font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma categoria</span>}
+                                           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <div className="p-4 rounded-2xl border flex flex-col text-center bg-red-500/5 border-red-200">
+                                    <h4 className="font-bold text-red-700 flex items-center justify-center gap-1 mb-3 text-sm">🔴 Forte &gt; 20%</h4>
+                                    <div className="flex flex-col gap-1">
+                                        {analysisData.resumo_foco?.forte?.length > 0 ? analysisData.resumo_foco.forte.map(c => <span key={c} className="text-xs font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma</span>}
                                     </div>
                                 </div>
-                                <div className="p-5 rounded-2xl border flex flex-col text-center bg-yellow-500/5 border-yellow-200">
-                                    <h4 className="font-bold text-yellow-700 flex items-center justify-center gap-1 mb-3 text-sm">🟡 Foco Médio 10-20%</h4>
-                                    <div className="flex flex-col gap-2">
-                                        {analysisData.resumo_foco?.medio?.length > 0 ? analysisData.resumo_foco.medio.map(c => <span key={c} className="text-sm font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma categoria</span>}
+                                <div className="p-4 rounded-2xl border flex flex-col text-center bg-yellow-500/5 border-yellow-200">
+                                    <h4 className="font-bold text-yellow-700 flex items-center justify-center gap-1 mb-3 text-sm">🟡 Médio 10-20%</h4>
+                                    <div className="flex flex-col gap-1">
+                                        {analysisData.resumo_foco?.medio?.length > 0 ? analysisData.resumo_foco.medio.map(c => <span key={c} className="text-xs font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma</span>}
                                     </div>
                                 </div>
-                                <div className="p-5 rounded-2xl border flex flex-col text-center bg-blue-500/5 border-blue-200">
-                                    <h4 className="font-bold text-blue-700 flex items-center justify-center gap-1 mb-3 text-sm">🔵 Foco Fraco {"<"} 10%</h4>
-                                    <div className="flex flex-col gap-2">
-                                        {analysisData.resumo_foco?.fraco?.length > 0 ? analysisData.resumo_foco.fraco.map(c => <span key={c} className="text-sm font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma categoria</span>}
+                                <div className="p-4 rounded-2xl border flex flex-col text-center bg-blue-500/5 border-blue-200">
+                                    <h4 className="font-bold text-blue-700 flex items-center justify-center gap-1 mb-3 text-sm">🔵 Fraco &lt; 10%</h4>
+                                    <div className="flex flex-col gap-1">
+                                        {analysisData.resumo_foco?.fraco?.length > 0 ? analysisData.resumo_foco.fraco.map(c => <span key={c} className="text-xs font-medium">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma</span>}
                                     </div>
                                 </div>
-                            </div>
+                                <div className="p-4 rounded-2xl border flex flex-col text-center bg-gray-500/5 border-gray-200">
+                                    <h4 className="font-bold text-gray-500 flex items-center justify-center gap-1 mb-3 text-sm">⚪ Ausente 0%</h4>
+                                    <div className="flex flex-col gap-1">
+                                        {analysisData.resumo_foco?.ausentes?.length > 0 ? analysisData.resumo_foco.ausentes.map(c => <span key={c} className="text-xs font-medium text-muted-foreground">{c}</span>) : <span className="text-xs text-muted-foreground italic">Nenhuma</span>}
+                                    </div>
+                                </div>
+                            </div>                         </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
