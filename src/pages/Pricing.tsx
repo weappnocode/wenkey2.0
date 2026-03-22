@@ -62,15 +62,15 @@ export default function Pricing() {
     };
 
     return (
-        <div className="container py-6 md:py-12 lg:py-16">
-            <div className="mx-auto flex max-w-[58rem] flex-col items-center space-y-4 text-center">
-                <h2 className="font-heading text-3xl leading-[1.1] sm:text-3xl md:text-6xl">Planos Simples e Transparentes</h2>
-                <p className="max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7">
+        <div className="container py-4 md:py-8 lg:py-10">
+            <div className="mx-auto flex max-w-[58rem] flex-col items-center space-y-2 text-center">
+                <h2 className="font-heading text-2xl leading-[1.1] sm:text-3xl md:text-5xl">Planos Simples e Transparentes</h2>
+                <p className="max-w-[85%] leading-normal text-muted-foreground text-sm sm:text-base sm:leading-6">
                     Escolha o plano que melhor atende às necessidades da sua empresa e comece a alcançar seus objetivos hoje.
                 </p>
             </div>
 
-            <div className="mt-8 flex justify-center items-center gap-4">
+            <div className="mt-6 flex justify-center items-center gap-4">
                 <span className={`text-sm font-semibold transition-colors ${!isAnnual ? 'text-[#2563eb]' : 'text-muted-foreground'}`}>
                     Mensal
                 </span>
@@ -84,7 +84,7 @@ export default function Pricing() {
                 </span>
             </div>
 
-            <div className="mx-auto w-full max-w-[380px] mt-8">
+            <div className="mx-auto w-full max-w-[340px] mt-6">
                 <Card className="relative border-2 shadow-sm rounded-xl">
                     {isAnnual && (
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -94,49 +94,49 @@ export default function Pricing() {
                         </div>
                     )}
 
-                    <CardHeader className="pt-10 pb-2 text-left px-8">
-                        <CardTitle className="text-2xl font-medium tracking-tight text-foreground">
+                    <CardHeader className="pt-8 pb-2 text-left px-6">
+                        <CardTitle className="text-xl font-medium tracking-tight text-foreground">
                             {plan.name}
                         </CardTitle>
-                        <div className="flex items-baseline mt-3">
-                            <span className="text-[3rem] leading-none font-medium text-foreground tracking-tight">
+                        <div className="flex items-baseline mt-2">
+                            <span className="text-[2.5rem] leading-none font-medium text-foreground tracking-tight">
                                 {currentPrice}
                             </span>
-                            <span className="text-lg text-muted-foreground ml-2 font-normal">
+                            <span className="text-base text-muted-foreground ml-2 font-normal">
                                 {currentPeriod}
                             </span>
                         </div>
                         {isAnnual && (
-                            <div className="text-sm font-medium text-[#2563eb] mt-2">
+                            <div className="text-xs font-medium text-[#2563eb] mt-1.5">
                                 Equivalente a {plan.monthlyEquivalent} /mês
                             </div>
                         )}
-                        <p className="text-base text-muted-foreground mt-3">
+                        <p className="text-sm text-muted-foreground mt-2">
                             O melhor valor para a sua empresa
                         </p>
                     </CardHeader>
 
-                    <CardContent className="px-8 pb-6">
-                        <ul className="space-y-4 mt-2">
+                    <CardContent className="px-6 pb-5">
+                        <ul className="space-y-3 mt-1">
                             {plan.features.map((feature) => (
-                                <li key={feature} className="flex items-start gap-3">
-                                    <Check className="h-5 w-5 text-[#2563eb] shrink-0 mt-0.5" strokeWidth={2.5} />
-                                    <span className="text-foreground text-base">{feature}</span>
+                                <li key={feature} className="flex items-start gap-2.5">
+                                    <Check className="h-4 w-4 text-[#2563eb] shrink-0 mt-0.5" strokeWidth={2.5} />
+                                    <span className="text-foreground text-[14px] leading-snug">{feature}</span>
                                 </li>
                             ))}
                         </ul>
                     </CardContent>
 
-                    <CardFooter className="flex flex-col gap-4 px-8 pb-8 pt-2">
+                    <CardFooter className="flex flex-col gap-3 px-6 pb-6 pt-2">
                         <Button
-                            className="w-full h-12 text-base font-medium bg-white text-black border border-gray-200 hover:bg-gray-50 shadow-sm rounded-lg"
+                            className="w-full h-11 text-[15px] font-medium bg-white text-black border border-gray-200 hover:bg-gray-50 shadow-sm rounded-lg"
                             disabled={isLoading}
                             onClick={() => handleSubscribe(currentPriceId)}
                         >
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             Assinar {currentPrice}
                         </Button>
-                        <p className="text-[13px] text-muted-foreground text-center leading-relaxed">
+                        <p className="text-xs text-muted-foreground text-center leading-relaxed">
                             {currentPrice} por usuário cobrado {isAnnual ? "anualmente" : "mensalmente"}.<br />
                             Cancele a qualquer momento.
                         </p>
