@@ -62,7 +62,7 @@ export default function Pricing() {
     };
 
     return (
-        <div className="container py-12 md:py-24 lg:py-32">
+        <div className="container py-6 md:py-12 lg:py-16">
             <div className="mx-auto flex max-w-[58rem] flex-col items-center space-y-4 text-center">
                 <h2 className="font-heading text-3xl leading-[1.1] sm:text-3xl md:text-6xl">Planos Simples e Transparentes</h2>
                 <p className="max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7">
@@ -70,7 +70,7 @@ export default function Pricing() {
                 </p>
             </div>
 
-            <div className="mt-12 flex justify-center items-center gap-4">
+            <div className="mt-8 flex justify-center items-center gap-4">
                 <span className={`text-sm font-semibold transition-colors ${!isAnnual ? 'text-[#2563eb]' : 'text-muted-foreground'}`}>
                     Mensal
                 </span>
@@ -84,7 +84,7 @@ export default function Pricing() {
                 </span>
             </div>
 
-            <div className="mx-auto w-full max-w-[380px] mt-10">
+            <div className="mx-auto w-full max-w-[380px] mt-8">
                 <Card className="relative border-2 shadow-sm rounded-xl">
                     {isAnnual && (
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
