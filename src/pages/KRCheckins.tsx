@@ -19,8 +19,9 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { toTitleCase } from '@/lib/utils';
 import { calculateDeadlineProgress } from '@/lib/deadlineProgress';
 import { ObjectiveLineChart } from '@/components/ObjectiveLineChart';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, PieChart } from 'lucide-react';
 import { OKRAnalysisDialog, type AIAnalysisContextData } from '@/components/OKRAnalysisDialog';
+import { FocusDistributionDialog } from '@/components/FocusDistributionDialog';
 
 interface Quarter {
   id: string;
@@ -103,6 +104,7 @@ export default function KRCheckins() {
   const [expandedObjectives, setExpandedObjectives] = useState<Record<string, boolean>>({});
 
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [focusDistributionOpen, setFocusDistributionOpen] = useState(false);
   const [analysisContext, setAnalysisContext] = useState<AIAnalysisContextData | null>(null);
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [keyResults, setKeyResults] = useState<KeyResult[]>([]);
@@ -950,10 +952,10 @@ export default function KRCheckins() {
     }
   }, [activeCheckinId, checkinOverallAverages]);
 
-  const handleOpenAnalysis = () => {
-    if (!selectedQuarter) return;
+  const prepareAnalysisContext = () => {
+    if (!selectedQuarter) return false;
     const quarterObj = quarters.find(q => q.id === selectedQuarter);
-    if (!quarterObj) return;
+    if (!quarterObj) return false;
 
     const todayStr = new Date().toISOString().split('T')[0];
     const isOngoing = quarterObj.end_date >= todayStr;
@@ -997,7 +999,15 @@ export default function KRCheckins() {
       data_checkin_atual: activeCheckinId ? formatDate((quarterCheckins.find(c => c.id === activeCheckinId)?.checkin_date) || '') : undefined,
       objetivos: mappedObjectives
     });
-    setAnalysisOpen(true);
+    return true;
+  };
+
+  const handleOpenAnalysis = () => {
+    if (prepareAnalysisContext()) setAnalysisOpen(true);
+  };
+
+  const handleOpenFocusDistribution = () => {
+    if (prepareAnalysisContext()) setFocusDistributionOpen(true);
   };
 
   const closeDialog = () => {
@@ -1398,14 +1408,27 @@ export default function KRCheckins() {
         onOpenChange={setAnalysisOpen}
         contextData={analysisContext}
       />
+      <FocusDistributionDialog
+        open={focusDistributionOpen}
+        onOpenChange={setFocusDistributionOpen}
+        contextData={analysisContext}
+      />
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
           <h1 className="text-3xl font-bold">{toTitleCase('Check-ins de Key Results')}</h1>
           {selectedQuarter && quarterCheckins.length > 0 && objectives.length > 0 && (
-            <Button onClick={handleOpenAnalysis} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shrink-0">
-              <Sparkles className="w-5 h-5" />
-              Distribuição de Foco
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <Button onClick={handleOpenAnalysis} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shrink-0">
+                <Sparkles className="w-5 h-5" />
+                Análise Estratégica AI
+              </Button>
+              {(role === 'admin' || role === 'manager') && (
+                <Button onClick={handleOpenFocusDistribution} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white shrink-0">
+                  <PieChart className="w-5 h-5" />
+                  Distribuição de Foco
+                </Button>
+              )}
+            </div>
           )}
         </div>
 

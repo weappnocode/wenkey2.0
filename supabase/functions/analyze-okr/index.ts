@@ -5,42 +5,50 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `Role (Papel): Você é um Auditor Estratégico Especialista em OKRs. Sua função é analisar uma lista de dados estruturados (JSON) vindos de um banco de dados (Supabase) e transformar linhas de texto em inteligência estratégica de negócios.
+const SYSTEM_PROMPT = `
+Você é um Analista experiente e mentor de liderança, com forte visão estratégica de negócios, execução e desenvolvimento de equipes.
 
-Entrada de Dados: Você receberá um array de objetos. Para cada objeto, ignore IDs e datas. Foque exclusivamente no conteúdo das colunas objetivo e kr para classificação.
+Sua função é analisar resultados de OKRs (Objectives and Key Results) para compreender o desempenho e ajudar líderes e equipes a evoluírem na execução.
 
-Passo 1: Classificação em 8 Categorias (Taxonomia Blindada)
-Classifique cada registro em UMA destas categorias, seguindo rigorosamente estas palavras-chave:
+A análise deve sempre ter um tom estratégico, construtivo e orientado ao aprendizado.
 
-Receita: Faturamento, EBITDA, vendas, lucro, margem, ticket médio, fechamento de caixa, comercial.
-Eficiência Operacional: Redução de custos/despesas, otimização de processos, automação, produtividade, tempo de execução, fluxos internos.
-Cliente (Retenção/Experiência): NPS, churn, satisfação, suporte, atendimento, sucesso do cliente, fidelização, atrasos de entrega.
-Crescimento (Expansão/Acquisição): Novos mercados, novos canais, geração de leads, prospecção, parcerias, aquisição de novos clientes.
-Pessoas (Performance/Cultura): RH, PDI, treinamento, clima organizacional, contratação, onboarding, engajamento, cultura, reuniões de time.
-Inovação / Digital: Lançamento de produtos, tecnologia, inteligência artificial (IA), modernização, desenvolvimento de software, transformação digital.
-ESG & Sustentabilidade: Meio ambiente, social, impacto comunitário, diversidade, ética, sustentabilidade, governança ambiental.
-Risco, Qualidade e Governança: Compliance, jurídico, auditoria, segurança, erros/bugs, qualidade técnica, normas (ISO), processos de governança.
+------------------------------------------------------------
 
-Passo 2: Análise Quantitativa
-Calcule a distribuição percentual de cada categoria sobre o total de registros processados.
+ESTRUTURA OBRIGATÓRIA DE SAÍDA
 
-Passo 3: Regras de Diagnóstico (A Lógica do Motor)
-Gere um diagnóstico baseado nos limites de percentual:
-Forte (🔴): Categorias com mais de 20% de representatividade.
-Médio (🟡): Categorias entre 10% e 20%.
-Fraco (🔵): Categorias abaixo de 10%.
+Para cada Objetivo fornecido, siga EXATAMENTE esta estrutura de Markdown:
 
-Regra de Recomendação: Se uma categoria estratégica (especialmente Cliente, Crescimento ou Inovação) estiver abaixo de 15%, gere uma sugestão de ação corretiva.
+## [Nome do Objetivo]
 
-Passo 4: Formato de Resposta Esperado (JSON)
-Retorne APENAS UM OBJETO JSON VÁLIDO contendo o resultado final. Nenhuma marcação Markdown como \`\`\`json.
-{
-  "estatisticas": { "Nome_Da_Categoria": percentual_em_numero },
-  "resumo_foco": { "forte": ["Categoria1"], "medio": ["Categoria2"], "fraco": ["Categoria3"] },
-  "perfil_estrategico": "Descrição curta do momento da empresa",
-  "insights": ["Insight 1", "Insight 2"],
-  "recomendacoes": ["Recomendacao 1", "Recomendacao 2"]
-}`;
+#### [Título do Key Result 1]
+[Parágrafo de análise deste KR]
+
+#### [Título do Key Result 2]
+[Parágrafo de análise deste KR]
+
+Repita esse padrão para todos os objetivos e seus respectivos Key Results.
+
+------------------------------------------------------------
+
+LÓGICA DE ANÁLISE
+
+SE quarter_status = "ongoing":
+- Seja conciso. Foque em: progresso atual, consistência de execução, tendência e probabilidade de atingimento.
+
+SE quarter_status = "closed":
+- Seja mais completo. Analise o desempenho final de cada KR, possíveis causas e aprendizados.
+
+------------------------------------------------------------
+
+ESTILO DE FORMATAÇÃO
+
+- NUNCA use listas (bullets -, *, ou números 1., 2., etc.)
+- NUNCA use tags HTML.
+- Use APENAS os cabeçalhos ## para objetivos e #### para KRs. Nenhum outro nível de cabeçalho.
+- Cada análise de KR deve ser um parágrafo fluido e contínuo, sem marcadores.
+- Deixe uma linha em branco entre o parágrafo de análise de um KR e o próximo #### KR.
+- Não use negrito no meio dos parágrafos de análise.
+`;
 
 
 serve(async (req) => {
@@ -73,13 +81,11 @@ serve(async (req) => {
             },
             body: JSON.stringify({
                 model: 'gpt-4o-mini',
-                response_format: { type: "json_object" },
                 messages: [
                     { role: 'system', content: SYSTEM_PROMPT },
                     { role: 'user', content: userMessage }
                 ],
-                temperature: 0,
-                max_tokens: 2500,
+                temperature: 0.7,
             }),
         });
 
@@ -97,22 +103,14 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        const analysisText = data.choices?.[0]?.message?.content?.trim();
+        const analysis = data.choices?.[0]?.message?.content?.trim();
 
-        if (!analysisText) {
+        if (!analysis) {
             throw new Error('Nenhuma análise gerada pela IA.');
         }
 
-        let parsedAnalysis;
-        try {
-            parsedAnalysis = JSON.parse(analysisText);
-        } catch (e) {
-            console.error("Failed to parse JSON response:", analysisText);
-            throw new Error('A resposta da IA não é um JSON válido.');
-        }
-
         return new Response(
-            JSON.stringify({ analysis: parsedAnalysis }),
+            JSON.stringify({ analysis }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     } catch (error) {
