@@ -1,15 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, Loader2, Sparkles as SparklesIcon, Target, Info, BookOpen, Filter, ArrowUpRight, CheckCircle2, AlertTriangle, BarChart2, BrainCircuit, Search } from 'lucide-react';
+import { Wand2, Loader2, Sparkles as SparklesIcon, Target, Info, BookOpen, CheckCircle2, AlertTriangle, BarChart2, BrainCircuit, Search, UploadCloud, FileText, FileSpreadsheet, File, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as xlsx from 'xlsx';
 import { useCompany } from '@/contexts/CompanyContext';
 
@@ -36,70 +35,67 @@ export default function Prototypes() {
     const [analysisResult, setAnalysisResult] = useState<any>(null);
     const [uploading, setUploading] = useState(false);
     const [activeTab, setActiveTab] = useState<'questionnaire' | 'free' | 'rag-upload'>('questionnaire');
+    const [dragOver, setDragOver] = useState(false);
+    const [uploadResult, setUploadResult] = useState<{ inserted: number; errors: number; filename: string } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const downloadTemplate = () => {
-        const ws = xlsx.utils.json_to_sheet([{
-            strategic_category: 'Engenharia',
-            industry: 'Tecnologia',
-            objective_text: 'Criar uma cultura de engenharia de alta performance',
-            key_results: JSON.stringify([
-                { "title": "Aumentar deploy frequency", "target": 5, "unit": "deploys/dia" }
-            ]),
-            impact_description: 'Times entregando valor mais rápido e com menos bugs.',
-            metric_type: 'processo',
-            goal_direction: 'increase',
-            complexity: 'high'
-        }]);
-        const wb = xlsx.utils.book_new();
-        xlsx.utils.book_append_sheet(wb, ws, "Template_OKR_RAG");
-        xlsx.writeFile(wb, "Template_OKR_RAG.xlsx");
+    const ACCEPTED_TYPES = '.pdf,.xlsx,.xls,.txt,.csv,.md,.doc,.docx';
+    const ACCEPTED_LABELS = ['PDF', 'XLSX', 'XLS', 'TXT', 'CSV', 'MD', 'DOC', 'DOCX'];
+
+    const getFileIcon = (name: string) => {
+        if (name.endsWith('.pdf')) return <FileText className="h-5 w-5 text-red-500" />;
+        if (name.endsWith('.xlsx') || name.endsWith('.xls')) return <FileSpreadsheet className="h-5 w-5 text-emerald-500" />;
+        return <File className="h-5 w-5 text-indigo-400" />;
     };
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
+    const processFileUpload = async (file: File) => {
         if (!file) return;
-
         setUploading(true);
+        setUploadResult(null);
+
+        toast({ title: '📤 Enviando arquivo...', description: `${file.name} (${(file.size / 1024).toFixed(0)} KB)` });
+
         try {
-            const data = await file.arrayBuffer();
-            const workbook = xlsx.read(data);
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            
-            // Tentar ler com cabeçalho primeiro, se não encontrar colunas esperadas, tenta modo array (header: 1)
-            let jsonData: any[] = xlsx.utils.sheet_to_json(sheet);
-            const firstRow: any = jsonData[0] || {};
-            const hasExpectedHeader = firstRow.strategic_category || firstRow.objective_text || firstRow.objective;
+            const formData = new FormData();
+            formData.append('file', file);
 
-            if (!hasExpectedHeader) {
-                console.log("Detectada planilha sem cabeçalho ou formato customizado. Usando mapeamento por índice.");
-                jsonData = xlsx.utils.sheet_to_json(sheet, { header: 1 });
-                // Remover linhas vazias no início se houver
-                jsonData = jsonData.filter(row => Array.isArray(row) && row.length > 0);
-            }
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData.session?.access_token;
 
-            if (jsonData.length === 0) throw new Error("A planilha está vazia.");
-
-            toast({ title: "Processando Planilha", description: `Enviando ${jsonData.length} linhas para a IA (Gerando Embeddings)...` });
-
-            const { data: resData, error: apiError } = await supabase.functions.invoke('seed-okr-benchmarks', {
-                body: { benchmarks: jsonData }
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const res = await fetch(`${supabaseUrl}/functions/v1/ingest-document`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
             });
 
-            if (apiError) throw apiError;
-            
-            if (resData.errors && resData.errors.length > 0) {
-                console.warn("Erros parciais:", resData.errors);
-                toast({ title: "Processado com Alertas", description: `Inseridas: ${resData.inserted}. Erros em ${resData.errors.length} linhas.`, variant: "default" });
-            } else {
-                toast({ title: "Sucesso!", description: `${resData.inserted} benchmarks inseridos na Base RAG.` });
-            }
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || `Erro ${res.status}`);
+
+            setUploadResult({ inserted: json.inserted, errors: json.errors, filename: file.name });
+            toast({
+                title: '✅ Documento ingerido!',
+                description: `${json.inserted} chunks adicionados ao RAG${json.errors > 0 ? ` (${json.errors} com erro)` : ''}.`
+            });
         } catch (error: any) {
-            console.error("Erro no upload", error);
-            toast({ title: "Erro no Upload", description: error.message || "Falha ao processar arquivo.", variant: "destructive" });
+            console.error('Erro no upload', error);
+            toast({ title: 'Erro no Upload', description: error.message || 'Falha ao processar arquivo.', variant: 'destructive' });
         } finally {
             setUploading(false);
-            if (e.target) e.target.value = ''; // reset input
         }
+    };
+
+    const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) processFileUpload(file);
+        if (e.target) e.target.value = '';
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setDragOver(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) processFileUpload(file);
     };
 
 
@@ -182,7 +178,7 @@ export default function Prototypes() {
                             <TabsList className="grid w-full grid-cols-3 h-8 text-xs">
                                 <TabsTrigger value="questionnaire" className="text-xs">Questionário Guiado</TabsTrigger>
                                 <TabsTrigger value="free" className="text-xs">Texto Livre</TabsTrigger>
-                                <TabsTrigger value="rag-upload" className="text-xs">Alimentar Base (Excel)</TabsTrigger>
+                                <TabsTrigger value="rag-upload" className="text-xs flex items-center gap-1"><UploadCloud className="h-3 w-3" />Base de Conhecimento</TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="questionnaire" className="space-y-3">
@@ -275,33 +271,73 @@ export default function Prototypes() {
                             </TabsContent>
 
                             <TabsContent value="rag-upload" className="space-y-4">
-                                <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-5 border border-slate-200 dark:border-slate-800 space-y-4">
-                                    <div>
-                                        <h3 className="font-semibold text-slate-800 dark:text-slate-200">1. Baixe o Template</h3>
-                                        <p className="text-xs text-slate-500 mt-1">Preencha os exemplos reais de OKR na planilha e salve no formato XLSX.</p>
-                                        <Button onClick={downloadTemplate} variant="outline" className="mt-3 gap-2 h-9 text-indigo-600 dark:text-indigo-400">
-                                            <BookOpen className="h-4 w-4" />
-                                            Baixar Template .xlsx
-                                        </Button>
-                                    </div>
-                                    <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-                                        <h3 className="font-semibold text-slate-800 dark:text-slate-200">2. Faça o Upload</h3>
-                                        <p className="text-xs text-slate-500 mt-1">Nós geraremos inteligência artificial (Embeddings) para cada linha.</p>
-                                        <div className="mt-3 relative">
-                                            <Input 
-                                                type="file" 
-                                                accept=".xlsx, .xls"
-                                                onChange={handleFileUpload}
-                                                disabled={uploading}
-                                                className="cursor-pointer file:bg-indigo-50 file:text-indigo-700 file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3 file:font-semibold hover:file:bg-indigo-100 dark:file:bg-indigo-900/40 dark:file:text-indigo-300 transition-colors h-11 pt-2"
-                                            />
-                                            {uploading && (
-                                                <div className="absolute top-1/2 right-3 -translate-y-1/2">
-                                                    <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
-                                                </div>
-                                            )}
+                                {/* Drag & Drop Zone */}
+                                <div
+                                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                                    onDragLeave={() => setDragOver(false)}
+                                    onDrop={handleDrop}
+                                    onClick={() => !uploading && fileInputRef.current?.click()}
+                                    className={`relative flex flex-col items-center justify-center gap-3 p-8 rounded-xl border-2 border-dashed cursor-pointer transition-all duration-200
+                                        ${ dragOver
+                                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30 scale-[1.01]'
+                                            : 'border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 bg-slate-50/50 dark:bg-slate-900/30'
+                                        } ${uploading ? 'pointer-events-none opacity-60' : ''}`}
+                                >
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept={ACCEPTED_TYPES}
+                                        className="hidden"
+                                        onChange={handleFileInputChange}
+                                        disabled={uploading}
+                                    />
+
+                                    {uploading ? (
+                                        <>
+                                            <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
+                                            <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Processando e gerando embeddings...</p>
+                                            <p className="text-xs text-slate-400">Isso pode levar alguns segundos</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="p-3 bg-indigo-100 dark:bg-indigo-900/40 rounded-full">
+                                                <UploadCloud className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                    Arraste um arquivo ou <span className="text-indigo-600 dark:text-indigo-400 underline">clique para selecionar</span>
+                                                </p>
+                                                <p className="text-xs text-slate-400 mt-1">
+                                                    Suportado: {ACCEPTED_LABELS.join(', ')}
+                                                </p>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Success Result */}
+                                {uploadResult && !uploading && (
+                                    <div className="flex items-start gap-3 p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 animate-in fade-in slide-in-from-bottom-2 duration-400">
+                                        <div className="shrink-0">{getFileIcon(uploadResult.filename)}</div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 truncate">{uploadResult.filename}</p>
+                                            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                                ✅ {uploadResult.inserted} chunks adicionados ao RAG
+                                                {uploadResult.errors > 0 && ` · ⚠️ ${uploadResult.errors} com erro`}
+                                            </p>
                                         </div>
+                                        <button onClick={() => setUploadResult(null)} className="shrink-0 text-slate-400 hover:text-slate-600">
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
                                     </div>
+                                )}
+
+                                {/* Info note */}
+                                <div className="flex gap-2 items-start p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                                    <Info className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        O conteúdo do arquivo será dividido em trechos, vetorizado e armazenado na base RAG. A IA usará esses dados automaticamente ao gerar OKRs.
+                                    </p>
                                 </div>
                             </TabsContent>
                         </Tabs>
