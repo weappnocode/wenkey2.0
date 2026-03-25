@@ -20,6 +20,7 @@ import PerformanceHistory from "./pages/PerformanceHistory";
 import Prototypes from "./pages/Prototypes";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
+import ForgotPassword from "./pages/ForgotPassword";
 import ConfirmEmail from "./pages/ConfirmEmail";
 import PendingApproval from "./pages/PendingApproval";
 
@@ -79,6 +80,7 @@ const App = () => (
               <Routes>
                 {/* Public Routes */}
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/confirm-email" element={<ConfirmEmail />} />
 

@@ -16,10 +16,7 @@ import { Target, Loader2 } from 'lucide-react';
 export default function Auth() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
-  const [showResetForm, setShowResetForm] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -115,37 +112,6 @@ export default function Auth() {
     }
   };
 
-  const handlePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const targetEmail = (resetEmail || formData.email).trim();
-    if (!targetEmail) {
-      toast.error('Informe o email utilizado no cadastro.');
-      return;
-    }
-
-    setResetLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-
-    if (error) {
-      toast.error(error.message || 'Não foi possível enviar o email.');
-    } else {
-      toast.success('Enviamos um link para redefinir sua senha.');
-      setShowResetForm(false);
-      setResetEmail('');
-    }
-
-    setResetLoading(false);
-  };
-
-  const toggleResetForm = () => {
-    if (!showResetForm && !resetEmail) {
-      setResetEmail(formData.email);
-    }
-    setShowResetForm((prev) => !prev);
-  };
 
   useEffect(() => {
     document.title = 'Wenkey - Entrar ou Cadastrar';
@@ -185,11 +151,6 @@ export default function Auth() {
     }
   }, [user, navigate]);
 
-  useEffect(() => {
-    if (activeTab !== 'signin') {
-      setShowResetForm(false);
-    }
-  }, [activeTab]);
 
   return (
     <div className="min-h-screen grid md:grid-cols-2">
@@ -258,39 +219,14 @@ export default function Auth() {
                       )}
                     </Button>
                   </form>
-                  <div className="mt-4 space-y-2 border-t pt-4">
+                  <div className="mt-4 text-center border-t pt-4">
                     <button
                       type="button"
-                      className="text-sm text-primary underline underline-offset-4"
-                      onClick={toggleResetForm}
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                      onClick={() => navigate('/forgot-password')}
                     >
                       Esqueceu a senha?
                     </button>
-                    {showResetForm && (
-                      <form onSubmit={handlePasswordReset} className="space-y-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="reset-email">Email para recuperação</Label>
-                          <Input
-                            id="reset-email"
-                            type="email"
-                            placeholder="Informe seu email"
-                            value={resetEmail}
-                            onChange={(event) => setResetEmail(event.target.value)}
-                            required
-                          />
-                        </div>
-                        <Button type="submit" className="w-full" variant="secondary" disabled={resetLoading}>
-                          {resetLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Enviando link...
-                            </>
-                          ) : (
-                            'Enviar link de redefinição'
-                          )}
-                        </Button>
-                      </form>
-                    )}
                   </div>
                 </TabsContent>
 
