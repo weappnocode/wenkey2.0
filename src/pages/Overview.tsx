@@ -19,6 +19,13 @@ const getInitials = (name: string) => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
+const getShortName = (name: string) => {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length <= 1) return name;
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+};
+
 interface Quarter {
   id: string;
   name: string;
@@ -352,11 +359,11 @@ export default function Overview() {
                         <div className="text-center space-y-0.5">
                           <p className={`font-semibold capitalize flex items-center justify-center gap-1.5 ${index >= 5 ? 'text-sm' : 'text-base'}`}>
                             {ranking.is_team && <Users className={`text-primary ${index >= 5 ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />}
-                            {ranking.full_name.toLowerCase()}
+                            {getShortName(ranking.full_name).toLowerCase()}
                           </p>
                           {ranking.position && (
-                            <p className={`text-muted-foreground capitalize ${index >= 5 ? 'text-xs' : 'text-sm'}`}>
-                              {ranking.position.toLowerCase()}
+                            <p className={`text-muted-foreground uppercase font-medium tracking-wide ${index >= 5 ? 'text-[10px]' : 'text-xs'}`}>
+                              {ranking.position}
                             </p>
                           )}
                         </div>
