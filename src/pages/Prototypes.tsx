@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, Loader2, Sparkles as SparklesIcon, Target, Info, BookOpen, CheckCircle2, AlertTriangle, BarChart2, BrainCircuit, Search, UploadCloud, FileText, FileSpreadsheet, File, X } from 'lucide-react';
+import { Wand2, Loader2, Sparkles as SparklesIcon, Target, Info, UploadCloud, FileText, FileSpreadsheet, File, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -32,9 +32,7 @@ export default function Prototypes() {
     const [loading, setLoading] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [answers, setAnswers] = useState({ area: '', problema: '', metrica: '', baseline: '', meta: '', prazo: '' });
-    const [generatedOKR, setGeneratedOKR] = useState<GeneratedOKR | null>(null);
-    const [analysisLoading, setAnalysisLoading] = useState(false);
-    const [analysisResult, setAnalysisResult] = useState<any>(null);
+    const [generatedOKRs, setGeneratedOKRs] = useState<GeneratedOKR[] | null>(null);
     const [uploading, setUploading] = useState(false);
     const [activeTab, setActiveTab] = useState<'questionnaire' | 'free' | 'rag-upload'>('questionnaire');
     const [dragOver, setDragOver] = useState(false);
@@ -103,8 +101,7 @@ export default function Prototypes() {
 
     const handleGenerate = async (mode: 'free' | 'questionnaire') => {
         setLoading(true);
-        setGeneratedOKR(null);
-        setAnalysisResult(null);
+        setGeneratedOKRs(null);
         try {
             const body = mode === 'free' 
                 ? { prompt, company_segment: selectedCompany?.business_segment } 
@@ -113,26 +110,11 @@ export default function Prototypes() {
             const { data: okrData, error: okrError } = await supabase.functions.invoke('generate-okr', { body });
 
             if (okrError) throw okrError;
-            setGeneratedOKR(okrData);
-            
-            setAnalysisLoading(true);
-            const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-okr-intelligence', {
-                body: { 
-                    generatedOKR: okrData, 
-                    answers: mode === 'free' ? { problema: prompt } : answers,
-                    company_segment: selectedCompany?.business_segment 
-                }
-            });
-
-            if (analysisError) {
-                console.error("Erro na análise:", analysisError);
-            } else {
-                setAnalysisResult(analysisData);
-            }
+            setGeneratedOKRs(okrData.okrs || []);
 
             toast({
                 title: "OKRs Gerados!",
-                description: "A IA criou uma proposta e efetuou a análise crítica estratégica.",
+                description: `A IA criou ${okrData.okrs?.length || 0} propostas estratégicas exclusivas baseadas na sua área.`,
             });
         } catch (error: any) {
             console.error('Error generating OKR:', error);
@@ -143,7 +125,6 @@ export default function Prototypes() {
             });
         } finally {
             setLoading(false);
-            setAnalysisLoading(false);
         }
     };
 
@@ -348,111 +329,50 @@ export default function Prototypes() {
                             </TabsContent>
                         </Tabs>
 
-                        {generatedOKR && activeTab !== 'rag-upload' && (
-                            <div className="mt-6 space-y-4 pt-6 border-t animate-in fade-in zoom-in duration-500">
-                                <div className="space-y-1">
-                                    <h3 className="text-base font-bold text-indigo-600 flex items-center gap-2">
-                                        <Target className="h-4 w-4 shrink-0" />
-                                        {generatedOKR.objective}
-                                    </h3>
-                                    <p className="text-muted-foreground italic text-xs pl-6">
-                                        "{generatedOKR.description}"
-                                    </p>
-                                </div>
+                        {generatedOKRs && generatedOKRs.length > 0 && activeTab !== 'rag-upload' && (
+                            <div className="mt-6 pt-6 border-t animate-in fade-in zoom-in duration-500">
+                                <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-500 mb-6">
+                                    10 Propostas Estratégicas Geradas
+                                </h2>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {generatedOKRs.map((okr, index) => (
+                                        <div key={index} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="space-y-2 mb-4">
+                                                <div className="flex items-start gap-2">
+                                                    <span className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 font-bold px-2 py-0.5 rounded text-xs mt-0.5 shrink-0">#{index + 1}</span>
+                                                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                                                        {okr.objective}
+                                                    </h3>
+                                                </div>
+                                                <p className="text-muted-foreground italic text-xs pl-8">
+                                                    "{okr.description}"
+                                                </p>
+                                            </div>
 
-                                <div className="grid gap-2">
-                                    {generatedOKR.key_results.map((kr, idx) => (
-                                        <div key={idx} className="p-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-900 transition-colors">
-                                            <p className="font-medium text-sm text-slate-900 dark:text-slate-100">{kr.title}</p>
-                                            <div className="flex gap-2 items-center mt-1">
-                                                <Badge variant="outline" className="text-[10px] uppercase tracking-wider px-1.5 py-0">
-                                                    {kr.type}
-                                                </Badge>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {kr.direction === 'increase' ? 'Aumentar para' : 'Reduzir para'} {kr.target} {kr.unit}
-                                                </span>
+                                            <div className="space-y-2 pl-8">
+                                                {okr.key_results?.map((kr, idx) => (
+                                                    <div key={idx} className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
+                                                        <p className="font-medium text-sm text-slate-800 dark:text-slate-200 leading-tight mb-1.5">{kr.title}</p>
+                                                        <div className="flex flex-wrap gap-2 items-center">
+                                                            <Badge variant="secondary" className="text-[10px] uppercase tracking-wider px-1.5 py-0 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
+                                                                {kr.type}
+                                                            </Badge>
+                                                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                                                {kr.direction === 'increase' ? 'Aumentar' : 'Reduzir'} para {kr.target} {kr.unit}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     ))}
                                 </div>
-
-                                <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-200 dark:border-amber-900/50 flex gap-2">
+                                <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-200 dark:border-amber-900/50 flex gap-2 mt-6">
                                     <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                                     <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
-                                        Esses OKRs são baseados em benchmarks de mercado (RAG). Analise-os conforme seu modelo de negócios.
+                                        Esses OKRs são baseados em benchmarks de mercado (RAG) associados à sua Área. Escolha as propostas ou combine ideias para implementar no Dashboard.
                                     </p>
-                                </div>
-                                
-                                {/* Seção de Análise Crítica */}
-                                <div className="mt-8 pt-6 border-t border-indigo-100 dark:border-indigo-900/40">
-                                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
-                                        <Search className="h-5 w-5 text-indigo-500" />
-                                        Análise crítica gerada:
-                                    </h3>
-                                    
-                                    {analysisLoading ? (
-                                        <div className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-900/50 rounded-lg">
-                                            <Loader2 className="h-6 w-6 animate-spin text-indigo-500 mb-2" />
-                                            <p className="text-sm text-slate-500">Executando Cognitive Engine...</p>
-                                        </div>
-                                    ) : analysisResult ? (
-                                        <div className="space-y-6">
-                                            <div className="flex items-center gap-3 bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm">
-                                                <BarChart2 className="h-6 w-6 text-indigo-500" />
-                                                <div>
-                                                    <p className="font-semibold text-slate-900 dark:text-slate-100 text-lg">Score geral: <span className={analysisResult.general_score >= 8 ? 'text-emerald-600' : analysisResult.general_score >= 6 ? 'text-amber-500' : 'text-rose-500'}>{analysisResult.general_score.toFixed(1)} / 10</span></p>
-                                                    <p className="text-xs text-slate-500 uppercase tracking-widest font-medium mt-0.5">Força Estratégica: {analysisResult.strength}</p>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-4 px-2">
-                                                <h4 className="font-bold flex items-center gap-2 text-slate-800 dark:text-slate-100 text-sm">
-                                                    <BrainCircuit className="h-5 w-5 text-pink-500" />
-                                                    Diagnóstico:
-                                                </h4>
-                                                
-                                                <div className="space-y-5">
-                                                    {[
-                                                        { key: 'clarity', label: 'Clareza' },
-                                                        { key: 'measurability', label: 'Mensurabilidade' },
-                                                        { key: 'outcome_vs_output', label: 'Outcome vs Output' },
-                                                        { key: 'ambition', label: 'Ambição' },
-                                                        { key: 'alignment', label: 'Alinhamento estratégico' }
-                                                    ].map(dim => {
-                                                        const detail = analysisResult.diagnostics[dim.key] || { score: 0, feedback: 'Sem dados.' };
-                                                        const isGood = detail.score >= 8;
-                                                        return (
-                                                            <div key={dim.key} className="space-y-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    {isGood ? (
-                                                                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                                                                    ) : (
-                                                                        <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                                                    )}
-                                                                    <p className="font-bold text-sm text-slate-800 dark:text-slate-200">{dim.label} ({detail.score}/10)</p>
-                                                                </div>
-                                                                <p className="text-sm text-slate-600 dark:text-slate-400 pl-6">{detail.feedback}</p>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-
-                                            {analysisResult.improvement_suggestions?.length > 0 && (
-                                              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-                                                  <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200 mb-3">Sugestões de Ajuste:</h4>
-                                                  <ul className="space-y-2">
-                                                      {analysisResult.improvement_suggestions.map((sug: string, i: number) => (
-                                                          <li key={i} className="text-sm text-slate-600 dark:text-slate-400 flex gap-2 items-start">
-                                                              <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
-                                                              <span>{sug}</span>
-                                                          </li>
-                                                      ))}
-                                                  </ul>
-                                              </div>
-                                            )}
-                                        </div>
-                                    ) : null}
                                 </div>
                             </div>
                         )}

@@ -94,7 +94,7 @@ interface UserProfile {
 export default function KRCheckins() {
   const { toast } = useToast();
   const { selectedCompanyId, selectedCompany } = useCompany();
-  const { user } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const { role, loading: roleLoading } = useUserRole();
   const canEditAnyCheckin = role === 'admin' || role === 'manager';
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -1001,7 +1001,8 @@ export default function KRCheckins() {
       data_checkin_atual: activeCheckinId ? formatDate((quarterCheckins.find(c => c.id === activeCheckinId)?.checkin_date) || '') : undefined,
       objetivos: mappedObjectives,
       company_segment: selectedCompany?.business_segment ?? undefined,
-    });
+      user_area: authProfile?.position ?? undefined,
+    } as AIAnalysisContextData);
     return true;
   };
 

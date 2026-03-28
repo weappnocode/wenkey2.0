@@ -27,6 +27,7 @@ export interface AIAnalysisContextData {
     data_ultimo_checkin_quarter?: string;
     objetivos: ObjectiveData[];
     company_segment?: string;
+    user_area?: string;
 }
 
 interface OKRAnalysisDialogProps {

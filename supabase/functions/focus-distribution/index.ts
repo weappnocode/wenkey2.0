@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -10,7 +11,7 @@ const SYSTEM_PROMPT = `Role (Papel): Você é um Auditor Estratégico Especialis
 Entrada de Dados: Para cada registro, ignore IDs e datas. Foque exclusivamente no conteúdo dos campos objetivo e kr para classificação.
 
 Passo 1: Classificação em 8 Categorias (Taxonomia Blindada)
-Classifique cada KR em EXATAMENTE UMA destas 8 categorias com base nas palavras-chave e ações abaixo:
+Classifique cada KR em EXATAMENTE UMA destas 8 categorias com base nas palavras-chave e ações abaixo. Mantenha em mente a ÁREA ATUAL e o SEGMENTO da empresa para o contexto da classificação:
 
 1. Receita: Faturamento, EBITDA, vendas, lucro, margem, ticket médio, fechamento de caixa, comercial, margem bruta, margem líquida, fluxo de caixa, cash flow, ARPU, MRR, ARR, receita recorrente, upsell, cross-sell, monetização, recuperação de crédito, inadimplência, LTV, lifetime value. Ações: maximizar, rentabilizar, faturar, recuperar, vender, cobrar.
 
@@ -39,8 +40,9 @@ Médio (🟡): Categorias entre 10% e 20%.
 Fraco (🔵): Categorias abaixo de 10% e acima de 0%.
 Ausente: Categorias com 0% NÃO devem aparecer em forte, medio ou fraco. Categorias com 0% devem aparecer em "ausentes".
 
-MOTOR DE RECOMENDAÇÕES (obrigatório):
-Para CADA categoria com percentual ABAIXO de 15% (incluindo 0%), gere um objeto de recomendação com o nome da categoria e 3 a 4 sugestões estratégicas práticas e específicas. Use os exemplos abaixo como referência de qualidade:
+MOTOR DE RECOMENDAÇÕES (obrigatório e crítico):
+Para CADA categoria com percentual ABAIXO de 15% (incluindo 0%), gere um objeto de recomendação com o nome da categoria e 3 a 4 sugestões estratégicas práticas e específicas.
+MUITO IMPORTANTE: Use a "BASE RAG" (se fornecida ao final deste prompt) e a ÁREA/SEGMENTO como NORTE absoluto para redigir as estratégias, moldando as dicas ao perfil da equipe. Use as linhas abaixo apenas como referência secundária se faltarem dados contextuais:
 - Crescimento: "Criar estratégia de geração de leads", "Expandir canais digitais de aquisição", "Definir meta de CAC e taxa de conversão", "Estruturar programa de parcerias comerciais"
 - Cliente: "Implantar pesquisa de NPS trimestral", "Criar fluxo de onboarding do cliente", "Definir SLA de atendimento e monitorar FRT", "Reduzir churn com programa de sucesso do cliente"
 - Inovação / Digital: "Criar roadmap de produto para o próximo ciclo", "Definir uma PoC de IA", "Reduzir dívida técnica com sprint dedicado", "Lançar MVP de nova funcionalidade"
@@ -79,6 +81,7 @@ serve(async (req) => {
     try {
         const { contextData } = await req.json();
         const company_segment: string | undefined = contextData?.company_segment;
+        const user_area: string | undefined = contextData?.user_area;
 
         if (!contextData) {
             return new Response(
@@ -88,12 +91,46 @@ serve(async (req) => {
         }
 
         const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-        if (!OPENAI_API_KEY) {
-            throw new Error('OPENAI_API_KEY not configured');
+        const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+        const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+        if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+            throw new Error('Missing environment configurations for OpenAI or Supabase.');
         }
 
-        const companyCtx = company_segment
-            ? `\n\nCONTEXTO ESSENCIAL DA EMPRESA (use para personalizar categorias, insights e recomendções):\n"${company_segment}"\n`
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+        let contextSection = "";
+        const embeddingText = `Área: ${user_area || 'Performance Estratégica'}. Segmento: ${company_segment || 'Negócios'}.`;
+        
+        console.log("Generating embedding for RAG in focus-distribution...");
+        const embedResponse = await fetch("https://api.openai.com/v1/embeddings", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+            body: JSON.stringify({ input: embeddingText, model: "text-embedding-3-small" }),
+        });
+
+        const embeddingData = await embedResponse.json();
+        const query_embedding = embeddingData.data?.[0]?.embedding;
+
+        if (query_embedding) {
+            console.log("Querying Supabase pgvector for focus distribution...");
+            const { data: matchedOKRs } = await supabase.rpc('match_okr_benchmarks', {
+                query_embedding,
+                match_threshold: 0.1,
+                match_count: 5
+            });
+
+            if (matchedOKRs && matchedOKRs.length > 0) {
+                contextSection = `\n\nEXEMPLOS DE BENCHMARKS DO MERCADO (BASE RAG PARA INSPIRAÇÃO DAS SUGESTÕES ESTRATÉGICAS):\n`;
+                matchedOKRs.forEach((okr: any, idx: number) => {
+                    contextSection += `\nExemplo ${idx + 1}:\nObjetivo: ${okr.objective_text}\nKRs: ${JSON.stringify(okr.key_results)}\nImpacto: ${okr.impact_description}\n`;
+                });
+            }
+        }
+
+        const companyCtx = company_segment || user_area
+            ? `\n\nCONTEXTO ESSENCIAL DA EMPRESA E ÁREA (use para personalizar categorias, insights e recomendções):\nSegmento: "${company_segment || 'Não informado'}"\nÁrea/Departamento: "${user_area || 'Não informado'}"\n${contextSection}\n`
             : '';
 
         const userMessage = `Por favor, faça a Análise de Distribuição de Foco nos seguintes dados:${companyCtx}\n\n${JSON.stringify(contextData, null, 2)}`;
