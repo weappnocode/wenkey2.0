@@ -71,7 +71,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     // Filter navigation items based on role
     const filteredNavItems = navItems.filter(item => {
         if (item.superAdminOnly) {
-            return user?.email === 'weappnocode@gmail.com';
+            return user?.email === 'wendelmorais@grupordz.com';
         }
         if (item.adminOnly) {
             return role === 'admin';

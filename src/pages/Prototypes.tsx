@@ -11,7 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import * as xlsx from 'xlsx';
 import { useCompany } from '@/contexts/CompanyContext';
-
+import { useAuth } from '@/contexts/AuthContext';
+import { Navigate } from 'react-router-dom';
 interface GeneratedOKR {
     objective: string;
     description: string;
@@ -27,6 +28,7 @@ interface GeneratedOKR {
 export default function Prototypes() {
     const { toast } = useToast();
     const { selectedCompany } = useCompany();
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [answers, setAnswers] = useState({ area: '', problema: '', metrica: '', baseline: '', meta: '', prazo: '' });
@@ -144,6 +146,10 @@ export default function Prototypes() {
             setAnalysisLoading(false);
         }
     };
+
+    if (user?.email !== 'wendelmorais@grupordz.com') {
+        return <Navigate to="/" replace />;
+    }
 
     return (
         <Layout>
