@@ -325,31 +325,31 @@ export default function Overview() {
                         animation: `rankCardIn 0.5s ease-out ${index * 150}ms both`,
                       }}
                     >
-                      <CardHeader className={`bg-muted/50 ${index >= 5 ? 'p-4 pb-12' : 'pt-6 pb-16'}`}>
-                        <CardTitle className={`text-center font-bold relative z-20 ${index >= 5 ? 'text-base' : 'text-xl'}`}>
+                      <CardHeader className={`bg-muted/50 ${index >= 5 ? 'pt-3 pb-8' : 'pt-4 pb-12'}`}>
+                        <CardTitle className={`text-center font-bold relative z-20 ${index >= 5 ? 'text-sm' : 'text-lg'}`}>
                           {getRankingLabel(ranking.rank)}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className={`flex flex-col items-center relative ${index >= 5 ? 'pt-10 pb-4 space-y-4' : 'pt-12 pb-6 space-y-5'}`}>
+                      <CardContent className={`flex flex-col items-center relative ${index >= 5 ? 'pt-8 pb-3 space-y-2' : 'pt-10 pb-4 space-y-3'}`}>
                         
                         {/* Avatar com design premium sobreposto */}
-                        <div className={`absolute left-1/2 -translate-x-1/2 z-10 ${index >= 5 ? '-top-8' : '-top-10'}`}>
-                          <Avatar className={`border-[4px] border-background shadow-lg bg-slate-100 dark:bg-slate-800 ${index >= 5 ? 'h-16 w-16' : 'h-24 w-24'}`}>
+                        <div className={`absolute left-1/2 -translate-x-1/2 z-10 ${index >= 5 ? '-top-7' : '-top-10'}`}>
+                          <Avatar className={`border-[3px] border-background shadow-lg bg-slate-100 dark:bg-slate-800 ${index >= 5 ? 'h-14 w-14' : 'h-20 w-20'}`}>
                             {ranking.avatar_url ? (
                               <AvatarImage src={ranking.avatar_url} alt={ranking.full_name} className="object-cover" />
                             ) : (
-                              <AvatarFallback className={index >= 5 ? 'text-lg font-semibold' : 'text-2xl font-bold'}>{getInitials(ranking.full_name)}</AvatarFallback>
+                              <AvatarFallback className={index >= 5 ? 'text-sm font-semibold' : 'text-xl font-bold'}>{getInitials(ranking.full_name)}</AvatarFallback>
                             )}
                           </Avatar>
                         </div>
 
                         <CircularProgress
                           percentage={ranking.result_percent}
-                          size={index >= 5 ? 110 : 130}
-                          strokeWidth={index >= 5 ? 10 : 12}
+                          size={index >= 5 ? 86 : 106}
+                          strokeWidth={index >= 5 ? 8 : 10}
                         />
 
-                        <div className="text-center space-y-1">
+                        <div className="text-center space-y-0.5">
                           <p className={`font-semibold capitalize flex items-center justify-center gap-1.5 ${index >= 5 ? 'text-sm' : 'text-base'}`}>
                             {ranking.is_team && <Users className={`text-primary ${index >= 5 ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />}
                             {ranking.full_name.toLowerCase()}
