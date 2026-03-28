@@ -83,10 +83,11 @@ export const calculateQuarterProgress = async (
 ): Promise<number | null> => {
     let objectivesQuery = supabase
         .from('objectives')
-        .select('id, title')
+        .select('id, title, profiles!user_id!inner(is_active)')
         .eq('company_id', companyId)
         .eq('quarter_id', quarterId)
-        .eq('archived', false);
+        .eq('archived', false)
+        .eq('profiles.is_active', true);
 
     if (userId) {
         objectivesQuery = objectivesQuery.eq('user_id', userId);
@@ -273,10 +274,11 @@ export function useDashboardData(filterUserId?: string | null) {
             // Active Objectives Count
             let objectivesQuery = supabase
                 .from('objectives')
-                .select('id')
+                .select('id, profiles!user_id!inner(is_active)')
                 .eq('company_id', selectedCompanyId)
                 .eq('quarter_id', activeQuarter.id)
-                .eq('archived', false);
+                .eq('archived', false)
+                .eq('profiles.is_active', true);
 
             if (userIdFilter) objectivesQuery = objectivesQuery.eq('user_id', userIdFilter);
             const { data: userObjectives } = await objectivesQuery;
@@ -432,10 +434,11 @@ export function useDashboardData(filterUserId?: string | null) {
             // Helper: Objective Rankings
             let allObjectivesQuery = supabase
                 .from('objectives')
-                .select('id, title, percent_obj, user_id, key_results (id, percent_kr, type, direction, target, weight, checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(id, quarter_id, checkin_date)))')
+                .select('id, title, percent_obj, user_id, profiles!user_id!inner(is_active), key_results (id, percent_kr, type, direction, target, weight, checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(id, quarter_id, checkin_date)))')
                 .eq('company_id', selectedCompanyId)
                 .eq('quarter_id', activeQuarter.id)
-                .eq('archived', false);
+                .eq('archived', false)
+                .eq('profiles.is_active', true);
 
             if (userIdFilter) {
                 allObjectivesQuery = allObjectivesQuery.eq('user_id', userIdFilter);
@@ -496,9 +499,10 @@ export function useDashboardData(filterUserId?: string | null) {
 
             // Helper: OKR Rankings
             let krsQuery = supabase.from('key_results')
-                .select('title, code, percent_kr, type, direction, target, user_id, objectives(user_id), checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(id, quarter_id, checkin_date))')
+                .select('title, code, percent_kr, type, direction, target, user_id, profiles!user_id!inner(is_active), objectives(user_id), checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(id, quarter_id, checkin_date))')
                 .eq('company_id', selectedCompanyId)
-                .eq('quarter_id', activeQuarter.id);
+                .eq('quarter_id', activeQuarter.id)
+                .eq('profiles.is_active', true);
             if (userIdFilter) krsQuery = krsQuery.eq('user_id', userIdFilter);
 
             const { data: krs } = await krsQuery;

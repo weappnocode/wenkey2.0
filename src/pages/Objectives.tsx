@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -143,10 +143,11 @@ export default function Objectives() {
     try {
       let query = supabase
         .from('objectives')
-        .select('id, title, description, status, quarter_id, company_id, user_id, archived, percent_obj')
+        .select('id, title, description, status, quarter_id, company_id, user_id, archived, percent_obj, profiles!user_id!inner(is_active)')
         .eq('company_id', companyId)
         .eq('quarter_id', quarterId)
         .eq('archived', false)
+        .eq('profiles.is_active', true)
         .neq('status', 'rascunho');
 
       let userKrObjIds: string[] = [];

@@ -689,7 +689,7 @@ export default function Users() {
                       <SelectContent>
                         <SelectItem value="all">Todos os status</SelectItem>
                         <SelectItem value="active">Ativos</SelectItem>
-                        <SelectItem value="pending">Pendentes</SelectItem>
+                        <SelectItem value="pending">Inativos / Pendentes</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -748,7 +748,7 @@ export default function Users() {
                                   variant={isUserActive ? 'default' : 'secondary'}
                                   className={!isUserActive ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200' : ''}
                                 >
-                                  {isUserActive ? toTitleCase('Ativo') : toTitleCase('Pendente')}
+                                  {isUserActive ? toTitleCase('Ativo') : toTitleCase('Inativo')}
                                 </Badge>
                               );
                             })()}
@@ -761,7 +761,7 @@ export default function Users() {
                                 variant={isUserActive ? 'default' : 'secondary'}
                                 className={!isUserActive ? 'bg-amber-100 text-amber-700 border-amber-200' : ''}
                               >
-                                {isUserActive ? toTitleCase('Ativo') : toTitleCase('Pendente')}
+                                {isUserActive ? toTitleCase('Ativo') : toTitleCase('Inativo')}
                               </Badge>
                             );
                           })()
@@ -780,10 +780,11 @@ export default function Users() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="text-destructive"
-                              onClick={() => openDeleteDialog(user)}
+                              className={user.is_active ? "text-destructive" : "text-primary"}
+                              onClick={() => toggleUserStatus(user.id, user.is_active)}
+                              title={user.is_active ? "Desativar Usuário" : "Reativar Usuário"}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              {user.is_active ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
                             </Button>
                           </div>
                         )}

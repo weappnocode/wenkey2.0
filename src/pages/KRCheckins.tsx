@@ -293,8 +293,9 @@ export default function KRCheckins() {
 
     let objectivesQuery = supabase
       .from('objectives')
-      .select('id, title, quarter_id, user_id, company_id')
+      .select('id, title, quarter_id, user_id, company_id, profiles!user_id!inner(is_active)')
       .eq('quarter_id', selectedQuarter)
+      .eq('profiles.is_active', true)
       .eq('archived', false);
 
     // Aplica filtro de usuário conforme seleção/permissão
@@ -403,8 +404,9 @@ export default function KRCheckins() {
     // Se um usuário for selecionado, filtramos pelo DONO do KR (key_results.user_id)
     let query = supabase
       .from('checkin_results')
-      .select('*, key_results!inner(user_id)')
-      .in('checkin_id', checkinIds);
+      .select('*, key_results!inner(user_id, profiles!user_id!inner(is_active))')
+      .in('checkin_id', checkinIds)
+      .eq('key_results.profiles.is_active', true);
 
     if (selectedUserId) {
       query = query.eq('key_results.user_id', selectedUserId);

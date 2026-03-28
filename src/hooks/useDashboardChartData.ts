@@ -51,10 +51,11 @@ export function useDashboardChartData(filterUserId?: string | null) {
 
             let objectivesQuery = supabase
                 .from('objectives')
-                .select('id, title, user_id')
+                .select('id, title, user_id, profiles!user_id!inner(is_active)')
                 .eq('company_id', company_id)
                 .eq('quarter_id', quarter_id)
-                .eq('archived', false);
+                .eq('archived', false)
+                .eq('profiles.is_active', true);
 
             if (userIdFilter) {
                 // Find KRs owned by user to include their objectives too
@@ -79,8 +80,9 @@ export function useDashboardChartData(filterUserId?: string | null) {
 
             let krsQuery = supabase
                 .from('key_results')
-                .select('id, objective_id, direction, type, weight, user_id')
-                .in('objective_id', objectiveIds);
+                .select('id, objective_id, direction, type, weight, user_id, profiles!user_id!inner(is_active)')
+                .in('objective_id', objectiveIds)
+                .eq('profiles.is_active', true);
 
             if (userIdFilter) {
                 krsQuery = krsQuery.eq('user_id', userIdFilter);
