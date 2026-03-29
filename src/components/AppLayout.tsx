@@ -2,7 +2,7 @@ import { ReactNode, useState, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth, type Profile } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { type Company } from '@/contexts/CompanyContext';
+import { type Company, useCompany } from '@/contexts/CompanyContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,7 +20,8 @@ import {
     Eye,
     History,
     Beaker,
-    CreditCard
+    CreditCard,
+    Lock
 } from 'lucide-react';
 import { cn, toTitleCase } from '@/lib/utils';
 import { CompanySelector } from './CompanySelector';
@@ -33,11 +34,15 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
     const { signOut, user, profile, refreshProfile } = useAuth();
     const { role } = useUserRole();
+    const { selectedCompany } = useCompany();
     const navigate = useNavigate();
     const location = useLocation();
     const [collapsed, setCollapsed] = useState(false);
     const [company, setCompany] = useState<{ name: string } | null>(null);
     const [editProfileOpen, setEditProfileOpen] = useState(false);
+
+    const isLocked = selectedCompany?.is_locked ?? false;
+    const lockedUntil = selectedCompany?.locked_until ?? null;
 
     useEffect(() => {
         const loadCompany = async () => {
@@ -190,6 +195,20 @@ export function AppLayout({ children }: AppLayoutProps) {
 
             {/* Main Content */}
             <main className="flex-1 overflow-auto">
+                {/* Banner de Bloqueio — visível para não-admins quando a plataforma está bloqueada */}
+                {isLocked && role !== 'admin' && (
+                    <div className="flex items-center gap-3 bg-amber-50 border-b border-amber-200 px-6 py-3 text-amber-800">
+                        <Lock className="h-4 w-4 shrink-0 text-amber-600" />
+                        <p className="text-sm font-medium">
+                            🔒 Plataforma em modo somente leitura para preservação dos dados do check-in.
+                            {lockedUntil && (
+                                <span className="ml-1 font-normal text-amber-700">
+                                    Liberação prevista: {new Date(lockedUntil).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            )}
+                        </p>
+                    </div>
+                )}
                 <div className="p-8">
                     {children ? children : <Outlet />}
                 </div>

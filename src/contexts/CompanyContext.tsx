@@ -9,6 +9,8 @@ export interface Company {
   name: string;
   is_active?: boolean;
   business_segment?: string | null;
+  is_locked?: boolean;
+  locked_until?: string | null;
 }
 
 interface CompanyContextType {
@@ -89,9 +91,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
     const fetchAndSelect = async () => {
       try {
-        const { data, error } = await supabase
+        // Cast to any: tipos gerados do Supabase estão desatualizados e não incluem as novas colunas
+        const { data, error } = await (supabase as any)
           .from('companies')
-          .select('id, name, is_active, business_segment')
+          .select('id, name, is_active, business_segment, is_locked, locked_until')
           .eq('id', targetCompanyId)
           .maybeSingle();
 
@@ -103,6 +106,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
             name: data.name,
             is_active: data.is_active,
             business_segment: data.business_segment ?? null,
+            is_locked: data.is_locked ?? false,
+            locked_until: data.locked_until ?? null,
           });
         }
       } catch (err) {
