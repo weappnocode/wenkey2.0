@@ -41,8 +41,9 @@ Fraco (🔵): Categorias abaixo de 10% e acima de 0%.
 Ausente: Categorias com 0% NÃO devem aparecer em forte, medio ou fraco. Categorias com 0% devem aparecer em "ausentes".
 
 MOTOR DE RECOMENDAÇÕES (obrigatório e crítico):
-Para CADA categoria com percentual ABAIXO de 15% (incluindo 0%), gere um objeto de recomendação com o nome da categoria e 3 a 4 sugestões estratégicas práticas e específicas.
-MUITO IMPORTANTE: Use a "BASE RAG" (se fornecida ao final deste prompt) e a ÁREA/SEGMENTO como NORTE absoluto para redigir as estratégias, moldando as dicas ao perfil da equipe. Use as linhas abaixo apenas como referência secundária se faltarem dados contextuais:
+Sua tarefa mais importante é identificar as categorias da Taxonomia que possuem 0% de foco (Ausentes) ou abaixo de 15% (Fraco).
+Para CADA UMA destas categorias deficitárias (OBRIGATORIAMENTE para TODAS AS CATEGORIAS QUE ESTÃO ZERADAS = 0%), você DEVE gerar um objeto de recomendação contendo o nome da categoria e PELO MENOS 3 OPORTUNIDADES de OKRs estratégicos focados nela. JAMAIS ignore uma categoria com 0%, mesmo que ache irrelevante. Encontre uma conexão usando a Área e o Segmento do cliente.
+MUITO IMPORTANTE: Use a "BASE RAG" (se fornecida ao final deste prompt) e a ÁREA/SEGMENTO como NORTE absoluto para redigir as estratégias. Use as linhas abaixo apenas como referência secundária se faltarem dados contextuais:
 - Crescimento: "Criar estratégia de geração de leads", "Expandir canais digitais de aquisição", "Definir meta de CAC e taxa de conversão", "Estruturar programa de parcerias comerciais"
 - Cliente: "Implantar pesquisa de NPS trimestral", "Criar fluxo de onboarding do cliente", "Definir SLA de atendimento e monitorar FRT", "Reduzir churn com programa de sucesso do cliente"
 - Inovação / Digital: "Criar roadmap de produto para o próximo ciclo", "Definir uma PoC de IA", "Reduzir dívida técnica com sprint dedicado", "Lançar MVP de nova funcionalidade"
