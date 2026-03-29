@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Zap, AlertTriangle, CheckCircle, Clock, Mail, RefreshCw, BarChart2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { CheckinScheduleCards } from '@/components/LeadershipRadar/CheckinScheduleCards';
 
 export default function LeadershipRadarTab() {
     const { toast } = useToast();
@@ -170,10 +171,6 @@ export default function LeadershipRadarTab() {
                         <Mail className="mr-2 h-4 w-4" />
                         Reenviar Email
                     </Button>
-                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => navigate('/dashboard')}>
-                        <BarChart2 className="mr-2 h-4 w-4" />
-                        Ir para Dashboard
-                    </Button>
                 </div>
             </div>
 
@@ -298,6 +295,14 @@ export default function LeadershipRadarTab() {
                     </Card>
                 </div>
             </div>
+
+            {/* ─── Configurações de Agendamento ─── */}
+            {selectedCompanyId && (
+                <CheckinScheduleCards
+                    companyId={selectedCompanyId}
+                    nextCheckinDate={activeQuarter?.end_date ?? null}
+                />
+            )}
             
         </div>
     );
