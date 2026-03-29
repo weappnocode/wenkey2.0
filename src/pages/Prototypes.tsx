@@ -13,6 +13,8 @@ import * as xlsx from 'xlsx';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
+import LeadershipRadarTab from '@/components/LeadershipRadar/LeadershipRadarTab';
+
 interface GeneratedOKR {
     objective: string;
     description: string;
@@ -38,6 +40,7 @@ export default function Prototypes() {
     const [dragOver, setDragOver] = useState(false);
     const [uploadResult, setUploadResult] = useState<{ inserted: number; errors: number; filename: string } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [mainTab, setMainTab] = useState<'okr-generator' | 'leadership-radar'>('leadership-radar');
 
     const ACCEPTED_TYPES = '.pdf,.xlsx,.xls,.txt,.csv,.md,.doc,.docx';
     const ACCEPTED_LABELS = ['PDF', 'XLSX', 'XLS', 'TXT', 'CSV', 'MD', 'DOC', 'DOCX'];
@@ -146,7 +149,14 @@ export default function Prototypes() {
                     </p>
                 </div>
 
-                <Card className="overflow-hidden border-2 border-indigo-500/20 shadow-xl bg-gradient-to-br from-white to-indigo-50/30 dark:from-slate-900 dark:to-indigo-950/20">
+                <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)} className="space-y-6">
+                    <TabsList className="grid w-full max-w-md grid-cols-2">
+                        <TabsTrigger value="okr-generator">Gerador OKR</TabsTrigger>
+                        <TabsTrigger value="leadership-radar" className="flex gap-2">Radar da Liderança <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 border-none dark:bg-indigo-900/30 dark:text-indigo-400">PRO</Badge></TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="okr-generator" className="space-y-6">
+                        <Card className="overflow-hidden border-2 border-indigo-500/20 shadow-xl bg-gradient-to-br from-white to-indigo-50/30 dark:from-slate-900 dark:to-indigo-950/20">
                     <CardHeader className="border-b bg-white/50 dark:bg-slate-900/50 py-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-indigo-500 rounded-lg shrink-0">
@@ -378,8 +388,12 @@ export default function Prototypes() {
                         )}
                     </CardContent>
                 </Card>
+                    </TabsContent>
 
-
+                    <TabsContent value="leadership-radar" className="mt-0">
+                        <LeadershipRadarTab />
+                    </TabsContent>
+                </Tabs>
             </div>
         </Layout>
     );

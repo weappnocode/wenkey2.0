@@ -37,6 +37,7 @@ interface Company {
   name: string;
   cnpj: string | null;
   responsible: string | null;
+  responsible_email: string | null;
   phone: string | null;
   city: string | null;
   state: string | null;
@@ -59,6 +60,7 @@ export default function Companies() {
     name: '',
     cnpj: '',
     responsible: '',
+    responsible_email: '',
     phone: '',
     city: '',
     state: '',
@@ -109,6 +111,7 @@ export default function Companies() {
           name: formData.name,
           cnpj: formData.cnpj || null,
           responsible: formData.responsible || null,
+          responsible_email: formData.responsible_email || null,
           phone: formData.phone || null,
           city: formData.city || null,
           state: formData.state || null,
@@ -136,6 +139,7 @@ export default function Companies() {
         name: '',
         cnpj: '',
         responsible: '',
+        responsible_email: '',
         phone: '',
         city: '',
         state: '',
@@ -162,6 +166,7 @@ export default function Companies() {
           name: formData.name,
           cnpj: formData.cnpj || null,
           responsible: formData.responsible || null,
+          responsible_email: formData.responsible_email || null,
           phone: formData.phone || null,
           city: formData.city || null,
           state: formData.state || null,
@@ -179,6 +184,7 @@ export default function Companies() {
         name: '',
         cnpj: '',
         responsible: '',
+        responsible_email: '',
         phone: '',
         city: '',
         state: '',
@@ -221,6 +227,7 @@ export default function Companies() {
       name: company.name,
       cnpj: company.cnpj || '',
       responsible: company.responsible || '',
+      responsible_email: company.responsible_email || '',
       phone: company.phone || '',
       city: company.city || '',
       state: company.state || '',
@@ -278,6 +285,15 @@ export default function Companies() {
                         id="responsible"
                         value={formData.responsible}
                         onChange={(e) => setFormData({ ...formData, responsible: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="responsible_email">{toTitleCase('E-mails do Responsável (separados por vírgula)')}</Label>
+                      <Input
+                        id="responsible_email"
+                        value={formData.responsible_email}
+                        onChange={(e) => setFormData({ ...formData, responsible_email: e.target.value })}
+                        placeholder="ceo@email.com, cto@email.com"
                       />
                     </div>
                     <div className="space-y-2">
@@ -484,6 +500,15 @@ export default function Companies() {
                     id="edit-responsible"
                     value={formData.responsible}
                     onChange={(e) => setFormData({ ...formData, responsible: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-responsible_email">E-mails do Responsável (separados por vírgula)</Label>
+                  <Input
+                    id="edit-responsible_email"
+                    value={formData.responsible_email}
+                    onChange={(e) => setFormData({ ...formData, responsible_email: e.target.value })}
+                    placeholder="ceo@email.com, cto@email.com"
                   />
                 </div>
                 <div className="space-y-2">
