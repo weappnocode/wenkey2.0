@@ -39,11 +39,10 @@ Forte (🔴): Categorias com mais de 20%.
 Médio (🟡): Categorias entre 10% e 20%.
 Fraco (🔵): Categorias abaixo de 10% e acima de 0%.
 Ausente: Categorias com 0% NÃO devem aparecer em forte, medio ou fraco. Categorias com 0% devem aparecer em "ausentes".
-
 MOTOR DE RECOMENDAÇÕES (obrigatório e crítico):
 Sua tarefa mais importante é identificar as categorias da Taxonomia que possuem 0% de foco (Ausentes) ou abaixo de 15% (Fraco).
-Para CADA UMA destas categorias deficitárias (OBRIGATORIAMENTE para TODAS AS CATEGORIAS QUE ESTÃO ZERADAS = 0%), você DEVE gerar um objeto de recomendação contendo o nome da categoria e PELO MENOS 3 OPORTUNIDADES de OKRs estratégicos focados nela. JAMAIS ignore uma categoria com 0%, mesmo que ache irrelevante. Encontre uma conexão usando a Área e o Segmento do cliente.
-MUITO IMPORTANTE: Use a "BASE RAG" (se fornecida ao final deste prompt) e a ÁREA/SEGMENTO como NORTE absoluto para redigir as estratégias. Use as linhas abaixo apenas como referência secundária se faltarem dados contextuais:
+Para CADA UMA destas categorias deficitárias (OBRIGATORIAMENTE para TODAS AS CATEGORIAS QUE ESTÃO ZERADAS = 0%), você DEVE gerar um objeto de recomendação contendo o nome da categoria e PELO MENOS 3 OPORTUNIDADES de OKRs estratégicos focados nela. JAMAIS ignore uma categoria com 0%, mesmo que ache irrelevante. Aja como um conselheiro C-Level (Diretoria/CEO) avaliando a empresa de forma GLOBAL.
+MUITO IMPORTANTE: Use a "BASE RAG" (se fornecida ao final deste prompt) e o SEGMENTO DA EMPRESA como NORTE absoluto para redigir as estratégias institucionais. Use as linhas abaixo apenas como referência secundária se faltarem dados contextuais:
 - Crescimento: "Criar estratégia de geração de leads", "Expandir canais digitais de aquisição", "Definir meta de CAC e taxa de conversão", "Estruturar programa de parcerias comerciais"
 - Cliente: "Implantar pesquisa de NPS trimestral", "Criar fluxo de onboarding do cliente", "Definir SLA de atendimento e monitorar FRT", "Reduzir churn com programa de sucesso do cliente"
 - Inovação / Digital: "Criar roadmap de produto para o próximo ciclo", "Definir uma PoC de IA", "Reduzir dívida técnica com sprint dedicado", "Lançar MVP de nova funcionalidade"
@@ -102,7 +101,7 @@ serve(async (req) => {
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
         let contextSection = "";
-        const embeddingText = `Área: ${user_area || 'Performance Estratégica'}. Segmento: ${company_segment || 'Negócios'}.`;
+        const embeddingText = `Estratégia Corporativa Global. Segmento: ${company_segment || 'Negócios'}. Visão Sistêmica e Holística da Empresa.`;
         
         console.log("Generating embedding for RAG in focus-distribution...");
         const embedResponse = await fetch("https://api.openai.com/v1/embeddings", {
@@ -131,7 +130,7 @@ serve(async (req) => {
         }
 
         const companyCtx = company_segment || user_area
-            ? `\n\nCONTEXTO ESSENCIAL DA EMPRESA E ÁREA (use para personalizar categorias, insights e recomendções):\nSegmento: "${company_segment || 'Não informado'}"\nÁrea/Departamento: "${user_area || 'Não informado'}"\n${contextSection}\n`
+            ? `\n\nCONTEXTO ESSENCIAL DA EMPRESA (Análise Holística Institucional):\nSegmento: "${company_segment || 'Não informado'}"\nLembrete: Ignore a função individual do usuário, estas sugestões devem servir para a organização inteira.\n${contextSection}\n`
             : '';
 
         const userMessage = `Por favor, faça a Análise de Distribuição de Foco nos seguintes dados:${companyCtx}\n\n${JSON.stringify(contextData, null, 2)}`;
