@@ -1411,6 +1411,7 @@ export default function KRCheckins() {
         open={analysisOpen}
         onOpenChange={setAnalysisOpen}
         contextData={analysisContext}
+        userName={authProfile?.full_name}
       />
       <FocusDistributionDialog
         open={focusDistributionOpen}
