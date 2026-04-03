@@ -648,7 +648,25 @@ export default function KRCheckins() {
     return formatted;
   };
 
+  const isCheckinDatePast = (checkin: QuarterCheckin): boolean => {
+    const checkinTime = getCheckinTime(checkin.checkin_date);
+    if (checkinTime === null) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return checkinTime < today.getTime();
+  };
+
   const openDialog = (kr: KeyResult, checkin: QuarterCheckin) => {
+    // Checkins com datas passadas só podem ser editados por Admin
+    if (isCheckinDatePast(checkin) && role !== 'admin') {
+      toast({
+        title: 'Acesso restrito',
+        description: 'Somente administradores podem editar check-ins de datas anteriores.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setCurrentKR(kr);
     setCurrentCheckin(checkin);
 
@@ -1614,7 +1632,7 @@ export default function KRCheckins() {
                               return (
                                 <TableCell
                                   key={checkin.id}
-                                  className="p-4 cursor-pointer hover:bg-muted/50"
+                                  className={`p-4 ${isCheckinDatePast(checkin) && role !== 'admin' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:bg-muted/50'}`}
                                   onClick={() => openDialog(kr, checkin)}
                                 >
                                   {result ? (
@@ -1735,7 +1753,7 @@ export default function KRCheckins() {
           }
         }}>
           <DialogContent
-            className="max-w-lg max-h-[85vh] overflow-y-auto"
+            className="max-w-md max-h-[80vh] overflow-y-auto"
             onInteractOutside={(e) => e.preventDefault()}
           >
             <DialogHeader>
@@ -1743,7 +1761,7 @@ export default function KRCheckins() {
             </DialogHeader>
 
             {currentKR && currentCheckin && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <div className="text-sm text-primary font-bold uppercase mb-2">
                     {currentKR.title}
@@ -1756,7 +1774,7 @@ export default function KRCheckins() {
                   </div>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
@@ -1937,15 +1955,15 @@ export default function KRCheckins() {
                   )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label htmlFor="observacoes">Observações</Label>
                   <textarea
                     id="observacoes"
-                    placeholder="Digite suas observações sobre este check-in..."
+                    placeholder="Observações sobre este check-in..."
                     value={formData.observacoes}
                     onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    rows={3}
+                    className="flex min-h-[52px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                    rows={2}
                   />
                 </div>
 
