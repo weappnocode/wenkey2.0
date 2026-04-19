@@ -20,13 +20,37 @@ const ResetPassword = () => {
   useEffect(() => {
     document.title = 'Wenkey - Redefinir Senha';
 
-    supabase.auth.getSession().then(({ data }) => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
       if (data.session) {
         setViewState('ready');
       } else {
-        setViewState('missing');
+        const hash = window.location.hash;
+        const search = window.location.search;
+        // If there are tokens in the URL, wait for Supabase to process them
+        if (hash.includes('access_token') || hash.includes('type=recovery') || search.includes('code=')) {
+          setTimeout(() => {
+            setViewState((prev) => (prev === 'checking' ? 'missing' : prev));
+          }, 4000);
+        } else {
+          setViewState('missing');
+        }
+      }
+    };
+
+    checkSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+        if (session) {
+          setViewState('ready');
+        }
       }
     });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const handleReset = async (event: React.FormEvent) => {
