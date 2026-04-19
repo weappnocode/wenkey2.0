@@ -60,7 +60,7 @@ export function CircularProgress({
         />
       </svg>
       {/* Percentage text with shadow */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 flex items-center justify-center">
         <span
           className={`${textClassName} font-bold`}
           style={{
@@ -70,7 +70,6 @@ export function CircularProgress({
         >
           {Math.round(percentage)}%
         </span>
-        <span className="text-xs text-muted-foreground">Alvo: 100%</span>
       </div>
     </div>
   );
