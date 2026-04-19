@@ -21,14 +21,33 @@ const ResetPassword = () => {
     document.title = 'Wenkey - Redefinir Senha';
 
     const checkSession = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get('code');
+
+      // Se houver um código na URL (Fluxo PKCE)
+      if (code) {
+        console.log('Código PKCE detectado, tentando fazer o exchange...');
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        
+        if (error) {
+          console.error('Erro na troca de código auth:', error.message);
+          setViewState('missing');
+        } else {
+          setViewState('ready');
+          // Limpa a URL para não deixar o código visível ou ser reutilizado acidentalmente
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        return; // Retorna pois o fluxo a partir daqui é garantido
+      }
+
+      // Se não houver código, checa a sessão padrão (Fluxo implícito com hash)
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         setViewState('ready');
       } else {
         const hash = window.location.hash;
-        const search = window.location.search;
-        // If there are tokens in the URL, wait for Supabase to process them
-        if (hash.includes('access_token') || hash.includes('type=recovery') || search.includes('code=')) {
+        // Se houver tokens no hash da URL aguarde o Supabase processá-los
+        if (hash.includes('access_token') || hash.includes('type=recovery')) {
           setTimeout(() => {
             setViewState((prev) => (prev === 'checking' ? 'missing' : prev));
           }, 4000);
