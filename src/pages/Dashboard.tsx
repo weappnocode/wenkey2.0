@@ -222,7 +222,7 @@ export default function Dashboard() {
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 20% 90%)" horizontal={true} vertical={false} />
                       <XAxis type="number" hide allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={120} tickLine={false} axisLine={false} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={180} tickLine={false} axisLine={false} />
                       <RechartsTooltip
                         contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                         formatter={(value: number) => [value, 'Key Results']}
