@@ -209,22 +209,25 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground">Nenhum objetivo.</p>
               ) : (
                 <div className="animate-in zoom-in-95 fade-in duration-700 fill-mode-both" style={{ animationDelay: '100ms' }}>
-                  <ResponsiveContainer width="100%" height={75}>
+                  <ResponsiveContainer width="100%" height={Math.max(120, metrics.objectiveRankings.length * 35)}>
                     <BarChart 
-                      data={metrics.objectiveRankings.map(o => ({
-                        name: toTitleCase(o.objective_title),
-                        krs: o.kr_count,
-                      }))}
-                      margin={{ top: 20, right: 0, left: 0, bottom: 0 }}
+                      layout="vertical"
+                      data={[...metrics.objectiveRankings]
+                        .sort((a, b) => b.kr_count - a.kr_count)
+                        .map(o => ({
+                          name: toTitleCase(o.objective_title),
+                          krs: o.kr_count,
+                        }))}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 20% 90%)" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} />
-                      <YAxis hide allowDecimals={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 20% 90%)" horizontal={true} vertical={false} />
+                      <XAxis type="number" hide allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={120} tickLine={false} axisLine={false} />
                       <RechartsTooltip
                         contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                         formatter={(value: number) => [value, 'Key Results']}
                       />
-                      <Bar dataKey="krs" fill="hsl(221 83% 53%)" radius={[4, 4, 0, 0]} barSize={20} label={{ position: 'top', fontSize: 11, fontWeight: 600, fill: 'hsl(221 83% 53%)' }} />
+                      <Bar dataKey="krs" fill="hsl(221 83% 53%)" radius={[0, 4, 4, 0]} barSize={16} label={{ position: 'right', fontSize: 11, fontWeight: 600, fill: 'hsl(221 83% 53%)' }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
