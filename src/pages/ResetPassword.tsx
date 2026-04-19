@@ -19,41 +19,38 @@ const ResetPassword = () => {
 
   useEffect(() => {
     document.title = 'Wenkey - Redefinir Senha';
+    let timeoutId: NodeJS.Timeout;
 
     const checkSession = async () => {
+      // 1. Checa se o Supabase já jogou algum erro na URL
       const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get('code');
-
-      // Se houver um código na URL (Fluxo PKCE)
-      if (code) {
-        console.log('Código PKCE detectado, tentando fazer o exchange...');
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        
-        if (error) {
-          console.error('Erro na troca de código auth:', error.message);
-          setViewState('missing');
-        } else {
-          setViewState('ready');
-          // Limpa a URL para não deixar o código visível ou ser reutilizado acidentalmente
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-        return; // Retorna pois o fluxo a partir daqui é garantido
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      
+      const errorStr = searchParams.get('error') || hashParams.get('error');
+      if (errorStr) {
+        console.error('Erro de auth na URL:', errorStr, searchParams.get('error_description') || hashParams.get('error_description'));
+        setViewState('missing');
+        return;
       }
 
-      // Se não houver código, checa a sessão padrão (Fluxo implícito com hash)
+      // 2. Tenta pegar a sessão atualizada
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         setViewState('ready');
+        return;
+      }
+
+      // 3. Se ainda não há sessão, mas temos indícios de token/código, aguardamos o auto-exchange do Supabase client
+      const code = searchParams.get('code');
+      const hash = window.location.hash;
+      
+      if (code || hash.includes('access_token') || hash.includes('type=recovery')) {
+        timeoutId = setTimeout(() => {
+          setViewState((prev) => (prev === 'checking' ? 'missing' : prev));
+        }, 4000);
       } else {
-        const hash = window.location.hash;
-        // Se houver tokens no hash da URL aguarde o Supabase processá-los
-        if (hash.includes('access_token') || hash.includes('type=recovery')) {
-          setTimeout(() => {
-            setViewState((prev) => (prev === 'checking' ? 'missing' : prev));
-          }, 4000);
-        } else {
-          setViewState('missing');
-        }
+        // Sem código e sem sessão = link acessado de forma inválida ou já consumido (e sem sessão cacheada)
+        setViewState('missing');
       }
     };
 
@@ -63,12 +60,16 @@ const ResetPassword = () => {
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
         if (session) {
           setViewState('ready');
+          if (window.location.search || window.location.hash) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
         }
       }
     });
 
     return () => {
       authListener.subscription.unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
 
