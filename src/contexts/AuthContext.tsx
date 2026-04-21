@@ -142,7 +142,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_OUT') {
           console.log('[Auth] User signed out, redirecting to /auth');
-          navigate('/auth', { replace: true });
+          const isPublicPage = ['/auth', '/forgot-password', '/reset-password', '/confirm-email'].includes(window.location.pathname);
+          if (!isPublicPage) {
+            navigate('/auth', { replace: true });
+          }
         }
 
         if (event === 'PASSWORD_RECOVERY') {
