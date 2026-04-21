@@ -61,6 +61,8 @@ interface KeyResult {
   floor_value: number | null;
   target: number | null;
   weight: number;
+  is_auto_redistributed?: boolean;
+  auto_redistribute_weights?: Record<string, number> | null;
 }
 
 interface CheckinResult {
@@ -656,6 +658,41 @@ export default function KRCheckins() {
     return checkinTime < today.getTime();
   };
 
+  const calculateDynamicTarget = (kr: KeyResult, currentCheckin: QuarterCheckin): number | null => {
+    if (!kr.is_auto_redistributed || !kr.auto_redistribute_weights) return null;
+    if (kr.type !== 'percentage' && kr.type !== 'percentual') return null;
+
+    const sortedCheckins = [...quarterCheckins].sort((a, b) => a.checkin_date.localeCompare(b.checkin_date));
+    const currentIndex = sortedCheckins.findIndex(c => c.id === currentCheckin.id);
+    if (currentIndex === -1) return null;
+
+    const weights = kr.auto_redistribute_weights as Record<string, number>;
+
+    let totalBaseMetaPrevious = 0;
+    let totalRealizedPrevious = 0;
+
+    for (let i = 0; i < currentIndex; i++) {
+        const c = sortedCheckins[i];
+        const baseWeight = weights[c.id] || 0;
+        totalBaseMetaPrevious += baseWeight;
+
+        const key = `${kr.id}-${c.id}`;
+        const result = checkinResults[key];
+        const realized = result?.valor_realizado || 0; // se nulo (não preenchido), avalia como 0 realizado no período
+        totalRealizedPrevious += realized;
+    }
+
+    const debt = totalBaseMetaPrevious - totalRealizedPrevious;
+    const remainingCheckinsCount = sortedCheckins.length - currentIndex;
+    const distributedDebt = remainingCheckinsCount > 0 ? (debt / remainingCheckinsCount) : 0;
+
+    const baseWeightCurrent = weights[currentCheckin.id] || 0;
+    const dynamicTarget = baseWeightCurrent + distributedDebt;
+
+    // Assegura que a meta não seja negativa em caso de extremo "crédito"
+    return Math.max(0, dynamicTarget);
+  };
+
   const openDialog = (kr: KeyResult, checkin: QuarterCheckin) => {
     // Checkins com datas passadas só podem ser editados por Admin
     if (isCheckinDatePast(checkin) && role !== 'admin') {
@@ -673,15 +710,24 @@ export default function KRCheckins() {
     const key = `${kr.id}-${checkin.id}`;
     const result = checkinResults[key];
 
+    let initialMeta = '';
+    const dynamicTarget = calculateDynamicTarget(kr, checkin);
+
+    if (dynamicTarget !== null) {
+      initialMeta = formatInputValue(dynamicTarget.toString(), kr.type);
+    }
+
     if (result) {
       setFormData({
-        meta: formatInputValue(result.meta_checkin?.toString() || '', kr.type),
+        meta: (kr.is_auto_redistributed && dynamicTarget !== null)
+          ? initialMeta
+          : formatInputValue(result.meta_checkin?.toString() || '', kr.type),
         minimo: formatInputValue(result.minimo_orcamento?.toString() || '', kr.type),
         realizado: formatInputValue(result.valor_realizado?.toString() || '', kr.type),
         observacoes: result.note || '',
       });
     } else {
-      setFormData({ meta: '', minimo: '', realizado: '', observacoes: '' });
+      setFormData({ meta: initialMeta, minimo: '', realizado: '', observacoes: '' });
     }
 
     setIsDialogOpen(true);
@@ -707,24 +753,34 @@ export default function KRCheckins() {
 
   const calculateSimpleAttainment = (
     realized: number | null,
+    min: number | null,
     target: number | null,
     direction: string | null,
     type?: string | null
   ): number | null => {
-    if (target === null || target === undefined || Number.isNaN(Number(target)) || Number(target) === 0) return null;
+    if (target === null || target === undefined || Number.isNaN(Number(target)) || Number(target) === 0) {
+      if (Number(target) === 0 && Number(min) === 0 && Number(realized) === 0) return null; // Ignore all 0s
+      if (target === undefined || target === null || Number.isNaN(Number(target))) return null;
+    }
     const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
+    const safeMin = (min !== null && min !== undefined && !Number.isNaN(Number(min))) ? Number(min) : null;
     if (safeRealized === null) return null;
 
     const safeTarget = Number(target);
+
+    // If 0-0-0 is registered
+    if (safeTarget === 0 && safeMin === 0 && safeRealized === 0) return null;
 
     if (type === 'date' || type === 'data') {
       return null;
     }
 
     if (!direction || direction === 'increase' || direction === 'maior-é-melhor') {
+      if (safeMin !== null && safeRealized < safeMin) return 0;
       return (safeRealized / safeTarget) * 100;
     } else {
       if (safeRealized <= safeTarget) return 100;
+      if (safeMin !== null && safeRealized > safeMin) return 0;
       return (safeTarget / safeRealized) * 100;
     }
   };
@@ -741,6 +797,9 @@ export default function KRCheckins() {
     const safeTarget = Number(target);
     const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
     const safeMin = (min !== null && min !== undefined) ? Number(min) : null;
+
+    // If 0-0-0 is registered, count as Not Filled
+    if (safeTarget === 0 && safeMin === 0 && safeRealized === 0) return null;
 
     if (type === 'date' || type === 'data') {
       if (safeRealized === null) return null;
@@ -766,6 +825,7 @@ export default function KRCheckins() {
 
     if (direction === 'decrease' || direction === 'menor-é-melhor') {
       if (safeRealized <= safeTarget) return 100;
+      if (safeMin !== null && safeRealized > safeMin) return 0;
       if (safeTarget === 0) return 0;
       const result = ((2 * safeTarget - safeRealized) / safeTarget) * 100;
       return Math.max(0, result);
@@ -1103,6 +1163,7 @@ export default function KRCheckins() {
     // Atingimento Visual (Realizado / Meta)
     const simpleAttainment = calculateSimpleAttainment(
       isNaN(realizado) ? null : realizado,
+      isNaN(minimo) ? null : minimo,
       isNaN(meta) ? null : meta,
       kr.direction,
       kr.type
@@ -1635,12 +1696,12 @@ export default function KRCheckins() {
                                   className={`p-4 ${isCheckinDatePast(checkin) && role !== 'admin' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:bg-muted/50'}`}
                                   onClick={() => openDialog(kr, checkin)}
                                 >
-                                  {result ? (
+                                  {(result && !(result.meta_checkin === 0 && result.minimo_orcamento === 0 && result.valor_realizado === 0)) ? (
                                     (() => {
                                       const cellContent = (
                                         <div className="space-y-2">
                                           <div>
-                                            <p className="text-xs text-muted-foreground">META:</p>
+                                            <p className="text-xs text-muted-foreground">META{kr.is_auto_redistributed && ' (DINÂMICA)'}:</p>
                                             <p className="font-medium text-xs">{formatValue(result.meta_checkin, kr.type, kr.unit)}</p>
                                           </div>
 
@@ -1659,6 +1720,7 @@ export default function KRCheckins() {
                                             );
                                             const simpleAttainment = calculateSimpleAttainment(
                                               result.valor_realizado,
+                                              result.minimo_orcamento,
                                               result.meta_checkin,
                                               kr.direction,
                                               kr.type
@@ -1778,7 +1840,7 @@ export default function KRCheckins() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <Label>META:</Label>
+                        <Label>META {currentKR.is_auto_redistributed && "(DINÂMICA)"}:</Label>
                         <span className="text-lg font-bold">
                           {formatValue(parseValueForType(formData.meta, currentKR.type), currentKR.type, currentKR.unit)}
                         </span>
@@ -1789,7 +1851,7 @@ export default function KRCheckins() {
                           value={formData.meta}
                           onChange={(e) => setFormData({ ...formData, meta: e.target.value })}
                           className="text-right"
-                          disabled={role !== 'admin'}
+                          disabled={role !== 'admin' || !!currentKR.is_auto_redistributed}
                         />
                       ) : (
                         <Input
@@ -1813,7 +1875,7 @@ export default function KRCheckins() {
                           }}
                           onBlur={() => setFormData({ ...formData, meta: formatInputValue(formData.meta, currentKR.type) })}
                           className="text-right"
-                          disabled={role !== 'admin'}
+                          disabled={role !== 'admin' || !!currentKR.is_auto_redistributed}
                         />
                       )}
                     </div>
@@ -1871,7 +1933,7 @@ export default function KRCheckins() {
                         : null;
 
                       const simpleAttainment = formData.realizado
-                        ? calculateSimpleAttainment(realizedVal, metaVal, currentKR.direction, currentKR.type)
+                        ? calculateSimpleAttainment(realizedVal, minVal, metaVal, currentKR.direction, currentKR.type)
                         : null;
 
                       const visualAttainmentValue = (currentKR.type === 'date' || currentKR.type === 'data')

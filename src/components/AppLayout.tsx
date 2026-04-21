@@ -88,27 +88,27 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="flex h-screen bg-background overflow-hidden">
             {/* Sidebar */}
             <aside className={cn(collapsed ? 'w-16' : 'w-64', 'bg-sidebar border-r border-sidebar-border flex flex-col transition-[width] duration-300')}>
-                <div className="p-4 border-b border-sidebar-border flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
-                            <Target className="w-6 h-6 text-white" />
-                        </div>
-                        {!collapsed && (
+                <div className={cn("p-4 border-b border-sidebar-border flex items-center shrink-0 overflow-hidden", collapsed ? "justify-center" : "justify-between")}>
+                    {!collapsed && (
+                        <div className="flex items-center gap-3 shrink-0">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
+                                <Target className="w-6 h-6 text-white" />
+                            </div>
                             <div>
                                 <h1 className="text-xl font-bold text-sidebar-foreground">Wenkey</h1>
                                 <p className="text-xs text-sidebar-foreground/60">{toTitleCase('Gestão de OKRs')}</p>
                             </div>
-                        )}
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={collapsed ? 'Expandir menu' : 'Colapsar menu'}
-                            onClick={() => setCollapsed((c) => !c)}
-                            className="text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                        >
-                            {collapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-                        </Button>
-                    </div>
+                        </div>
+                    )}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={collapsed ? 'Expandir menu' : 'Colapsar menu'}
+                        onClick={() => setCollapsed((c) => !c)}
+                        className="text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent shrink-0"
+                    >
+                        {collapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+                    </Button>
                 </div>
 
                 {/* Company Selector */}

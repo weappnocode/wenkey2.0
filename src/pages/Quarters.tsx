@@ -1,7 +1,7 @@
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -65,6 +65,14 @@ export default function Quarters() {
   const [expandedQuarters, setExpandedQuarters] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedCompanyForForm, setSelectedCompanyForForm] = useState<string>('');
+
+  const [keyResults, setKeyResults] = useState<any[]>([]);
+  const [allCheckinResults, setAllCheckinResults] = useState<any[]>([]);
+  const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
+
+  // Summary dialog states
+  const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
+  const [selectedCheckinSummary, setSelectedCheckinSummary] = useState<any>(null);
 
   // Quarter dialog states
   const [quarterDialogOpen, setQuarterDialogOpen] = useState(false);
@@ -137,6 +145,32 @@ export default function Quarters() {
         }, {} as Record<string, CheckIn[]>);
 
         setCheckIns(grouped);
+
+        if (checkInsData.length > 0) {
+          const { data: krData } = await supabase
+            .from('key_results')
+            .select('id, user_id, quarter_id')
+            .in('quarter_id', quarterIds);
+          
+          if (krData) setKeyResults(krData);
+
+          const { data: crData } = await supabase
+            .from('checkin_results')
+            .select('checkin_id, key_result_id, meta_checkin, minimo_orcamento, valor_realizado, user_id')
+            .in('checkin_id', checkInsData.map((c) => c.id));
+          
+          if (crData) setAllCheckinResults(crData);
+
+          const { data: profData } = await supabase
+            .from('profiles')
+            .select('id, full_name');
+            
+          if (profData) {
+            const map: Record<string, string> = {};
+            profData.forEach(p => map[p.id] = p.full_name);
+            setProfilesMap(map);
+          }
+        }
       }
     } catch (error) {
       toast({
@@ -697,6 +731,63 @@ export default function Quarters() {
                               {checkIn.note && (
                                 <p className="text-sm text-muted-foreground mt-1">{checkIn.note}</p>
                               )}
+                              
+                              {/* Progresso do Check-in */}
+                              {(() => {
+                                const quarterKRs = keyResults.filter(kr => kr.quarter_id === quarter.id);
+                                const totalOKRCount = quarterKRs.length;
+                                const checkinResList = allCheckinResults.filter(cr => cr.checkin_id === checkIn.id);
+                                
+                                const filledKRs = quarterKRs.filter(kr => {
+                                  const cr = checkinResList.find(c => c.key_result_id === kr.id);
+                                  if (!cr) return false;
+                                  
+                                  // Regra do "Não Preenchido": 
+                                  // 1. Se estiver tudo zero (0-0-0)
+                                  if (cr.meta_checkin === 0 && cr.minimo_orcamento === 0 && cr.valor_realizado === 0) return false;
+                                  // 2. Se o REALIZADO for nulo ou indefinido (mostra -- na tela de checkins)
+                                  if (cr.valor_realizado === null || cr.valor_realizado === undefined) return false;
+                                  
+                                  return true;
+                                });
+
+                                const filledCount = filledKRs.length;
+                                const pendingCount = totalOKRCount - filledCount;
+
+                                return totalOKRCount > 0 ? (
+                                  <div className="flex items-center gap-4 mt-3 mt-1 text-xs">
+                                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                                      <span className="flex w-2 h-2 rounded-full bg-green-500"></span>
+                                      Preenchidos: <strong className="text-foreground">{filledCount}</strong>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                                      <span className="flex w-2 h-2 rounded-full bg-red-400"></span>
+                                      Pendentes: <strong className="text-foreground">{pendingCount}</strong>
+                                    </div>
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      className="p-0 h-auto text-primary"
+                                      onClick={() => {
+                                        setSelectedCheckinSummary({
+                                          checkIn,
+                                          quarter,
+                                          quarterKRs,
+                                          checkinResList,
+                                          totalOKRCount,
+                                          filledCount,
+                                          pendingCount
+                                        });
+                                        setSummaryDialogOpen(true);
+                                      }}
+                                    >
+                                      Ver Detalhes
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="mt-2 text-xs text-muted-foreground">Nenhum KR no Quarter</div>
+                                );
+                              })()}
                             </div>
                             {isAdmin && (
                               <div className="flex gap-2">
@@ -856,6 +947,84 @@ export default function Quarters() {
             onSuccess={loadQuarters}
           />
         )}
+
+        {/* Check-in Progress Summary Dialog */}
+        <Dialog open={summaryDialogOpen} onOpenChange={setSummaryDialogOpen}>
+          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Status de Preenchimento: {selectedCheckinSummary?.quarter.name}</DialogTitle>
+              <DialogDescription>
+                Resumo do Check-in: {selectedCheckinSummary?.checkIn.checkin_date ? format(new Date(selectedCheckinSummary.checkIn.checkin_date.split('-').map(Number)[0], selectedCheckinSummary.checkIn.checkin_date.split('-').map(Number)[1] - 1, selectedCheckinSummary.checkIn.checkin_date.split('-').map(Number)[2]), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedCheckinSummary && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 flex flex-col items-center justify-center text-center">
+                    <span className="text-sm font-medium text-green-600 dark:text-green-400">Preenchidos</span>
+                    <span className="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">{selectedCheckinSummary.filledCount}</span>
+                  </div>
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex flex-col items-center justify-center text-center">
+                    <span className="text-sm font-medium text-red-600 dark:text-red-400">Pendentes</span>
+                    <span className="text-3xl font-bold text-red-600 dark:text-red-400 mt-1">{selectedCheckinSummary.pendingCount}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm">Responsáveis com Pendências</h4>
+                  {(() => {
+                    const { quarterKRs, checkinResList } = selectedCheckinSummary;
+                    const pendingByOwner: Record<string, { count: number, name: string }> = {};
+
+                    quarterKRs.forEach(kr => {
+                      const cr = checkinResList.find(c => c.key_result_id === kr.id);
+                      let isFilled = false;
+                      if (cr && !(cr.meta_checkin === 0 && cr.minimo_orcamento === 0 && cr.valor_realizado === 0) && cr.valor_realizado !== null && cr.valor_realizado !== undefined) {
+                        isFilled = true;
+                      }
+
+                      if (!isFilled && kr.user_id) {
+                        if (!pendingByOwner[kr.user_id]) {
+                          const fullName = profilesMap[kr.user_id];
+                          pendingByOwner[kr.user_id] = {
+                            count: 0,
+                            name: fullName || 'Usuário Desconhecido'
+                          };
+                        }
+                        pendingByOwner[kr.user_id].count++;
+                      }
+                    });
+
+                    const sortedOwners = Object.values(pendingByOwner).sort((a, b) => b.count - a.count);
+
+
+                    if (sortedOwners.length === 0) {
+                      return <p className="text-sm text-muted-foreground">Todos os responsáveis preencheram seus OKRs para este check-in.</p>;
+                    }
+
+                    return (
+                      <div className="space-y-2 border rounded-md divide-y">
+                        {sortedOwners.map((owner, idx) => (
+                          <div key={idx} className="flex justify-between items-center p-3 hover:bg-muted/50">
+                            <span className="text-sm font-medium">{owner.name}</span>
+                            <span className="text-xs font-bold bg-muted px-2 py-1 rounded-full text-destructive">
+                              {owner.count} pendente{owner.count > 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setSummaryDialogOpen(false)}>Fechar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout >
   );
