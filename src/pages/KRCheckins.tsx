@@ -207,12 +207,20 @@ export default function KRCheckins() {
   const loadUsers = useCallback(async () => {
     if (!filterCompanyId) return;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('profiles')
       .select('id, full_name, company_id')
       .eq('company_id', filterCompanyId)
       .eq('is_active', true)
+      .eq('is_team', false)
       .order('full_name');
+
+    // Gestor: restringe ao próprio usuário e seus liderados diretos
+    if (role === 'manager' && user) {
+      query = query.or(`id.eq.${user.id},manager_id.eq.${user.id}`);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError');
@@ -227,7 +235,8 @@ export default function KRCheckins() {
     }
 
     setUsers(data || []);
-  }, [filterCompanyId, toast]);
+  }, [filterCompanyId, role, user, toast]);
+
 
   const loadQuarters = useCallback(async (companyId: string) => {
     const { data, error } = await supabase
@@ -1545,7 +1554,7 @@ export default function KRCheckins() {
           </div>
 
           {/* TERCEIRO: Filtro de Usuário */}
-          {role === 'admin' && (
+          {(role === 'admin' || role === 'manager') && (
             <div>
               <Label htmlFor="user">{toTitleCase('Usuário')}</Label>
               <Select

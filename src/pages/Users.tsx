@@ -60,6 +60,7 @@ interface Profile {
   is_active: boolean;
   company_id: string | null;
   is_team: boolean | null;
+  manager_id: string | null;
   team_member_ids: string[] | null;
   companies?: Company | null;
 }
@@ -112,6 +113,7 @@ export default function Users() {
     sector: '',
     permission_type: 'user' as Permission,
     company_id: '',
+    manager_id: '' as string,
     avatar_file: null as File | null,
   });
 
@@ -259,6 +261,7 @@ export default function Users() {
             sector: formData.sector || null,
             permission_type: formData.permission_type,
             company_id: formData.company_id,
+            manager_id: formData.manager_id || null,
             avatar_url: avatarUrl,
           })
           .eq('id', authData.user.id);
@@ -310,6 +313,7 @@ export default function Users() {
           sector: formData.sector || null,
           permission_type: formData.permission_type,
           company_id: formData.company_id || null,
+          manager_id: formData.manager_id || null,
           avatar_url: avatarUrl,
           is_active: selectedUser.is_active,
         })
@@ -604,6 +608,7 @@ export default function Users() {
       sector: user.sector || '',
       permission_type: user.permission_type,
       company_id: user.company_id || '',
+      manager_id: user.manager_id || '',
       avatar_file: null,
     });
     setIsEditDialogOpen(true);
@@ -623,6 +628,7 @@ export default function Users() {
       sector: '',
       permission_type: 'user',
       company_id: selectedCompanyId || '',
+      manager_id: '',
       avatar_file: null,
     });
   };
@@ -1078,6 +1084,25 @@ export default function Users() {
                 </Select>
               </div>
               <div>
+                <Label htmlFor="manager">Gestor Direto</Label>
+                <Select
+                  value={formData.manager_id || 'none'}
+                  onValueChange={value => setFormData({ ...formData, manager_id: value === 'none' ? '' : value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sem gestor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem gestor</SelectItem>
+                    {users
+                      .filter(u => !u.is_team && u.company_id === formData.company_id && u.permission_type !== 'user')
+                      .map(u => (
+                        <SelectItem key={u.id} value={u.id}>{toTitleCase(u.full_name)}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label htmlFor="avatar">Foto do Perfil</Label>
                 <Input
                   id="avatar"
@@ -1099,46 +1124,47 @@ export default function Users() {
         {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Editar Usuário</DialogTitle>
-              <DialogDescription>
+            <DialogHeader className="pb-1">
+              <DialogTitle className="text-base">Editar Usuário</DialogTitle>
+              <DialogDescription className="text-xs">
                 Atualize os dados do usuário
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-2.5">
               <div>
-                <Label htmlFor="edit_full_name">Nome Completo</Label>
+                <Label htmlFor="edit_full_name" className="text-xs font-medium">Nome Completo</Label>
                 <Input
                   id="edit_full_name"
+                  className="h-8 text-sm mt-0.5"
                   value={formData.full_name}
                   onChange={e => setFormData({ ...formData, full_name: e.target.value })}
                 />
               </div>
               <div>
-                <Label htmlFor="edit_company">Empresa</Label>
-                <div className="h-10 px-3 flex items-center rounded-md border bg-muted/30 text-sm text-foreground">
+                <Label htmlFor="edit_company" className="text-xs font-medium">Empresa</Label>
+                <div className="h-8 px-3 flex items-center rounded-md border bg-muted/30 text-xs text-foreground mt-0.5">
                   {selectedCompany?.name ? toTitleCase(selectedCompany.name) : 'Nenhuma empresa selecionada'}
                 </div>
               </div>
               <div>
-                <Label htmlFor="edit_sector">Setor</Label>
+                <Label htmlFor="edit_sector" className="text-xs font-medium">Setor</Label>
                 <Select
                   value={formData.sector}
                   onValueChange={value => setFormData({ ...formData, sector: value })}
                   disabled={getCompanySectors(formData.company_id).length === 0}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs mt-0.5">
                     <SelectValue
                       placeholder={
                         getCompanySectors(formData.company_id).length === 0
-                          ? 'Nenhum setor cadastrado para esta empresa'
+                          ? 'Nenhum setor cadastrado'
                           : 'Selecione um setor'
                       }
                     />
                   </SelectTrigger>
                   <SelectContent>
                     {getCompanySectors(formData.company_id).map(sector => (
-                      <SelectItem key={sector} value={sector}>
+                      <SelectItem key={sector} value={sector} className="text-xs">
                         {sector}
                       </SelectItem>
                     ))}
@@ -1146,37 +1172,58 @@ export default function Users() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="edit_position">Cargo</Label>
+                <Label htmlFor="edit_position" className="text-xs font-medium">Cargo</Label>
                 <Input
                   id="edit_position"
+                  className="h-8 text-sm mt-0.5"
                   value={formData.position}
                   onChange={e => setFormData({ ...formData, position: e.target.value })}
                 />
               </div>
               <div>
-                <Label htmlFor="edit_permission">Permissão</Label>
+                <Label htmlFor="edit_permission" className="text-xs font-medium">Permissão</Label>
                 <Select
                   value={formData.permission_type}
                   onValueChange={value =>
                     setFormData({ ...formData, permission_type: value as Permission })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs mt-0.5">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">Usuário</SelectItem>
-                    <SelectItem value="manager">Gestor</SelectItem>
-                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="user" className="text-xs">Usuário</SelectItem>
+                    <SelectItem value="manager" className="text-xs">Gestor</SelectItem>
+                    <SelectItem value="admin" className="text-xs">Administrador</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="edit_avatar">Foto do Perfil</Label>
+                <Label htmlFor="edit_manager" className="text-xs font-medium">Gestor Direto</Label>
+                <Select
+                  value={formData.manager_id || 'none'}
+                  onValueChange={value => setFormData({ ...formData, manager_id: value === 'none' ? '' : value })}
+                >
+                  <SelectTrigger className="h-8 text-xs mt-0.5">
+                    <SelectValue placeholder="Sem gestor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-xs">Sem gestor</SelectItem>
+                    {users
+                      .filter(u => !u.is_team && u.company_id === (formData.company_id || selectedCompanyId) && u.permission_type !== 'user' && u.id !== selectedUser?.id)
+                      .map(u => (
+                        <SelectItem key={u.id} value={u.id} className="text-xs">{toTitleCase(u.full_name)}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit_avatar" className="text-xs font-medium">Foto do Perfil</Label>
                 <Input
                   id="edit_avatar"
                   type="file"
                   accept="image/*"
+                  className="h-8 text-xs mt-0.5"
                   onChange={e => setFormData({ ...formData, avatar_file: e.target.files?.[0] || null })}
                 />
                 {selectedUser?.avatar_url && (

@@ -32,16 +32,30 @@ export default function Dashboard() {
   const { data, isLoading } = useDashboardData(filterOwnerId === 'all' ? null : filterOwnerId);
 
   useEffect(() => {
-    if (role === 'admin' && selectedCompanyId) {
-      supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('company_id', selectedCompanyId)
-        .eq('is_active', true)
-        .order('full_name')
-        .then(({ data }) => setUsersInfo(data || []));
+    if ((role === 'admin' || role === 'manager') && selectedCompanyId && user) {
+      if (role === 'admin') {
+        supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('company_id', selectedCompanyId)
+          .eq('is_active', true)
+          .eq('is_team', false)
+          .order('full_name')
+          .then(({ data }) => setUsersInfo(data || []));
+      } else if (role === 'manager') {
+        // Manager: vê a si mesmo + seus liderados diretos
+        supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('company_id', selectedCompanyId)
+          .eq('is_active', true)
+          .eq('is_team', false)
+          .or(`id.eq.${user.id},manager_id.eq.${user.id}`)
+          .order('full_name')
+          .then(({ data }) => setUsersInfo(data || []));
+      }
     }
-  }, [role, selectedCompanyId]);
+  }, [role, selectedCompanyId, user]);
 
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [analysisContext, setAnalysisContext] = useState<AIAnalysisContextData | null>(null);
@@ -160,7 +174,7 @@ export default function Dashboard() {
               </p>
             </div>
             
-            {role === 'admin' && (
+            {(role === 'admin' || role === 'manager') && (
               <div className="w-full sm:w-[280px]">
                 <Label htmlFor="user" className="mb-1.5 block text-xs font-medium text-muted-foreground">{toTitleCase('Filtrar por Usuário')}</Label>
                 <Select value={filterOwnerId || 'all'} onValueChange={setFilterOwnerId}>

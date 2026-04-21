@@ -614,6 +614,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_team: boolean | null
+          manager_id: string | null
           permission_type: Database["public"]["Enums"]["user_permission"]
           position: string | null
           sector: string | null
@@ -630,6 +631,7 @@ export type Database = {
           id: string
           is_active?: boolean
           is_team?: boolean | null
+          manager_id?: string | null
           permission_type?: Database["public"]["Enums"]["user_permission"]
           position?: string | null
           sector?: string | null
@@ -646,6 +648,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_team?: boolean | null
+          manager_id?: string | null
           permission_type?: Database["public"]["Enums"]["user_permission"]
           position?: string | null
           sector?: string | null
