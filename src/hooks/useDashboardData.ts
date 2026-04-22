@@ -113,21 +113,7 @@ export const calculateQuarterProgress = async (
         .eq('checkins.quarter_id', quarterId)
         .in('key_result_id', krIds);
 
-    // Find active checkin (most recent checkin date <= today)
     const today = new Date().toISOString().split('T')[0];
-
-    const sortedCheckinDates = Array.from(new Set(
-        (checkins || []).map(c => c.checkins?.checkin_date).filter(Boolean)
-    )).sort() as string[];
-
-    const validDates = sortedCheckinDates.filter(d => d <= today);
-    const activeCheckinDate = validDates.length > 0
-        ? validDates[validDates.length - 1]
-        : sortedCheckinDates.length > 0
-            ? sortedCheckinDates[sortedCheckinDates.length - 1]
-            : null;
-
-    if (!activeCheckinDate) return 0;
 
     // Build objective title map for grouping (same logic as useDashboardChartData)
     const objectiveIdToTitle = new Map<string, string>(objectives.map(o => [o.id, o.title]));
@@ -149,9 +135,11 @@ export const calculateQuarterProgress = async (
         let hasData = false;
 
         groupKRs.forEach((kr) => {
-            const krCheckin = (checkins || []).find(
-                c => c.key_result_id === kr.id && c.checkins?.checkin_date === activeCheckinDate
-            );
+            const krCheckinsForKr = (checkins || [])
+                .filter(c => c.key_result_id === kr.id && (c.checkins?.checkin_date || '') <= today)
+                .sort((a, b) => (b.checkins?.checkin_date || '').localeCompare(a.checkins?.checkin_date || ''));
+
+            const krCheckin = krCheckinsForKr[0];
 
             if (krCheckin && krCheckin.valor_realizado !== null && krCheckin.meta_checkin !== null && krCheckin.minimo_orcamento !== null) {
                 const krProgress = calculateKR(
@@ -400,35 +388,6 @@ export function useDashboardData(filterUserId?: string | null) {
 
             const { data: globalCheckins } = await globalCheckinsQuery;
 
-            let globalActiveCheckinDate = null;
-            if (globalCheckins && globalCheckins.length > 0) {
-                const parseDateOnly = (dateString: string) => {
-                    const [yearStr, monthStr, dayStr] = dateString.split('-');
-                    const cleanedDay = dayStr.split('T')[0];
-                    const year = Number(yearStr);
-                    const month = Number(monthStr);
-                    const day = Number(cleanedDay);
-                    if ([year, month, day].some((value) => Number.isNaN(value))) return null;
-                    return new Date(year, month - 1, day).getTime();
-                };
-
-                const sorted = [...globalCheckins].sort((a, b) => (parseDateOnly(a.checkin_date) ?? Infinity) - (parseDateOnly(b.checkin_date) ?? Infinity));
-                const referenceList = sorted.filter((checkin) => parseDateOnly(checkin.checkin_date) !== null);
-                const orderedList = referenceList.length > 0 ? referenceList : sorted;
-
-                const now = new Date().getTime();
-                for (let i = 0; i < orderedList.length; i++) {
-                    const start = parseDateOnly(orderedList[i].checkin_date);
-                    if (start === null) continue;
-                    const nextStart = orderedList[i + 1] ? parseDateOnly(orderedList[i + 1].checkin_date) : null;
-                    if (!nextStart && now >= start) { globalActiveCheckinDate = orderedList[i].checkin_date; break; }
-                    if (nextStart !== null && now >= start && now < nextStart) { globalActiveCheckinDate = orderedList[i].checkin_date; break; }
-                }
-                if (!globalActiveCheckinDate && orderedList.length > 0) {
-                    globalActiveCheckinDate = orderedList[orderedList.length - 1].checkin_date;
-                }
-            }
-
             const getKRAttainment = (kr: Record<string, unknown>, quarterId: string) => {
                 const krCheckinsData = (kr.checkin_results as Record<string, unknown>[] || [])
                     .map(r => ({
@@ -437,10 +396,12 @@ export function useDashboardData(filterUserId?: string | null) {
                     }))
                     .filter(r => r.checkins && r.checkins.quarter_id === quarterId);
 
-                if (!globalActiveCheckinDate) return null;
+                const today = new Date().toISOString().split('T')[0];
+                const validResults = krCheckinsData
+                    .filter(r => r.checkins?.checkin_date && r.checkins.checkin_date <= today)
+                    .sort((a, b) => b.checkins.checkin_date.localeCompare(a.checkins.checkin_date));
 
-                // Aqui nós pegamos APENAS o resultado correspondente à data global do check-in
-                const activeResult = krCheckinsData.find(r => r.checkins.checkin_date === globalActiveCheckinDate) as Record<string, unknown> | undefined;
+                const activeResult = validResults[0];
 
                 if (activeResult && activeResult.valor_realizado !== null && activeResult.meta_checkin !== null && activeResult.minimo_orcamento !== null) {
                     return calculateKR(
