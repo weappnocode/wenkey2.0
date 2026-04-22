@@ -90,18 +90,7 @@ export const calculateQuarterProgress = async (
         .eq('profiles.is_active', true);
 
     if (userId) {
-        const { data: userKrs } = await supabase
-            .from('key_results')
-            .select('objective_id')
-            .eq('user_id', userId);
-
-        const userKrObjIds = (userKrs || []).map(kr => kr.objective_id);
-
-        if (userKrObjIds.length > 0) {
-            objectivesQuery = objectivesQuery.or(`user_id.eq.${userId},id.in.(${userKrObjIds.join(',')})`);
-        } else {
-            objectivesQuery = objectivesQuery.eq('user_id', userId);
-        }
+        objectivesQuery = objectivesQuery.eq('user_id', userId);
     }
 
     const { data: objectives } = await objectivesQuery;
@@ -109,16 +98,10 @@ export const calculateQuarterProgress = async (
 
     const objectiveIds = objectives.map(o => o.id);
 
-    let krsQuery = supabase
+    const { data: krs } = await supabase
         .from('key_results')
-        .select('id, objective_id, direction, type, percent_kr, weight, user_id')
+        .select('id, objective_id, direction, type, percent_kr, weight')
         .in('objective_id', objectiveIds);
-
-    if (userId) {
-        krsQuery = krsQuery.eq('user_id', userId);
-    }
-
-    const { data: krs } = await krsQuery;
 
     if (!krs || krs.length === 0) return 0;
 
@@ -435,25 +418,14 @@ export function useDashboardData(filterUserId?: string | null) {
             // Helper: Objective Rankings
             let allObjectivesQuery = supabase
                 .from('objectives')
-                .select('id, title, percent_obj, user_id, profiles!user_id!inner(is_active), key_results (id, percent_kr, type, direction, target, weight, user_id, checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(id, quarter_id, checkin_date)))')
+                .select('id, title, percent_obj, user_id, profiles!user_id!inner(is_active), key_results (id, percent_kr, type, direction, target, weight, checkin_results(percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins(id, quarter_id, checkin_date)))')
                 .eq('company_id', selectedCompanyId)
                 .eq('quarter_id', activeQuarter.id)
                 .eq('archived', false)
                 .eq('profiles.is_active', true);
 
             if (userIdFilter) {
-                const { data: userKrs } = await supabase
-                    .from('key_results')
-                    .select('objective_id')
-                    .eq('user_id', userIdFilter);
-
-                const userKrObjIds = (userKrs || []).map(kr => kr.objective_id);
-
-                if (userKrObjIds.length > 0) {
-                    allObjectivesQuery = allObjectivesQuery.or(`user_id.eq.${userIdFilter},id.in.(${userKrObjIds.join(',')})`);
-                } else {
-                    allObjectivesQuery = allObjectivesQuery.eq('user_id', userIdFilter);
-                }
+                allObjectivesQuery = allObjectivesQuery.eq('user_id', userIdFilter);
             }
 
             const { data: allObjectives } = await allObjectivesQuery;
@@ -466,11 +438,7 @@ export function useDashboardData(filterUserId?: string | null) {
                     const current = groups.get(title) || { totalPct: 0, userCount: 0, krCount: 0 };
 
                     let objAttainment = 0;
-                    const krs = ((obj.key_results as Record<string, unknown>[]) || []).filter(kr => {
-                        if (userIdFilter) return kr.user_id === userIdFilter;
-                        return true;
-                    });
-                    
+                    const krs = (obj.key_results as Record<string, unknown>[]) || [];
                     let hasData = false;
 
                     if (krs.length > 0) {

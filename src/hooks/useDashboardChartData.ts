@@ -98,13 +98,18 @@ export function useDashboardChartData(filterUserId?: string | null) {
 
             let checkinResultsQuery = supabase
                 .from('checkin_results')
-                .select('checkin_id, key_result_id, valor_realizado, meta_checkin, minimo_orcamento, checkins!inner(checkin_date)')
+                .select('checkin_id, key_result_id, valor_realizado, meta_checkin, minimo_orcamento')
                 .in('checkin_id', checkinIds)
                 .in('key_result_id', krIds);
 
             const { data: checkinResults } = await checkinResultsQuery;
 
-            // We don't map by checkin.id exactly, we keep an array of results to query by date.
+            // 5. Calculate averages per checkin
+            const checkinResultsMap = new Map();
+            (checkinResults || []).forEach(r => {
+                const key = `${r.key_result_id}-${r.checkin_id}`;
+                checkinResultsMap.set(key, r);
+            });
 
             // Group by objective title (like in KRCheckins)
             const titleMap = new Map<string, typeof krs>();
@@ -141,13 +146,7 @@ export function useDashboardChartData(filterUserId?: string | null) {
                     let groupHasData = false;
 
                     group.keyResults.forEach(kr => {
-                        const krResults = (checkinResults || []) as any[];
-                        const resultsForKr = krResults
-                            .filter(r => r.key_result_id === kr.id && (r.checkins?.checkin_date || '') <= checkin.checkin_date)
-                            .sort((a, b) => (b.checkins?.checkin_date || '').localeCompare(a.checkins?.checkin_date || ''));
-
-                        const result = resultsForKr[0];
-                        
+                        const result = checkinResultsMap.get(`${kr.id}-${checkin.id}`);
                         if (result && result.valor_realizado !== null && result.meta_checkin !== null && result.minimo_orcamento !== null) {
                             const krPct = calculateKR(result.valor_realizado, result.minimo_orcamento, result.meta_checkin, kr.direction, kr.type);
                             if (krPct !== null) {
