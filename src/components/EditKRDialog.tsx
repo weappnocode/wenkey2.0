@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Pencil } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 interface EditKRDialogProps {
   krId: string;
@@ -23,6 +24,11 @@ interface Team {
 interface Profile {
   id: string;
   full_name: string;
+}
+
+interface QuarterCheckin {
+  id: string;
+  name: string;
 }
 
 interface KRForm {
@@ -52,6 +58,11 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
     team_id: '',
     code: '',
   });
+
+  // Auto-redistribute states
+  const [quarterCheckins, setQuarterCheckins] = useState<QuarterCheckin[]>([]);
+  const [isAutoRedistributed, setIsAutoRedistributed] = useState(false);
+  const [weights, setWeights] = useState<Record<string, number>>({});
 
   const loadUsers = useCallback(async () => {
     const { data: profiles, error: profilesError } = await supabase
@@ -102,8 +113,13 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
         unit, 
         user_id, 
         code,
+        is_auto_redistributed,
+        auto_redistribute_weights,
         profiles!key_results_user_id_fkey (
           is_team
+        ),
+        objectives!inner (
+          quarter_id
         )
       `)
       .eq('id', krId)
@@ -127,6 +143,34 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
       team_id: isTeam ? (data.user_id ?? '') : '',
       code: data.code ?? '',
     });
+    
+    setIsAutoRedistributed(data.is_auto_redistributed || false);
+    
+    const quarterId = (data.objectives as any)?.quarter_id;
+    if (quarterId) {
+      const { data: qcs } = await supabase
+        .from('quarter_checkins')
+        .select('id, name')
+        .eq('quarter_id', quarterId)
+        .order('checkin_date');
+        
+      if (qcs) {
+        setQuarterCheckins(qcs);
+        if (data.auto_redistribute_weights) {
+          setWeights(data.auto_redistribute_weights as Record<string, number>);
+        } else if (qcs.length > 0) {
+          const equalWeight = Math.floor(100 / qcs.length);
+          const initialWeights: Record<string, number> = {};
+          qcs.forEach((qc, idx) => {
+            initialWeights[qc.id] = (idx === qcs.length - 1) 
+              ? 100 - (equalWeight * (qcs.length - 1)) 
+              : equalWeight;
+          });
+          setWeights(initialWeights);
+        }
+      }
+    }
+    
     setLoading(false);
   }, [krId]);
 
@@ -153,6 +197,12 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
       return;
     }
 
+    const totalWeight = Object.values(weights).reduce((sum, val) => sum + (Number(val) || 0), 0);
+    if ((form.type === 'percentage' || form.type === 'percentual') && isAutoRedistributed && quarterCheckins.length > 0 && totalWeight !== 100) {
+      toast.error(`A soma dos pesos deve ser exatamente 100%. Atual: ${totalWeight}%`);
+      return;
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase
@@ -164,6 +214,8 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
           unit: form.unit || null,
           user_id: form.owner_type === 'user' ? form.user_id : form.team_id,
           code: form.code || null,
+          is_auto_redistributed: (form.type === 'percentage' || form.type === 'percentual') ? isAutoRedistributed : false,
+          auto_redistribute_weights: ((form.type === 'percentage' || form.type === 'percentual') && isAutoRedistributed) ? weights : null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', krId);
@@ -258,6 +310,52 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
               </Select>
             </div>
           </div>
+
+          {(form.type === 'percentage' || form.type === 'percentual') && (
+            <div className="space-y-4 border rounded-md p-4 bg-muted/10">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label>Redistribuição Automática de Atrasos</Label>
+                  <p className="text-xs text-muted-foreground flex-1">
+                    Ative para que o peso não atingido de um check-in seja dividido entre os próximos automaticamente.
+                  </p>
+                </div>
+                <Switch
+                  checked={isAutoRedistributed}
+                  onCheckedChange={setIsAutoRedistributed}
+                />
+              </div>
+
+              {isAutoRedistributed && quarterCheckins.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase">Distribuição Inicial</Label>
+                    <span className={`text-xs font-bold ${Object.values(weights).reduce((a, b) => a + (Number(b) || 0), 0) === 100 ? 'text-green-500' : 'text-destructive'}`}>
+                      Soma atual: {Object.values(weights).reduce((a, b) => a + (Number(b) || 0), 0)}% / 100%
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    {quarterCheckins.map((qc) => (
+                      <div key={qc.id} className="flex items-center gap-2">
+                        <Label className="w-24 text-xs truncate" title={qc.name}>{qc.name}</Label>
+                        <div className="relative flex-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            className="h-8 pr-6 text-right"
+                            value={weights[qc.id] === 0 ? '' : weights[qc.id]}
+                            onChange={(e) => setWeights({ ...weights, [qc.id]: Number(e.target.value) })}
+                          />
+                          <span className="absolute right-2 top-1.5 text-xs text-muted-foreground">%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

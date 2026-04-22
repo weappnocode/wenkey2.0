@@ -388,11 +388,17 @@ export function useDashboardData(filterUserId?: string | null) {
 
             // Identificar o activeCheckinDate global para as métricas de Objetivos e OKRs
             // O today já está declarado acima, não precisamos redeclarar
-            const { data: globalCheckins } = await supabase
+            let globalCheckinsQuery = supabase
                 .from('checkins')
                 .select('id, checkin_date')
                 .eq('quarter_id', activeQuarter.id)
                 .order('checkin_date', { ascending: false });
+
+            if (userIdFilter) {
+                globalCheckinsQuery = globalCheckinsQuery.eq('user_id', userIdFilter);
+            }
+
+            const { data: globalCheckins } = await globalCheckinsQuery;
 
             let globalActiveCheckinId = null;
             if (globalCheckins && globalCheckins.length > 0) {
