@@ -400,7 +400,7 @@ export function useDashboardData(filterUserId?: string | null) {
 
             const { data: globalCheckins } = await globalCheckinsQuery;
 
-            let globalActiveCheckinId = null;
+            let globalActiveCheckinDate = null;
             if (globalCheckins && globalCheckins.length > 0) {
                 const parseDateOnly = (dateString: string) => {
                     const [yearStr, monthStr, dayStr] = dateString.split('-');
@@ -421,11 +421,11 @@ export function useDashboardData(filterUserId?: string | null) {
                     const start = parseDateOnly(orderedList[i].checkin_date);
                     if (start === null) continue;
                     const nextStart = orderedList[i + 1] ? parseDateOnly(orderedList[i + 1].checkin_date) : null;
-                    if (!nextStart && now >= start) { globalActiveCheckinId = orderedList[i].id; break; }
-                    if (nextStart !== null && now >= start && now < nextStart) { globalActiveCheckinId = orderedList[i].id; break; }
+                    if (!nextStart && now >= start) { globalActiveCheckinDate = orderedList[i].checkin_date; break; }
+                    if (nextStart !== null && now >= start && now < nextStart) { globalActiveCheckinDate = orderedList[i].checkin_date; break; }
                 }
-                if (!globalActiveCheckinId && orderedList.length > 0) {
-                    globalActiveCheckinId = orderedList[orderedList.length - 1].id;
+                if (!globalActiveCheckinDate && orderedList.length > 0) {
+                    globalActiveCheckinDate = orderedList[orderedList.length - 1].checkin_date;
                 }
             }
 
@@ -437,10 +437,10 @@ export function useDashboardData(filterUserId?: string | null) {
                     }))
                     .filter(r => r.checkins && r.checkins.quarter_id === quarterId);
 
-                if (!globalActiveCheckinId) return null;
+                if (!globalActiveCheckinDate) return null;
 
-                // Aqui nós pegamos APENAS o resultado correspondente ao globalActiveCheckinId
-                const activeResult = krCheckinsData.find(r => r.checkins.id === globalActiveCheckinId) as Record<string, unknown> | undefined;
+                // Aqui nós pegamos APENAS o resultado correspondente à data global do check-in
+                const activeResult = krCheckinsData.find(r => r.checkins.checkin_date === globalActiveCheckinDate) as Record<string, unknown> | undefined;
 
                 if (activeResult && activeResult.valor_realizado !== null && activeResult.meta_checkin !== null && activeResult.minimo_orcamento !== null) {
                     return calculateKR(
