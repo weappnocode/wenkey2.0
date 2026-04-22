@@ -312,9 +312,26 @@ export function useDashboardData(filterUserId?: string | null) {
                 } else {
                     currentQuarterProgress = (await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, user.id)) ?? 0;
                 }
+            } else if (userIdFilter) {
+                // Admin/manager filtrando um usuário específico: usa quarter_results (mesma fonte do ranking)
+                // para garantir consistência entre o círculo de progresso e o ranking.
+                const { data: quarterResult } = await supabase
+                    .from('quarter_results')
+                    .select('result_percent')
+                    .eq('company_id', selectedCompanyId)
+                    .eq('user_id', userIdFilter)
+                    .eq('quarter_id', activeQuarter.id)
+                    .maybeSingle();
+
+                if (quarterResult && quarterResult.result_percent !== null) {
+                    currentQuarterProgress = Math.round(quarterResult.result_percent);
+                } else {
+                    // Fallback: calcula em tempo real se ainda não há resultado salvo
+                    currentQuarterProgress = (await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, userIdFilter)) ?? 0;
+                }
             } else {
-                // Admin/manager: calcula em tempo real para pegar o check-in mais recente
-                currentQuarterProgress = (await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, userIdFilter)) ?? 0;
+                // Admin/manager sem filtro específico: calcula consolidado em tempo real
+                currentQuarterProgress = (await calculateQuarterProgress(selectedCompanyId, activeQuarter.id, null)) ?? 0;
             }
 
             // Rankings Calculation (Inline or helper)
