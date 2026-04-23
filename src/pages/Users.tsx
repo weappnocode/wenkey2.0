@@ -38,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, Send, UserPlus, Users as UsersIcon, UserMinus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Send, UserPlus, Users as UsersIcon, UserMinus, Mail, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,6 +48,7 @@ import { toast } from 'sonner';
 import { toTitleCase } from '@/lib/utils';
 import { callN8nWebhook } from '@/lib/n8nWebhook';
 import { EmailScheduleCard } from '@/components/EmailScheduleCard';
+import { Switch } from '@/components/ui/switch';
 
 interface Profile {
   id: string;
@@ -62,6 +63,7 @@ interface Profile {
   is_team: boolean | null;
   manager_id: string | null;
   team_member_ids: string[] | null;
+  exclude_from_okr: boolean;
   companies?: Company | null;
 }
 
@@ -115,6 +117,7 @@ export default function Users() {
     company_id: '',
     manager_id: '' as string,
     avatar_file: null as File | null,
+    exclude_from_okr: false,
   });
 
   const [teamForm, setTeamForm] = useState({
@@ -316,6 +319,7 @@ export default function Users() {
           manager_id: formData.manager_id || null,
           avatar_url: avatarUrl,
           is_active: selectedUser.is_active,
+          exclude_from_okr: formData.exclude_from_okr,
         })
         .eq('id', selectedUser.id);
 
@@ -523,6 +527,7 @@ export default function Users() {
     }
   };
 
+
   const handleSaveTeam = async () => {
     try {
       if (!teamForm.full_name || !selectedCompanyId) {
@@ -610,6 +615,7 @@ export default function Users() {
       company_id: user.company_id || '',
       manager_id: user.manager_id || '',
       avatar_file: null,
+      exclude_from_okr: user.exclude_from_okr || false,
     });
     setIsEditDialogOpen(true);
   };
@@ -776,6 +782,7 @@ export default function Users() {
                       <TableCell className="text-right">
                         {isAdmin && (
                           <div className="flex justify-end gap-2">
+
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1229,6 +1236,22 @@ export default function Users() {
                 {selectedUser?.avatar_url && (
                   <p className="text-sm text-muted-foreground mt-1">Avatar atual será substituído se você selecionar um novo arquivo</p>
                 )}
+              </div>
+              {/* Exclude from OKR toggle */}
+              <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2.5 mt-1">
+                <div className="space-y-0.5">
+                  <Label htmlFor="exclude_from_okr" className="text-xs font-medium text-amber-800 dark:text-amber-300 cursor-pointer">
+                    Consultor / Admin Externo
+                  </Label>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-tight">
+                    Ocultar de rankings, dropdowns e emails de OKR
+                  </p>
+                </div>
+                <Switch
+                  id="exclude_from_okr"
+                  checked={formData.exclude_from_okr}
+                  onCheckedChange={checked => setFormData({ ...formData, exclude_from_okr: checked })}
+                />
               </div>
             </div>
             <DialogFooter>

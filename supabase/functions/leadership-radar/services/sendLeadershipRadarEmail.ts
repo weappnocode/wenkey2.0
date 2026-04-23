@@ -65,7 +65,7 @@ function getStatusBanner(status: string): string {
 }
 
 export async function sendLeadershipRadarEmail(radarRecord: any) {
-    const N8N_BASE_URL = "https://n8n-terj.onrender.com/webhook";
+    const N8N_BASE_URL = "https://n8n.weappnocode.com/webhook";
     const WEBHOOK_PATH = "29032026";
 
     console.log(`[sendLeadershipRadarEmail] Sending radar ${radarRecord.id} to n8n webhook...`);

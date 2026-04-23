@@ -170,6 +170,7 @@ export default function PerformanceHistory() {
                 .from('profiles')
                 .select('id, full_name, avatar_url, sector, is_active, company_id, is_team')
                 .eq('company_id', filterCompanyId)
+                .eq('exclude_from_okr', false)
                 .order('full_name');
 
             // Se for perfil 'user', força a ver apenas a si mesmo

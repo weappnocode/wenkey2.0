@@ -157,7 +157,8 @@ export default function Overview() {
         .from('profiles')
         .select('id, full_name, position, is_active, avatar_url, is_team')
         .eq('company_id', selectedCompany)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('exclude_from_okr', false);
 
       if (viewType !== 'all') {
         query = query.eq('is_team', viewType === 'team');
@@ -354,6 +355,7 @@ export default function Overview() {
                           percentage={ranking.result_percent}
                           size={index >= 5 ? 86 : 106}
                           strokeWidth={index >= 5 ? 8 : 10}
+                          textClassName={index >= 5 ? 'text-lg' : 'text-xl'}
                         />
 
                         <div className="text-center space-y-0.5">

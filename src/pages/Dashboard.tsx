@@ -40,6 +40,7 @@ export default function Dashboard() {
           .eq('company_id', selectedCompanyId)
           .eq('is_active', true)
           .eq('is_team', false)
+          .eq('exclude_from_okr', false)
           .order('full_name')
           .then(({ data }) => setUsersInfo(data || []));
       } else if (role === 'manager') {
@@ -50,6 +51,7 @@ export default function Dashboard() {
           .eq('company_id', selectedCompanyId)
           .eq('is_active', true)
           .eq('is_team', false)
+          .eq('exclude_from_okr', false)
           .or(`id.eq.${user.id},manager_id.eq.${user.id}`)
           .order('full_name')
           .then(({ data }) => setUsersInfo(data || []));

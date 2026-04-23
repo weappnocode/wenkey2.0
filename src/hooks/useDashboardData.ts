@@ -98,10 +98,16 @@ export const calculateQuarterProgress = async (
 
     const objectiveIds = objectives.map(o => o.id);
 
-    const { data: krs } = await supabase
+    let krsQuery = supabase
         .from('key_results')
         .select('id, objective_id, direction, type, percent_kr, weight')
         .in('objective_id', objectiveIds);
+
+    if (userId) {
+        krsQuery = krsQuery.eq('user_id', userId);
+    }
+
+    const { data: krs } = await krsQuery;
 
     if (!krs || krs.length === 0) return 0;
 
@@ -328,7 +334,8 @@ export function useDashboardData(filterUserId?: string | null) {
                 .from('profiles')
                 .select('id, full_name, sector, avatar_url, is_active, is_team')
                 .eq('company_id', selectedCompanyId)
-                .eq('is_active', true);
+                .eq('is_active', true)
+                .eq('exclude_from_okr', false);
 
             const { data: quarterResults } = await supabase
                 .from('quarter_results')

@@ -151,7 +151,8 @@ Deno.serve(async (req: Request) => {
                 .from("profiles")
                 .select("id, full_name, sector, avatar_url")
                 .eq("company_id", companyId)
-                .eq("is_active", true);
+                .eq("is_active", true)
+                .eq("exclude_from_okr", false);
 
             if (isTest) {
                 profileQuery = profileQuery.eq("id", testUserId);

@@ -31,11 +31,13 @@ export function useDashboardChartData(filterUserId?: string | null) {
             const quarter_id = activeQuarter.id;
 
             // 2. Get checkins for the quarter
-            const { data: checkins } = await supabase
+            let checkinsQuery = supabase
                 .from('checkins')
-                .select('id, checkin_date')
+                .select('id, checkin_date, user_id')
                 .eq('quarter_id', quarter_id)
                 .order('checkin_date', { ascending: true });
+
+            const { data: checkins } = await checkinsQuery;
 
             if (!checkins || checkins.length === 0) return { checkins: [], averages: {} };
 
@@ -93,50 +95,48 @@ export function useDashboardChartData(filterUserId?: string | null) {
 
             const krIds = krs.map(kr => kr.id);
 
-            // 4. Get checkin_results for these KRs
+            // 4. Get checkin_results for these KRs (only for actual recorded check-ins)
             const checkinIds = checkins.map(c => c.id);
 
-            let checkinResultsQuery = supabase
+            const { data: checkinResults } = await supabase
                 .from('checkin_results')
                 .select('checkin_id, key_result_id, valor_realizado, meta_checkin, minimo_orcamento')
                 .in('checkin_id', checkinIds)
                 .in('key_result_id', krIds);
 
-            const { data: checkinResults } = await checkinResultsQuery;
-
-            // 5. Calculate averages per checkin
-            const checkinResultsMap = new Map();
+            // Mapa direto: checkin_id -> lista de resultados DESSE checkin específico
+            const resultsByCheckinId = new Map<string, typeof checkinResults>();
             (checkinResults || []).forEach(r => {
-                const key = `${r.key_result_id}-${r.checkin_id}`;
-                checkinResultsMap.set(key, r);
+                if (!resultsByCheckinId.has(r.checkin_id)) resultsByCheckinId.set(r.checkin_id, []);
+                resultsByCheckinId.get(r.checkin_id)!.push(r);
             });
 
-            // Group by objective title (like in KRCheckins)
+            // Group KRs by objective title
             const titleMap = new Map<string, typeof krs>();
             const objectiveIdToTitle = new Map<string, string>();
-
             objectives.forEach(obj => {
                 objectiveIdToTitle.set(obj.id, obj.title);
-                if (!titleMap.has(obj.title)) {
-                    titleMap.set(obj.title, []);
-                }
+                if (!titleMap.has(obj.title)) titleMap.set(obj.title, []);
             });
-
             krs.forEach(kr => {
                 const title = objectiveIdToTitle.get(kr.objective_id);
-                if (title) {
-                    titleMap.get(title)?.push(kr);
-                }
+                if (title) titleMap.get(title)?.push(kr);
             });
-
-            const grouped = Array.from(titleMap.entries()).map(([title, keyResults]) => ({
-                title,
-                keyResults
-            })).filter(g => g.keyResults.length > 0);
+            const grouped = Array.from(titleMap.entries())
+                .map(([title, keyResults]) => ({ title, keyResults }))
+                .filter(g => g.keyResults.length > 0);
 
             const averages: Record<string, { average: number; hasData: boolean }> = {};
 
             checkins.forEach(checkin => {
+                // Só calcula se há resultados registrados NESTE check-in específico
+                const thisCheckinResults = resultsByCheckinId.get(checkin.id) || [];
+
+                if (thisCheckinResults.length === 0) {
+                    averages[checkin.id] = { average: 0, hasData: false };
+                    return;
+                }
+
                 let sum = 0;
                 let count = 0;
 
@@ -146,7 +146,9 @@ export function useDashboardChartData(filterUserId?: string | null) {
                     let groupHasData = false;
 
                     group.keyResults.forEach(kr => {
-                        const result = checkinResultsMap.get(`${kr.id}-${checkin.id}`);
+                        // Resultado deste KR NESTE checkin — sem carry-forward
+                        const result = thisCheckinResults.find(r => r.key_result_id === kr.id);
+
                         if (result && result.valor_realizado !== null && result.meta_checkin !== null && result.minimo_orcamento !== null) {
                             const krPct = calculateKR(result.valor_realizado, result.minimo_orcamento, result.meta_checkin, kr.direction, kr.type);
                             if (krPct !== null) {

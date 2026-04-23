@@ -6,7 +6,7 @@ const corsHeaders = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const N8N_BASE_URL = "https://n8n-terj.onrender.com/webhook";
+const N8N_BASE_URL = "https://n8n.weappnocode.com/webhook";
 
 Deno.serve(async (req: Request) => {
     // Tratamento de CORS preflight
