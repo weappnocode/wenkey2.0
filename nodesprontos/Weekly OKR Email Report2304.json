@@ -1,0 +1,176 @@
+{
+  "name": "Weekly OKR Email Report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 11 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "a1c0723c-cb04-4677-837a-4c6b89e3a5b8",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tasaalobestljwraqjov.supabase.co/functions/v1/get-weekly-report-data",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "id": "21a09e26-64c2-4528-9830-8b4a45662641",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.first().json.emails.map(item => ({ json: item }));"
+      },
+      "id": "aa4b8320-fe41-42fd-8e77-bfe32debb5f1",
+      "name": "Explode Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "f8bad516-bff6-4dda-93d4-4fb168137822",
+      "name": "Split in Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nfunction bar(pct) {\n  const c = pct >= 100 ? '#16a34a' : pct >= 70 ? '#d97706' : '#dc2626';\n  return `<div style=\"background:#e2e8f0;border-radius:99px;height:8px;overflow:hidden;margin-top:8px\"><div style=\"width:${Math.min(pct,100)}%;height:100%;background:${c};border-radius:99px\"></div></div>`;\n}\nfunction c(pct) { return pct >= 100 ? '#16a34a' : pct >= 70 ? '#d97706' : '#dc2626'; }\nfunction ini(name) { return name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase(); }\n\n// ── Objetivos: espaço real entre nome e %\nconst objRows = (item.objective_progress || []).map(o => `\n  <div style=\"margin-bottom:16px\">\n    <div style=\"display:flex;justify-content:space-between;align-items:center\">\n      <span style=\"font-size:13px;font-weight:600;color:#1a2035;line-height:1.3;padding-right:16px\">${o.title}</span>\n      <span style=\"font-size:13px;font-weight:700;color:${c(o.result_pct)};white-space:nowrap;flex-shrink:0\">${o.result_pct}%</span>\n    </div>${bar(o.result_pct)}\n  </div>`).join('');\n\n// ── Ranking item\nfunction rankItem(r, rank, isMe) {\n  const brd = isMe ? 'border:2px solid #93c5fd;background:#eff6ff' : 'border:1px solid #e2e8f0;background:#f8faff';\n  const avatar = r.avatar_url\n    ? `<img src=\"${r.avatar_url}\" style=\"width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0\" />`\n    : `<div style=\"width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1e40af);color:#fff;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\">${ini(r.full_name)}</div>`;\n  return `\n  <div style=\"${brd};border-radius:10px;padding:10px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px\">\n    <span style=\"min-width:30px;font-size:16px;font-weight:800;color:#1e40af;flex-shrink:0;text-align:center\">#${rank}</span>\n    ${avatar}\n    <div style=\"flex:1;min-width:0;padding-left:4px\">\n      <div style=\"font-size:13px;font-weight:600;color:#1a2035;white-space:nowrap;overflow:hidden;text-overflow:ellipsis\">\n        ${r.full_name}${isMe?' <span style=\"font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:4px\">Você</span>':''}\n      </div>\n      <div style=\"font-size:11px;color:#94a3b8;margin-top:2px\">${r.sector||'Sem setor'}</div>\n    </div>\n    <span style=\"font-size:15px;font-weight:700;color:#1e40af;flex-shrink:0;padding-left:12px\">${r.result_pct}%</span>\n  </div>`;\n}\n\n// ── Minha posição\nconst myData = (item.top5_ranking || []).find(r => r.user_id === item.user_id) || {\n  user_id: item.user_id, full_name: item.to_name, sector: '', avatar_url: null, result_pct: item.user_progress\n};\nconst myCard = rankItem(myData, item.user_rank, true);\n\n// ── OKRs DO PRÓPRIO USUÁRIO\nconst okrRows = (item.user_okrs || []).map(o => `\n  <div style=\"padding:12px 0;border-bottom:1px solid #f1f5f9\">\n    <div style=\"display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px\">\n      <span style=\"font-size:13px;font-weight:500;color:#1a2035;line-height:1.4;padding-right:8px\">${o.title}</span>\n      <span style=\"font-size:14px;font-weight:700;color:${c(o.result_pct)};flex-shrink:0\">${o.result_pct}%</span>\n    </div>${bar(o.result_pct)}\n  </div>`).join('');\n\nconst now = new Date();\nconst mon = new Date(now); mon.setDate(now.getDate()-((now.getDay()+6)%7));\nconst sun = new Date(mon); sun.setDate(mon.getDate()+6);\nconst fmt = d => d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});\n\nconst html = `<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background:#f0f4f8;font-family:'Segoe UI',Arial,sans-serif;color:#1a2035\">\n<div style=\"max-width:640px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 32px rgba(30,64,175,.10)\">\n\n  <div style=\"background:linear-gradient(135deg,#1e40af 0%,#3b82f6 60%,#06b6d4 100%);padding:36px 40px 28px;text-align:center\">\n    <div style=\"margin-bottom:16px\"><span style=\"font-size:22px;font-weight:700;color:#fff\">🎯 WenKey</span></div>\n    <span style=\"display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#e0f2fe;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:4px 12px;border-radius:999px;margin-bottom:10px\">✉ Relatório Semanal</span>\n    <h1 style=\"color:#fff;font-size:26px;font-weight:700;margin:0\">Seus Indicadores de OKR</h1>\n    <p style=\"margin-top:8px;color:rgba(255,255,255,.75);font-size:14px\">${item.quarter_name} · ${fmt(mon)} – ${fmt(sun)}</p>\n  </div>\n\n  <div style=\"padding:28px 40px 0\">\n    <h2 style=\"font-size:20px;font-weight:600;color:#1a2035;margin:0\">Olá, ${item.to_name} 👋</h2>\n    <p style=\"margin-top:6px;font-size:14px;color:#64748b;line-height:1.6\">Aqui está um resumo dos seus indicadores e do desempenho da equipe no quarter atual.</p>\n  </div>\n\n  <p style=\"padding:24px 40px 10px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#94a3b8;margin:0\">Seus números desta semana</p>\n  <div style=\"padding:0 40px 8px;display:flex;gap:12px\">\n    <div style=\"flex:1;background:#f8faff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 16px;text-align:center\">\n      <div style=\"font-size:32px;font-weight:700;color:#1e40af;line-height:1\">${item.active_objectives}</div>\n      <div style=\"margin-top:6px;font-size:11px;color:#64748b;text-transform:uppercase\">Objetivos Ativos</div>\n    </div>\n    <div style=\"flex:1;background:#f8faff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 16px;text-align:center\">\n      <div style=\"font-size:32px;font-weight:700;color:#1e40af;line-height:1\">${item.active_okrs}</div>\n      <div style=\"margin-top:6px;font-size:11px;color:#64748b;text-transform:uppercase\">OKRs Ativos</div>\n    </div>\n    <div style=\"flex:1;background:#f8faff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 16px;text-align:center\">\n      <div style=\"font-size:32px;font-weight:700;color:#16a34a;line-height:1\">${item.user_progress}%</div>\n      <div style=\"margin-top:6px;font-size:11px;color:#64748b;text-transform:uppercase\">Progresso Quarter</div>\n    </div>\n  </div>\n\n  <p style=\"padding:24px 40px 10px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#94a3b8;margin:0\">Progresso por Objetivo</p>\n  <div style=\"padding:0 40px 8px\">\n    <div style=\"background:#f8faff;border:1px solid #e2e8f0;border-radius:12px;padding:20px\">${objRows}</div>\n  </div>\n\n  <p style=\"padding:24px 40px 10px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#94a3b8;margin:0\">Sua posição no ranking</p>\n  <div style=\"padding:0 40px\">${myCard}</div>\n\n  <p style=\"padding:24px 40px 10px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#94a3b8;margin:0\">Meus OKRs em Destaque</p>\n  <div style=\"padding:0 40px\">${okrRows}</div>\n\n  <div style=\"margin-top:32px;padding:24px 40px;background:#f8faff;border-top:1px solid #e2e8f0;text-align:center\">\n    <div style=\"font-size:16px;font-weight:800;color:#1e40af;margin-bottom:8px\">WenKey</div>\n    <p style=\"font-size:11px;color:#94a3b8;line-height:1.6\">© 2026 WenKey. Todos os direitos reservados.</p>\n  </div>\n\n</div></body></html>`;\n\nreturn [{ json: { ...item, html_body: html, subject: `📊 Seu Relatório Semanal de OKRs – ${item.quarter_name}` } }];\n"
+      },
+      "id": "ff6e892e-a3ba-483a-a7a2-457058928c4d",
+      "name": "Generate Email HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "=weappnocode@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1088,
+        0
+      ],
+      "id": "b4bdf496-bffc-47cf-8b7f-1371357d1e9e",
+      "name": "Send a message",
+      "webhookId": "eb8ef4a8-f4d9-4ab0-a3b8-e8d2713ab76f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "PGQhFRwb1q0ZIbVS",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Explode Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Explode Emails": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split in Batches": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Generate Email HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email HTML": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d8431edc-b9bf-4e77-8dd7-eb4c50b7a2f5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "da8aac4036f990c02bf7105ce6d08a3d63f6c2176ef7536989231c5ff6272455"
+  },
+  "id": "M04VxaC06HjmLV0L",
+  "tags": []
+}

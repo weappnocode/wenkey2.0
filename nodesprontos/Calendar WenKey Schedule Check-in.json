@@ -1,0 +1,92 @@
+{
+  "name": "WenKey Schedule Check-in",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wenkey-schedule",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567801",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 200],
+      "webhookId": "wenkey-schedule"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\n\nconst attendeeEmails = Array.isArray(body.attendee_emails) ? body.attendee_emails : [];\nconst attendeeCount = attendeeEmails.length;\n\n// Monta o body completo da Google Calendar API\nconst eventBody = {\n  summary: `Reunião de Check-in — ${body.quarter_name}`,\n  description: `Check-in do quarter ${body.quarter_name} agendado pelo WenKey.\\n\\nParticipantes: ${attendeeCount} pessoa(s).`,\n  start: {\n    dateTime: body.start_datetime,\n    timeZone: 'America/Sao_Paulo'\n  },\n  end: {\n    dateTime: body.end_datetime,\n    timeZone: 'America/Sao_Paulo'\n  },\n  attendees: attendeeEmails.map(email => ({ email })),\n  conferenceData: {\n    createRequest: {\n      requestId: body.checkin_id || `wenkey-${Date.now()}`,\n      conferenceSolutionKey: {\n        type: 'hangoutsMeet'\n      }\n    }\n  },\n  guestsCanModifyEvent: false,\n  guestsCanInviteOthers: false,\n  reminders: {\n    useDefault: false,\n    overrides: [\n      { method: 'email', minutes: 60 },\n      { method: 'popup', minutes: 10 }\n    ]\n  }\n};\n\nreturn [{\n  json: {\n    event_body: JSON.stringify(eventBody),\n    attendee_count: attendeeCount,\n    checkin_id: body.checkin_id,\n    quarter_name: body.quarter_name\n  }\n}];"
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789003",
+      "name": "Prepare Event Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.event_body }}",
+        "options": {}
+      },
+      "id": "e5f6a7b8-c9d0-1234-efab-345678901205",
+      "name": "Google Calendar API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [448, 200],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ocuxJ0l3Q2LmVywM",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"event_id\": \"{{ $json.id }}\",\n  \"meet_link\": \"{{ $json.conferenceData.entryPoints[0].uri }}\"\n}",
+        "options": {}
+      },
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678902",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [672, 200]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Prepare Event Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Event Data": {
+      "main": [
+        [{ "node": "Google Calendar API", "type": "main", "index": 0 }]
+      ]
+    },
+    "Google Calendar API": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "WenKeyScheduleCheckin01",
+  "tags": ["wenkey", "google-calendar", "checkin"]
+}

@@ -1,0 +1,113 @@
+{
+  "name": "Checkin Reminder Email",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "b1c2d3e4-f5a6-7890-abcd-ef1234567890",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tasaalobestljwraqjov.supabase.co/functions/v1/get-checkin-reminder-data",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "id": "c2d3e4f5-a6b7-8901-bcde-f12345678901",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [224, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.first().json.emails.map(item => ({ json: item }));"
+      },
+      "id": "d3e4f5a6-b7c8-9012-cdef-123456789012",
+      "name": "Explode Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [448, 0]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "e4f5a6b7-c8d9-0123-defa-234567890123",
+      "name": "Split in Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [672, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nfunction ini(name) { return name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase(); }\n\nconst urgency = item.days_until <= 1\n  ? { color: '#dc2626', bg: '#fef2f2', border: '#fecaca', label: '🔴 AMANHÃ' }\n  : item.days_until <= 2\n  ? { color: '#d97706', bg: '#fffbeb', border: '#fde68a', label: '🟡 EM 2 DIAS' }\n  : { color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', label: '🟢 EM BREVE' };\n\nconst html = `<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background:#f0f4f8;font-family:'Segoe UI',Arial,sans-serif;color:#1a2035\">\n<div style=\"max-width:600px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 32px rgba(30,64,175,.10)\">\n\n  <div style=\"background:linear-gradient(135deg,#1e40af 0%,#3b82f6 60%,#06b6d4 100%);padding:36px 40px 28px;text-align:center\">\n    <div style=\"margin-bottom:12px\"><span style=\"font-size:22px;font-weight:700;color:#fff\">🎯 WenKey</span></div>\n    <div style=\"font-size:40px;margin-bottom:8px\">📅</div>\n    <h1 style=\"color:#fff;font-size:24px;font-weight:700;margin:0\">Lembrete de Check-in</h1>\n    <p style=\"margin-top:8px;color:rgba(255,255,255,.80);font-size:14px\">${item.quarter_name}</p>\n  </div>\n\n  <div style=\"padding:32px 40px 0\">\n    <h2 style=\"font-size:20px;font-weight:600;color:#1a2035;margin:0\">Olá, ${item.to_name} 👋</h2>\n    <p style=\"margin-top:8px;font-size:14px;color:#64748b;line-height:1.7\">\n      Este é um lembrete de que o próximo <strong>check-in de OKRs</strong> está se aproximando. Prepare seus números e registre o progresso dos seus Key Results a tempo!\n    </p>\n  </div>\n\n  <div style=\"padding:24px 40px\">\n    <div style=\"background:${urgency.bg};border:2px solid ${urgency.border};border-radius:14px;padding:24px;text-align:center\">\n      <div style=\"font-size:13px;font-weight:700;color:${urgency.color};letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px\">${urgency.label}</div>\n      <div style=\"font-size:28px;font-weight:800;color:#1a2035;line-height:1.2\">${item.checkin_date_formatted}</div>\n      <div style=\"margin-top:8px;font-size:13px;color:#64748b\">\n        ${item.days_until === 0 ? 'O check-in é <strong>hoje!</strong>' : item.days_until === 1 ? 'Falta <strong>1 dia</strong>' : `Faltam <strong>${item.days_until} dias</strong>`}\n      </div>\n    </div>\n  </div>\n\n  <div style=\"padding:0 40px 8px\">\n    <p style=\"font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#94a3b8;margin:0 0 12px\">O que fazer antes do check-in</p>\n    <div style=\"background:#f8faff;border:1px solid #e2e8f0;border-radius:12px;padding:20px\">\n      <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n        <tr>\n          <td style=\"vertical-align:top;padding-right:12px;width:28px\">\n            <div style=\"background:#dbeafe;border-radius:50%;width:24px;height:24px;text-align:center;line-height:24px;color:#1d4ed8;font-size:12px;font-weight:700\">1</div>\n          </td>\n          <td style=\"font-size:13px;color:#334155;line-height:1.6;padding-bottom:12px\">Colete os dados realizados de cada Key Result</td>\n        </tr>\n        <tr>\n          <td style=\"vertical-align:top;padding-right:12px\">\n            <div style=\"background:#dbeafe;border-radius:50%;width:24px;height:24px;text-align:center;line-height:24px;color:#1d4ed8;font-size:12px;font-weight:700\">2</div>\n          </td>\n          <td style=\"font-size:13px;color:#334155;line-height:1.6;padding-bottom:12px\">Acesse o WenKey e registre o progresso de cada KR</td>\n        </tr>\n        <tr>\n          <td style=\"vertical-align:top;padding-right:12px\">\n            <div style=\"background:#dbeafe;border-radius:50%;width:24px;height:24px;text-align:center;line-height:24px;color:#1d4ed8;font-size:12px;font-weight:700\">3</div>\n          </td>\n          <td style=\"font-size:13px;color:#334155;line-height:1.6\">Adicione observações sobre bloqueios ou conquistas relevantes</td>\n        </tr>\n      </table>\n    </div>\n  </div>\n\n  <div style=\"margin-top:24px;padding:24px 40px;background:#f8faff;border-top:1px solid #e2e8f0;text-align:center\">\n    <div style=\"font-size:16px;font-weight:800;color:#1e40af;margin-bottom:4px\">WenKey</div>\n    <p style=\"font-size:11px;color:#94a3b8;line-height:1.6\">© 2026 WenKey. Todos os direitos reservados.</p>\n  </div>\n\n</div></body></html>`;\n\nreturn [{ json: { ...item, html_body: html, subject: `📅 Lembrete: Check-in de OKRs em ${item.days_until <= 1 ? (item.days_until === 0 ? 'hoje' : 'amanhã') : item.days_until + ' dias'} – ${item.quarter_name}` } }];\n"
+      },
+      "id": "f5a6b7c8-d9e0-1234-efab-345678901234",
+      "name": "Generate Email HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to_email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1088, 0],
+      "id": "a6b7c8d9-e0f1-2345-fabc-456789012345",
+      "name": "Send a message",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "PGQhFRwb1q0ZIbVS",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "HTTP Request", "type": "main", "index": 0 }]]
+    },
+    "HTTP Request": {
+      "main": [[{ "node": "Explode Emails", "type": "main", "index": 0 }]]
+    },
+    "Explode Emails": {
+      "main": [[{ "node": "Split in Batches", "type": "main", "index": 0 }]]
+    },
+    "Split in Batches": {
+      "main": [[], [{ "node": "Generate Email HTML", "type": "main", "index": 0 }]]
+    },
+    "Generate Email HTML": {
+      "main": [[{ "node": "Send a message", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "CheckinReminderEmail01",
+  "tags": []
+}
