@@ -1658,7 +1658,7 @@ export default function KRCheckins() {
                             const avgPercentage = stats?.average ?? 0;
 
                             return (
-                              <TableCell key={checkin.id} className="bg-muted/50 text-center px-2">
+                              <TableCell key={checkin.id} className={`text-center px-2 ${selectedCheckinDate === checkin.id ? 'bg-primary/10' : 'bg-muted/50'}`}>
                                 <div className="flex flex-col items-center gap-1 py-2">
                                   <span className="text-xl font-bold text-primary">{avgPercentage}%</span>
                                   <Progress
@@ -1702,7 +1702,7 @@ export default function KRCheckins() {
                               return (
                                 <TableCell
                                   key={checkin.id}
-                                  className={`p-4 ${isCheckinDatePast(checkin) && role !== 'admin' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:bg-muted/50'}`}
+                                  className={`p-4 ${selectedCheckinDate === checkin.id ? 'bg-primary/5' : ''} ${isCheckinDatePast(checkin) && role !== 'admin' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:bg-muted/50'}`}
                                   onClick={() => openDialog(kr, checkin)}
                                 >
                                   {(result && !(result.meta_checkin === 0 && result.minimo_orcamento === 0 && result.valor_realizado === 0)) ? (
