@@ -1278,33 +1278,31 @@ export default function KRCheckins() {
         console.log('Inserção bem-sucedida:', data);
       }
 
-      await updateStoredProgress(kr, roundedKRProgress);
-      // Recarregar os dados para refletir as mudanças
-      await loadCheckinResults();
-
-      // Forçar atualização do resultado do quarter para o dono do KR
-      await saveQuarterResult(kr.user_id ?? user?.id);
-
       toast({
         title: 'Sucesso',
         description: 'Dados salvos com sucesso',
       });
 
-      // Dispara webhook n8n para criar evento no Google Calendar (falha silenciosa)
-      try {
-        await callN8nWebhook('wenkey-checkin', {
-          kr_title: currentKR.title,
-          checkin_date: currentCheckin.checkin_date,
-          valor_realizado: isNaN(realizado) ? null : realizado,
-          meta: isNaN(meta) ? null : meta,
-          percentual: roundedVisualAttainment,
-          company: selectedCompany?.name ?? '',
-        });
-      } catch (webhookErr) {
-        console.warn('[n8n] Webhook falhou (não impacta o check-in):', webhookErr);
-      }
-
+      // Fechar o dialog imediatamente após confirmação do salvamento
       closeDialog();
+
+      // Operações secundárias em background (não bloqueiam o fechamento do modal)
+      updateStoredProgress(kr, roundedKRProgress)
+        .then(() => loadCheckinResults())
+        .then(() => saveQuarterResult(kr.user_id ?? user?.id))
+        .catch((bgErr) => console.error('[KRCheckins] Erro em operação background:', bgErr));
+
+      // Dispara webhook n8n para criar evento no Google Calendar (falha silenciosa)
+      callN8nWebhook('wenkey-checkin', {
+        kr_title: currentKR.title,
+        checkin_date: currentCheckin.checkin_date,
+        valor_realizado: isNaN(realizado) ? null : realizado,
+        meta: isNaN(meta) ? null : meta,
+        percentual: roundedVisualAttainment,
+        company: selectedCompany?.name ?? '',
+      }).catch((webhookErr) => {
+        console.warn('[n8n] Webhook falhou (não impacta o check-in):', webhookErr);
+      });
     } catch (error: unknown) {
       console.error('Erro no catch:', error);
       toast({

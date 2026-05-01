@@ -167,11 +167,24 @@ export default function Dashboard() {
       />
       <div className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
-          <div className="flex flex-col gap-4">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">{toTitleCase('Dashboard')}</p>
-              <h1 className="text-2xl font-bold tracking-tight text-black">{toTitleCase('Bem-vindo')}, {toTitleCase(userProfile?.full_name ?? 'Usuário')}</h1>
-              <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col gap-3">
+            <div className="space-y-0.5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{toTitleCase('Dashboard')}</p>
+              <div className="flex items-center gap-2.5">
+                <Avatar className="h-8 w-8 shrink-0">
+                  {userProfile?.avatar_url ? (
+                    <AvatarImage src={userProfile.avatar_url} alt={userProfile.full_name} />
+                  ) : (
+                    <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">
+                      {getInitials(userProfile?.full_name ?? '')}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                <h1 className="text-lg font-bold tracking-tight text-black leading-tight">
+                  {toTitleCase('Bem-vindo')}, {toTitleCase(userProfile?.full_name ?? 'Usuário')}
+                </h1>
+              </div>
+              <p className="text-xs text-muted-foreground">
                 {toTitleCase('Acompanhe a evolução dos objetivos e resultados-chave da empresa.')}
               </p>
             </div>
