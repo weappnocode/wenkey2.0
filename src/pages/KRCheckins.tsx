@@ -704,15 +704,9 @@ export default function KRCheckins() {
   };
 
   const openDialog = (kr: KeyResult, checkin: QuarterCheckin) => {
-    // Checkins com datas passadas só podem ser editados por Admin
-    if (isCheckinDatePast(checkin) && role !== 'admin') {
-      toast({
-        title: 'Acesso restrito',
-        description: 'Somente administradores podem editar check-ins de datas anteriores.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    // Agora permitimos abrir o diálogo para todos, os campos individuais
+    // no diálogo (meta, minimo) já possuem restrição por role.
+    // O RLS do Supabase garante que o usuário só salve o que tem permissão.
 
     setCurrentKR(kr);
     setCurrentCheckin(checkin);
@@ -1727,7 +1721,7 @@ export default function KRCheckins() {
                               return (
                                 <TableCell
                                   key={checkin.id}
-                                  className={`p-4 ${selectedCheckinDate === checkin.id ? 'bg-primary/5' : ''} ${isCheckinDatePast(checkin) && role !== 'admin' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:bg-muted/50'}`}
+                                  className={`p-4 ${selectedCheckinDate === checkin.id ? 'bg-primary/5' : ''} cursor-pointer hover:bg-muted/50`}
                                   onClick={() => openDialog(kr, checkin)}
                                 >
                                   {(result && !(result.meta_checkin === 0 && result.minimo_orcamento === 0 && result.valor_realizado === 0)) ? (
