@@ -30,27 +30,32 @@ export function useDashboardChartData(filterUserId?: string | null) {
             const activeQuarter = quarters.find(q => q.start_date <= today && q.end_date >= today) || quarters[0];
             const quarter_id = activeQuarter.id;
 
-            // 2. Get checkins for the quarter
+            // 2. Get checkins for the quarter (filter by user when applicable)
             let checkinsQuery = supabase
                 .from('checkins')
                 .select('id, checkin_date, user_id')
                 .eq('quarter_id', quarter_id)
                 .order('checkin_date', { ascending: true });
 
-            const { data: checkins } = await checkinsQuery;
-
-            if (!checkins || checkins.length === 0) return { checkins: [], averages: {} };
-
-            // 3. Get Objectives & KRs
             let userIdFilter: string | null = null;
             if (role === 'user') {
                 userIdFilter = user.id;
             } else if (role === 'admin') {
                 userIdFilter = (filterUserId && filterUserId !== 'all') ? filterUserId : null;
-            } else if (role === 'manager') {
-                userIdFilter = null;
             }
 
+            if (userIdFilter) {
+                checkinsQuery = checkinsQuery.eq('user_id', userIdFilter);
+            }
+
+            const { data: checkins } = await checkinsQuery;
+
+            if (!checkins || checkins.length === 0) return { checkins: [], averages: {} };
+
+            // Mapa: checkin_id -> checkin_date (para resolver datas dos resultados)
+            const checkinDateMap = new Map(checkins.map(c => [c.id, c.checkin_date]));
+
+            // 3. Get Objectives & KRs
             let objectivesQuery = supabase
                 .from('objectives')
                 .select('id, title, user_id, profiles!user_id!inner(is_active)')
@@ -60,7 +65,7 @@ export function useDashboardChartData(filterUserId?: string | null) {
                 .eq('profiles.is_active', true);
 
             if (userIdFilter) {
-                // Find KRs owned by user to include their objectives too
+                // Inclui objetivos do usuário OU onde o usuário tem KRs
                 const { data: userKrs } = await supabase
                     .from('key_results')
                     .select('objective_id')
@@ -95,21 +100,15 @@ export function useDashboardChartData(filterUserId?: string | null) {
 
             const krIds = krs.map(kr => kr.id);
 
-            // 4. Get checkin_results for these KRs (only for actual recorded check-ins)
+            // 4. Busca TODOS os resultados do quarter (não só do checkin específico)
+            // Isso permite fazer "último resultado disponível até a data do check-in"
             const checkinIds = checkins.map(c => c.id);
 
-            const { data: checkinResults } = await supabase
+            const { data: allResults } = await supabase
                 .from('checkin_results')
                 .select('checkin_id, key_result_id, valor_realizado, meta_checkin, minimo_orcamento')
                 .in('checkin_id', checkinIds)
                 .in('key_result_id', krIds);
-
-            // Mapa direto: checkin_id -> lista de resultados DESSE checkin específico
-            const resultsByCheckinId = new Map<string, typeof checkinResults>();
-            (checkinResults || []).forEach(r => {
-                if (!resultsByCheckinId.has(r.checkin_id)) resultsByCheckinId.set(r.checkin_id, []);
-                resultsByCheckinId.get(r.checkin_id)!.push(r);
-            });
 
             // Group KRs by objective title
             const titleMap = new Map<string, typeof krs>();
@@ -129,10 +128,27 @@ export function useDashboardChartData(filterUserId?: string | null) {
             const averages: Record<string, { average: number; hasData: boolean }> = {};
 
             checkins.forEach(checkin => {
-                // Só calcula se há resultados registrados NESTE check-in específico
-                const thisCheckinResults = resultsByCheckinId.get(checkin.id) || [];
+                const checkinDate = checkin.checkin_date;
 
-                if (thisCheckinResults.length === 0) {
+                // Para cada KR, busca o resultado mais recente ATÉ ESTA DATA do check-in
+                // Isso garante que o gráfico usa a mesma lógica do círculo de progresso
+                const latestResultPerKR = new Map<string, typeof allResults[0]>();
+
+                (allResults || []).forEach(result => {
+                    const resultDate = checkinDateMap.get(result.checkin_id);
+                    if (!resultDate || resultDate > checkinDate) return; // ignora resultados futuros
+
+                    const existing = latestResultPerKR.get(result.key_result_id);
+                    const existingDate = existing ? checkinDateMap.get(existing.checkin_id) : null;
+
+                    // Mantém o mais recente até esta data
+                    if (!existing || (existingDate && resultDate > existingDate)) {
+                        latestResultPerKR.set(result.key_result_id, result);
+                    }
+                });
+
+                // Se não há dados até esta data, não exibe o ponto
+                if (latestResultPerKR.size === 0) {
                     averages[checkin.id] = { average: 0, hasData: false };
                     return;
                 }
@@ -146,8 +162,8 @@ export function useDashboardChartData(filterUserId?: string | null) {
                     let groupHasData = false;
 
                     group.keyResults.forEach(kr => {
-                        // Resultado deste KR NESTE checkin — sem carry-forward
-                        const result = thisCheckinResults.find(r => r.key_result_id === kr.id);
+                        // Último resultado disponível para este KR até a data do check-in
+                        const result = latestResultPerKR.get(kr.id);
 
                         if (result && result.valor_realizado !== null && result.meta_checkin !== null && result.minimo_orcamento !== null) {
                             const krPct = calculateKR(result.valor_realizado, result.minimo_orcamento, result.meta_checkin, kr.direction, kr.type);

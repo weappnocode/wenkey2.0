@@ -115,11 +115,29 @@ export const calculateQuarterProgress = async (
 
     const { data: checkins } = await supabase
         .from('checkin_results')
-        .select('key_result_id, percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins!inner(quarter_id, checkin_date)')
+        .select('key_result_id, percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins!inner(id, quarter_id, checkin_date)')
         .eq('checkins.quarter_id', quarterId)
         .in('key_result_id', krIds);
 
-    const today = new Date().toISOString().split('T')[0];
+    const { data: globalCheckins } = await supabase
+        .from('checkins')
+        .select('id, checkin_date')
+        .eq('quarter_id', quarterId)
+        .order('checkin_date', { ascending: false });
+
+    let activeCheckinDate: string | null = null;
+    if (globalCheckins && globalCheckins.length > 0) {
+        const uniqueDates = Array.from(new Set(globalCheckins.map(c => c.checkin_date)));
+        const orderedDates = uniqueDates.sort((a, b) => new Date(`${a}T00:00:00`).getTime() - new Date(`${b}T00:00:00`).getTime());
+        const now = new Date().getTime();
+        for (let i = 0; i < orderedDates.length; i++) {
+            const start = new Date(`${orderedDates[i]}T00:00:00`).getTime();
+            const nextStart = orderedDates[i + 1] ? new Date(`${orderedDates[i + 1]}T00:00:00`).getTime() : null;
+            if (!nextStart && now >= start) { activeCheckinDate = orderedDates[i]; break; }
+            if (nextStart !== null && now >= start && now < nextStart) { activeCheckinDate = orderedDates[i]; break; }
+        }
+        if (!activeCheckinDate && orderedDates.length > 0) activeCheckinDate = orderedDates[orderedDates.length - 1];
+    }
 
     // Build objective title map for grouping (same logic as useDashboardChartData)
     const objectiveIdToTitle = new Map<string, string>(objectives.map(o => [o.id, o.title]));
@@ -141,13 +159,9 @@ export const calculateQuarterProgress = async (
         let hasData = false;
 
         groupKRs.forEach((kr) => {
-            const krCheckinsForKr = (checkins || [])
-                .filter(c => c.key_result_id === kr.id && (c.checkins?.checkin_date || '') <= today)
-                .sort((a, b) => (b.checkins?.checkin_date || '').localeCompare(a.checkins?.checkin_date || ''));
+            const krCheckin = (checkins || []).find(c => c.key_result_id === kr.id && c.checkins?.checkin_date === activeCheckinDate);
 
-            const krCheckin = krCheckinsForKr[0];
-
-            if (krCheckin && krCheckin.valor_realizado !== null && krCheckin.meta_checkin !== null && krCheckin.minimo_orcamento !== null) {
+            if (krCheckin && krCheckin.valor_realizado !== null && krCheckin.meta_checkin !== null) {
                 const krProgress = calculateKR(
                     Number(krCheckin.valor_realizado),
                     Number(krCheckin.minimo_orcamento),
@@ -382,7 +396,6 @@ export function useDashboardData(filterUserId?: string | null) {
             }
 
             // Identificar o activeCheckinDate global para as métricas de Objetivos e OKRs
-            // O today já está declarado acima, não precisamos redeclarar
             let globalCheckinsQuery = supabase
                 .from('checkins')
                 .select('id, checkin_date')
@@ -395,6 +408,21 @@ export function useDashboardData(filterUserId?: string | null) {
 
             const { data: globalCheckins } = await globalCheckinsQuery;
 
+            let activeCheckinDate: string | null = null;
+            if (globalCheckins && globalCheckins.length > 0) {
+                const uniqueDates = Array.from(new Set(globalCheckins.map(c => c.checkin_date)));
+                const orderedDates = uniqueDates.sort((a, b) => new Date(`${a}T00:00:00`).getTime() - new Date(`${b}T00:00:00`).getTime());
+                const now = new Date().getTime();
+                
+                for (let i = 0; i < orderedDates.length; i++) {
+                    const start = new Date(`${orderedDates[i]}T00:00:00`).getTime();
+                    const nextStart = orderedDates[i + 1] ? new Date(`${orderedDates[i + 1]}T00:00:00`).getTime() : null;
+                    if (!nextStart && now >= start) { activeCheckinDate = orderedDates[i]; break; }
+                    if (nextStart !== null && now >= start && now < nextStart) { activeCheckinDate = orderedDates[i]; break; }
+                }
+                if (!activeCheckinDate && orderedDates.length > 0) activeCheckinDate = orderedDates[orderedDates.length - 1];
+            }
+
             const getKRAttainment = (kr: Record<string, unknown>, quarterId: string) => {
                 const krCheckinsData = (kr.checkin_results as Record<string, unknown>[] || [])
                     .map(r => ({
@@ -403,14 +431,11 @@ export function useDashboardData(filterUserId?: string | null) {
                     }))
                     .filter(r => r.checkins && r.checkins.quarter_id === quarterId);
 
-                const today = new Date().toISOString().split('T')[0];
-                const validResults = krCheckinsData
-                    .filter(r => r.checkins?.checkin_date && r.checkins.checkin_date <= today)
-                    .sort((a, b) => b.checkins.checkin_date.localeCompare(a.checkins.checkin_date));
+                const validResults = krCheckinsData.filter(r => r.checkins?.checkin_date === activeCheckinDate);
 
-                const activeResult = validResults[0];
+                const activeResult = validResults.length > 0 ? validResults[0] : null;
 
-                if (activeResult && activeResult.valor_realizado !== null && activeResult.meta_checkin !== null && activeResult.minimo_orcamento !== null) {
+                if (activeResult && activeResult.valor_realizado !== null && activeResult.meta_checkin !== null) {
                     return calculateKR(
                         Number(activeResult.valor_realizado),
                         Number(activeResult.minimo_orcamento),
@@ -439,51 +464,38 @@ export function useDashboardData(filterUserId?: string | null) {
 
             const objectiveRankings: ObjectiveRanking[] = [];
             if (allObjectives && allObjectives.length > 0) {
-                const groups = new Map<string, { totalPct: number; userCount: number; krCount: number }>();
+                // Pool ALL KRs by objective title — mesma lógica de calculateQuarterProgress.
+                // Evita "média de médias" quando múltiplos usuários têm o mesmo título de objetivo.
+                const titleToKRData = new Map<string, { weightedSum: number; totalWeight: number; krCount: number }>();
+
                 allObjectives.forEach(obj => {
                     const title = obj.title.trim();
-                    const current = groups.get(title) || { totalPct: 0, userCount: 0, krCount: 0 };
-
-                    let objAttainment = 0;
+                    if (!titleToKRData.has(title)) {
+                        titleToKRData.set(title, { weightedSum: 0, totalWeight: 0, krCount: 0 });
+                    }
+                    const entry = titleToKRData.get(title)!;
                     const krs = (obj.key_results as Record<string, unknown>[]) || [];
-                    let hasData = false;
 
-                    if (krs.length > 0) {
-                        let weightedSum = 0;
-                        let totalWeight = 0;
+                    krs.forEach((kr) => {
+                        const krPercentage = getKRAttainment(kr, activeQuarter.id);
+                        const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
+                        entry.krCount += 1;
 
-                        krs.forEach((kr) => {
-                            const krPercentage = getKRAttainment(kr, activeQuarter.id);
-                            const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
-
-                            if (krPercentage !== null) {
-                                weightedSum += krPercentage * weight;
-                                totalWeight += weight;
-                                hasData = true;
-                            }
-                        });
-
-                        if (hasData && totalWeight > 0) {
-                            objAttainment = weightedSum / totalWeight;
+                        if (krPercentage !== null) {
+                            entry.weightedSum += krPercentage * weight;
+                            entry.totalWeight += weight;
                         }
-                    }
-
-                    if (hasData) {
-                        current.totalPct += objAttainment;
-                        current.userCount += 1;
-                    }
-                    
-                    // Sempre consideramos a contagem de KRs para o agrupamento
-                    current.krCount += krs.length;
-                    groups.set(title, current);
-                });
-                for (const [title, stats] of groups.entries()) {
-                    const avg = stats.userCount > 0 ? Math.round(stats.totalPct / stats.userCount) : 0;
-                    objectiveRankings.push({
-                        objective_title: title,
-                        result_pct: avg,
-                        kr_count: stats.krCount
                     });
+                });
+
+                for (const [title, data] of titleToKRData.entries()) {
+                    if (data.totalWeight > 0) {
+                        objectiveRankings.push({
+                            objective_title: title,
+                            result_pct: Math.round(data.weightedSum / data.totalWeight),
+                            kr_count: data.krCount
+                        });
+                    }
                 }
                 objectiveRankings.sort((a, b) => b.result_pct - a.result_pct);
             }
