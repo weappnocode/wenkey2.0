@@ -67,24 +67,29 @@ const RenderAvatarDot = (props: any) => {
     
     // Check if this is the last visible point for this line
     const isLast = index === data.length - 1;
+    const avatarUrl = userMetadata[dataKey]?.avatar_url;
     
-    if (isLast && userMetadata[dataKey]?.avatar_url) {
+    // Slugify name for unique clipPath ID
+    const safeId = dataKey.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    
+    if (isLast && avatarUrl) {
         return (
-            <g>
-                <circle cx={cx} cy={cy} r={12} fill={color} stroke="#fff" strokeWidth={2} />
+            <g className="animate-in fade-in zoom-in duration-300">
+                <circle cx={cx} cy={cy} r={14} fill={color} stroke="#fff" strokeWidth={2} className="shadow-lg" />
                 <defs>
-                    <clipPath id={`clip-${dataKey}`}>
-                        <circle cx={cx} cy={cy} r={10} />
+                    <clipPath id={`clip-${safeId}`}>
+                        <circle cx={cx} cy={cy} r={12} />
                     </clipPath>
                 </defs>
                 <image
-                    x={cx - 10}
-                    y={cy - 10}
-                    width={20}
-                    height={20}
-                    href={userMetadata[dataKey].avatar_url}
-                    clipPath={`url(#clip-${dataKey})`}
+                    x={cx - 12}
+                    y={cy - 12}
+                    width={24}
+                    height={24}
+                    href={avatarUrl}
+                    clipPath={`url(#clip-${safeId})`}
                     style={{ borderRadius: '50%' }}
+                    preserveAspectRatio="xMidYMid slice"
                 />
             </g>
         );

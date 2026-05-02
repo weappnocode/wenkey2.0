@@ -187,9 +187,10 @@ export function useRankingHistory() {
             // Filter out history points that are in the future and have no meaningful changes
             // or where no results were recorded yet.
             // Rule: Find the last checkin_id that has at least one entry in allResults
+            const todayStr = new Date().toISOString().split('T')[0];
             const checkinIdsWithResults = new Set(allResults.map(r => r.checkin_id));
             const lastCheckinWithResultsIndex = checkins.reduce((lastIdx, c, idx) => {
-                if (checkinIdsWithResults.has(c.id)) return idx;
+                if (c.checkin_date <= todayStr && checkinIdsWithResults.has(c.id)) return idx;
                 return lastIdx;
             }, -1);
 
