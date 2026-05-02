@@ -21,6 +21,47 @@ const COLORS = [
     '#059669', '#f43f5e', '#8b5cf6', '#06b6d4', '#f59e0b',
 ];
 
+const CustomTooltip = ({ active, payload, label, viewMode }: any) => {
+    if (active && payload && payload.length) {
+        const sortedPayload = [...payload].sort((a, b) => {
+            if (viewMode === 'ranking') {
+                return a.value - b.value;
+            }
+            return b.value - a.value;
+        });
+
+        return (
+            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xl max-h-[350px] overflow-y-auto min-w-[200px] pointer-events-none z-50">
+                <p className="text-[11px] font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1.5">
+                    {(() => {
+                        try {
+                            return format(new Date(label + 'T12:00:00'), "EEEE, d 'de' MMMM", { locale: ptBR });
+                        } catch (e) {
+                            return label;
+                        }
+                    })()}
+                </p>
+                <div className="flex flex-col gap-1.5">
+                    {sortedPayload.map((entry: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.stroke }} />
+                                <span className="text-[10px] font-medium text-slate-600 truncate max-w-[140px]">
+                                    {entry.name}
+                                </span>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-900">
+                                {viewMode === 'ranking' ? `${entry.value}º` : `${entry.value}%`}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
 export const RankingHistoryChart: React.FC = () => {
     const { data: history, isLoading } = useRankingHistory();
     const [viewMode, setViewMode] = useState<'performance' | 'ranking'>('performance');
@@ -127,12 +168,13 @@ export const RankingHistoryChart: React.FC = () => {
                         <span className="w-1 h-1 bg-muted-foreground/30 rounded-full" />
                         <button 
                             onClick={maxIndex !== null ? handleReset : handlePlay}
-                            className="text-xs font-medium text-primary hover:underline flex items-center gap-1 transition-all"
+                            disabled={isAnimating}
+                            className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 transition-all disabled:opacity-50"
                         >
                             {maxIndex !== null ? (
-                                <><RotateCcw className="w-3 h-3" /> Resetar Visualização</>
+                                <><RotateCcw className="w-3 h-3" /> Resetar</>
                             ) : (
-                                <><Play className="w-3 h-3" /> Iniciar Animação</>
+                                <><Play className="w-3 h-3" /> Reproduzir</>
                             )}
                         </button>
                     </div>
@@ -191,29 +233,8 @@ export const RankingHistoryChart: React.FC = () => {
                             tickFormatter={(value) => viewMode === 'ranking' ? `${value}º` : `${value}%`}
                         />
                         <Tooltip 
-                            contentStyle={{ 
-                                borderRadius: '12px', 
-                                border: '1px solid #e2e8f0', 
-                                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-                                fontSize: '12px',
-                                padding: '12px'
-                            }}
+                            content={<CustomTooltip viewMode={viewMode} />}
                             cursor={{ stroke: '#e2e8f0', strokeWidth: 2 }}
-                            formatter={(value: number, name: string) => [
-                                viewMode === 'ranking' ? `${value}º lugar` : `${value}%`, 
-                                name
-                            ]}
-                            labelFormatter={(label: string) => {
-                                 try {
-                                    return format(new Date(label + 'T12:00:00'), "EEEE, d 'de' MMMM", { locale: ptBR });
-                                } catch (e) {
-                                    return label;
-                                }
-                            }}
-                        />
-                        <Legend 
-                            iconType="circle"
-                            wrapperStyle={{ paddingTop: '30px', fontSize: '11px', color: '#64748b' }}
                         />
                         {userNames.map((user, index) => (
                             <Line
@@ -231,6 +252,18 @@ export const RankingHistoryChart: React.FC = () => {
                         ))}
                     </LineChart>
                 </ResponsiveContainer>
+            </div>
+
+            {/* Custom Scrollable Legend */}
+            <div className="flex flex-wrap justify-center gap-x-2 gap-y-2 max-h-[120px] overflow-y-auto px-4 py-3 bg-slate-50/50 rounded-xl border border-slate-100 shadow-inner scrollbar-thin scrollbar-thumb-slate-200">
+                {userNames.map((user, index) => (
+                    <div key={user} className="flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-slate-100 shadow-sm transition-all hover:border-primary/20">
+                        <div className="w-2 h-2 rounded-full shadow-sm" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <span className="text-[10px] font-semibold text-slate-600 truncate max-w-[130px]">
+                            {user}
+                        </span>
+                    </div>
+                ))}
             </div>
             
             <div className="flex flex-col gap-2 px-4">
