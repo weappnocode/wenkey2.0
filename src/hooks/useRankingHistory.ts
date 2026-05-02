@@ -197,7 +197,7 @@ export function useRankingHistory() {
             // or where no results were recorded yet.
             // Rule: Find the last checkin_id that has at least one entry in allResults
             const todayStr = new Date().toISOString().split('T')[0];
-            const checkinIdsWithResults = new Set(allResults.map(r => r.checkin_id));
+            const checkinIdsWithResults = new Set((allResults || []).map(r => r.checkin_id));
             const lastCheckinWithResultsIndex = checkins.reduce((lastIdx, c, idx) => {
                 if (c.checkin_date <= todayStr && checkinIdsWithResults.has(c.id)) return idx;
                 return lastIdx;
@@ -205,15 +205,37 @@ export function useRankingHistory() {
 
             let filteredHistory = history.slice(0, lastCheckinWithResultsIndex + 1);
 
-            // 7. Force latest point to match quarter_results for consistency
-            if (filteredHistory.length > 0) {
-                const latestPoint = filteredHistory[filteredHistory.length - 1];
-                profiles.forEach(profile => {
-                    const savedResult = quarterResultsMap.get(profile.id);
-                    if (savedResult !== undefined) {
-                        latestPoint[profile.full_name] = Math.round(savedResult);
-                    }
-                });
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayDateStr = today.toISOString().split('T')[0];
+
+            let finalHistory = filteredHistory;
+
+            if (finalHistory.length > 0) {
+                const lastPoint = finalHistory[finalHistory.length - 1];
+                const lastDate = lastPoint.originalDate;
+
+                if (lastDate !== todayDateStr) {
+                    const currentPoint: RankingHistoryPoint = {
+                        date: 'Agora',
+                        originalDate: todayDateStr,
+                        isCurrent: true
+                    };
+
+                    profiles.forEach(profile => {
+                        const qResult = quarterResults?.find(qr => qr.user_id === profile.id);
+                        currentPoint[profile.full_name] = qResult ? Math.round(qResult.result_percent) : (lastPoint[profile.full_name] || 0);
+                    });
+
+                    finalHistory = [...finalHistory, currentPoint];
+                } else {
+                    profiles.forEach(profile => {
+                        const qResult = quarterResults?.find(qr => qr.user_id === profile.id);
+                        if (qResult) {
+                            lastPoint[profile.full_name] = Math.round(qResult.result_percent);
+                        }
+                    });
+                }
             }
 
             const userMetadata: UserMetadata = {};

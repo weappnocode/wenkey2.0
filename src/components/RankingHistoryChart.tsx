@@ -31,26 +31,27 @@ const CustomTooltip = ({ active, payload, label, viewMode }: any) => {
         });
 
         return (
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xl min-w-[240px] pointer-events-none z-50">
-                <p className="text-xs font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">
+            <div className="bg-white/95 backdrop-blur-sm p-4 rounded-xl border border-slate-200 shadow-2xl min-w-[280px] pointer-events-none z-[9999]">
+                <p className="text-[11px] font-bold text-primary mb-3 border-b border-slate-100 pb-2 uppercase tracking-wider">
                     {(() => {
                         try {
+                            if (label === 'Agora' || label === 'Hoje') return 'Resultado Atual';
                             return format(new Date(label + 'T12:00:00'), "EEEE, d 'de' MMMM", { locale: ptBR });
                         } catch (e) {
                             return label;
                         }
                     })()}
                 </p>
-                <div className="flex flex-col gap-2">
+                <div className={`grid ${payload.length > 8 ? 'grid-cols-2' : 'grid-cols-1'} gap-x-6 gap-y-2`}>
                     {sortedPayload.map((entry: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between gap-6">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: entry.stroke }} />
-                                <span className="text-[11px] font-semibold text-slate-600">
-                                    {entry.name}
+                        <div key={index} className="flex items-center justify-between gap-4 py-0.5 border-b border-slate-50 last:border-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-2 h-2 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: entry.stroke }} />
+                                <span className="text-[10px] font-bold text-slate-700 truncate">
+                                    {entry.name.split(' ')[0]} {entry.name.split(' ')[1] || ''}
                                 </span>
                             </div>
-                            <span className="text-[11px] font-extrabold text-slate-900">
+                            <span className="text-[10px] font-black text-slate-900 flex-shrink-0 bg-slate-100 px-1.5 py-0.5 rounded">
                                 {viewMode === 'ranking' ? `${entry.value}º` : `${entry.value}%`}
                             </span>
                         </div>
@@ -159,6 +160,7 @@ export const RankingHistoryChart: React.FC = () => {
 
     const formatXAxis = (tickItem: string) => {
         try {
+            if (tickItem === 'Agora') return 'Atual';
             return format(new Date(tickItem + 'T12:00:00'), 'dd/MM', { locale: ptBR });
         } catch (e) {
             return tickItem;
