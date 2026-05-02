@@ -83,6 +83,15 @@ export function useRankingHistory() {
                 .in('checkin_id', checkins.map(c => c.id))
                 .in('key_result_id', krs.map(kr => kr.id));
 
+            // 6. Get Current Results (quarter_results) for consistency with dashboard
+            const { data: quarterResults } = await supabase
+                .from('quarter_results')
+                .select('user_id, result_percent')
+                .eq('company_id', company_id)
+                .eq('quarter_id', activeQuarter.id);
+
+            const quarterResultsMap = new Map((quarterResults || []).map(r => [r.user_id, Number(r.result_percent)]));
+
             // Map checkin_id to checkin_date for quick lookup
             const checkinDateMap = new Map(checkins.map(c => [c.id, c.checkin_date]));
             
@@ -194,7 +203,18 @@ export function useRankingHistory() {
                 return lastIdx;
             }, -1);
 
-            const filteredHistory = history.slice(0, lastCheckinWithResultsIndex + 1);
+            let filteredHistory = history.slice(0, lastCheckinWithResultsIndex + 1);
+
+            // 7. Force latest point to match quarter_results for consistency
+            if (filteredHistory.length > 0) {
+                const latestPoint = filteredHistory[filteredHistory.length - 1];
+                profiles.forEach(profile => {
+                    const savedResult = quarterResultsMap.get(profile.id);
+                    if (savedResult !== undefined) {
+                        latestPoint[profile.full_name] = Math.round(savedResult);
+                    }
+                });
+            }
 
             const userMetadata: UserMetadata = {};
             profiles.forEach(p => {
