@@ -11,6 +11,13 @@ export interface RankingHistoryPoint {
     [userName: string]: number | string; // userName -> result_pct
 }
 
+export interface UserMetadata {
+    [userName: string]: {
+        avatar_url: string | null;
+        id: string;
+    };
+}
+
 export function useRankingHistory() {
     const { user } = useAuth();
     const { selectedCompanyId: company_id } = useCompany();
@@ -37,7 +44,7 @@ export function useRankingHistory() {
             // 2. Get all active users (profiles)
             const { data: profiles } = await supabase
                 .from('profiles')
-                .select('id, full_name, is_team')
+                .select('id, full_name, is_team, avatar_url')
                 .eq('company_id', company_id)
                 .eq('is_active', true)
                 .eq('exclude_from_okr', false);
@@ -144,7 +151,7 @@ export function useRankingHistory() {
 
                         groupKRs.forEach(kr => {
                             const result = latestResultPerKR.get(kr.id);
-                            if (result && result.valor_realizado !== null && result.meta_checkin !== null) {
+                            if (result && result.valor_realizado !== null && result.meta_checkin !== null && result.minimo_orcamento !== null) {
                                 const krPct = calculateKR(
                                     result.valor_realizado,
                                     result.minimo_orcamento,
@@ -177,7 +184,26 @@ export function useRankingHistory() {
                 history.push(point);
             });
 
-            return history;
+            // Filter out history points that are in the future and have no meaningful changes
+            // or where no results were recorded yet.
+            // Rule: Find the last checkin_id that has at least one entry in allResults
+            const checkinIdsWithResults = new Set(allResults.map(r => r.checkin_id));
+            const lastCheckinWithResultsIndex = checkins.reduce((lastIdx, c, idx) => {
+                if (checkinIdsWithResults.has(c.id)) return idx;
+                return lastIdx;
+            }, -1);
+
+            const filteredHistory = history.slice(0, lastCheckinWithResultsIndex + 1);
+
+            const userMetadata: UserMetadata = {};
+            profiles.forEach(p => {
+                userMetadata[p.full_name] = {
+                    avatar_url: p.avatar_url,
+                    id: p.id
+                };
+            });
+
+            return { history: filteredHistory, userMetadata };
         },
         enabled,
         staleTime: 5 * 60 * 1000,

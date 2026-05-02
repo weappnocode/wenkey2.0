@@ -1520,7 +1520,7 @@ export default function KRCheckins() {
                     Histórico de Ranking
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-6 overflow-hidden">
+                <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-6 overflow-hidden">
                   <DialogHeader className="pb-4 border-b">
                     <DialogTitle className="text-xl font-bold flex items-center gap-2">
                       <TrendingUp className="w-5 h-5 text-primary" />

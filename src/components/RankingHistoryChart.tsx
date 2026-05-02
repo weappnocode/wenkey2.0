@@ -31,8 +31,8 @@ const CustomTooltip = ({ active, payload, label, viewMode }: any) => {
         });
 
         return (
-            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xl max-h-[350px] overflow-y-auto min-w-[200px] pointer-events-none z-50">
-                <p className="text-[11px] font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1.5">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xl min-w-[240px] pointer-events-none z-50">
+                <p className="text-xs font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">
                     {(() => {
                         try {
                             return format(new Date(label + 'T12:00:00'), "EEEE, d 'de' MMMM", { locale: ptBR });
@@ -41,16 +41,16 @@ const CustomTooltip = ({ active, payload, label, viewMode }: any) => {
                         }
                     })()}
                 </p>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-2">
                     {sortedPayload.map((entry: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.stroke }} />
-                                <span className="text-[10px] font-medium text-slate-600 truncate max-w-[140px]">
+                        <div key={index} className="flex items-center justify-between gap-6">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: entry.stroke }} />
+                                <span className="text-[11px] font-semibold text-slate-600">
                                     {entry.name}
                                 </span>
                             </div>
-                            <span className="text-[10px] font-bold text-slate-900">
+                            <span className="text-[11px] font-extrabold text-slate-900">
                                 {viewMode === 'ranking' ? `${entry.value}º` : `${entry.value}%`}
                             </span>
                         </div>
@@ -62,8 +62,42 @@ const CustomTooltip = ({ active, payload, label, viewMode }: any) => {
     return null;
 };
 
+const RenderAvatarDot = (props: any) => {
+    const { cx, cy, payload, dataKey, index, data, userMetadata, color } = props;
+    
+    // Check if this is the last visible point for this line
+    const isLast = index === data.length - 1;
+    
+    if (isLast && userMetadata[dataKey]?.avatar_url) {
+        return (
+            <g>
+                <circle cx={cx} cy={cy} r={12} fill={color} stroke="#fff" strokeWidth={2} />
+                <defs>
+                    <clipPath id={`clip-${dataKey}`}>
+                        <circle cx={cx} cy={cy} r={10} />
+                    </clipPath>
+                </defs>
+                <image
+                    x={cx - 10}
+                    y={cy - 10}
+                    width={20}
+                    height={20}
+                    href={userMetadata[dataKey].avatar_url}
+                    clipPath={`url(#clip-${dataKey})`}
+                    style={{ borderRadius: '50%' }}
+                />
+            </g>
+        );
+    }
+    
+    return <circle cx={cx} cy={cy} r={4} fill="#fff" stroke={color} strokeWidth={2} />;
+};
+
 export const RankingHistoryChart: React.FC = () => {
-    const { data: history, isLoading } = useRankingHistory();
+    const { data, isLoading } = useRankingHistory();
+    const history = data?.history || [];
+    const userMetadata = data?.userMetadata || {};
+    
     const [viewMode, setViewMode] = useState<'performance' | 'ranking'>('performance');
     const [isAnimating, setIsAnimating] = useState(false);
     const [maxIndex, setMaxIndex] = useState<number | null>(null);
@@ -243,23 +277,27 @@ export const RankingHistoryChart: React.FC = () => {
                                 dataKey={user}
                                 stroke={COLORS[index % COLORS.length]}
                                 strokeWidth={viewMode === 'ranking' ? 3 : 2}
-                                dot={{ r: 4, strokeWidth: 2, fill: '#fff' }}
-                                activeDot={{ r: 6, strokeWidth: 2, fill: COLORS[index % COLORS.length] }}
+                                dot={<RenderAvatarDot data={processedData} userMetadata={userMetadata} color={COLORS[index % COLORS.length]} />}
+                                activeDot={{ r: 7, strokeWidth: 2, fill: COLORS[index % COLORS.length] }}
                                 animationDuration={isAnimating ? 300 : 1000}
                                 connectNulls
-                                isAnimationActive={!isAnimating} // Desativa animação interna do Recharts durante o Play para fluidez
+                                isAnimationActive={!isAnimating}
                             />
                         ))}
                     </LineChart>
                 </ResponsiveContainer>
             </div>
 
-            {/* Custom Scrollable Legend */}
-            <div className="flex flex-wrap justify-center gap-x-2 gap-y-2 max-h-[120px] overflow-y-auto px-4 py-3 bg-slate-50/50 rounded-xl border border-slate-100 shadow-inner scrollbar-thin scrollbar-thumb-slate-200">
+            {/* Custom Legend */}
+            <div className="flex flex-wrap justify-center gap-x-2 gap-y-2 px-4 py-3 bg-slate-50/50 rounded-xl border border-slate-100 shadow-inner">
                 {userNames.map((user, index) => (
-                    <div key={user} className="flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-slate-100 shadow-sm transition-all hover:border-primary/20">
-                        <div className="w-2 h-2 rounded-full shadow-sm" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                        <span className="text-[10px] font-semibold text-slate-600 truncate max-w-[130px]">
+                    <div key={user} className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-100 shadow-sm transition-all hover:border-primary/20">
+                        {userMetadata[user]?.avatar_url ? (
+                            <img src={userMetadata[user].avatar_url!} className="w-5 h-5 rounded-full" alt="" />
+                        ) : (
+                            <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        )}
+                        <span className="text-[11px] font-bold text-slate-600">
                             {user}
                         </span>
                     </div>
