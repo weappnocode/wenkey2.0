@@ -104,8 +104,6 @@ export const RankingHistoryChart: React.FC = () => {
     const userMetadata = data?.userMetadata || {};
     
     const [viewMode, setViewMode] = useState<'performance' | 'ranking'>('performance');
-    const [isAnimating, setIsAnimating] = useState(false);
-    const [maxIndex, setMaxIndex] = useState<number | null>(null);
 
     const processedData = useMemo(() => {
         if (!history || history.length === 0) return [];
@@ -127,12 +125,8 @@ export const RankingHistoryChart: React.FC = () => {
             });
         }
 
-        if (maxIndex !== null) {
-            return currentData.slice(0, maxIndex + 1);
-        }
-
         return currentData;
-    }, [history, viewMode, maxIndex]);
+    }, [history, viewMode]);
 
     const userNames = useMemo(() => {
         if (!history || history.length === 0) return [];
@@ -145,32 +139,6 @@ export const RankingHistoryChart: React.FC = () => {
         );
     }, [history]);
 
-    useEffect(() => {
-        let interval: any;
-        if (isAnimating && history && history.length > 0) {
-            interval = setInterval(() => {
-                setMaxIndex(prev => {
-                    if (prev === null) return 0;
-                    if (prev >= history.length - 1) {
-                        setIsAnimating(false);
-                        return prev;
-                    }
-                    return prev + 1;
-                });
-            }, 800); // Velocidade da animação (ms por ponto)
-        }
-        return () => clearInterval(interval);
-    }, [isAnimating, history]);
-
-    const handlePlay = () => {
-        setMaxIndex(0);
-        setIsAnimating(true);
-    };
-
-    const handleReset = () => {
-        setMaxIndex(null);
-        setIsAnimating(false);
-    };
 
     if (isLoading) {
         return (
@@ -204,18 +172,6 @@ export const RankingHistoryChart: React.FC = () => {
                     <h3 className="text-sm font-semibold text-foreground">Visualização de Dados</h3>
                     <div className="flex items-center gap-2">
                         <p className="text-xs text-muted-foreground">Alternar entre atingimento real e posição no ranking</p>
-                        <span className="w-1 h-1 bg-muted-foreground/30 rounded-full" />
-                        <button 
-                            onClick={maxIndex !== null ? handleReset : handlePlay}
-                            disabled={isAnimating}
-                            className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 transition-all disabled:opacity-50"
-                        >
-                            {maxIndex !== null ? (
-                                <><RotateCcw className="w-3 h-3" /> Resetar</>
-                            ) : (
-                                <><Play className="w-3 h-3" /> Reproduzir</>
-                            )}
-                        </button>
                     </div>
                 </div>
                 <div className="flex bg-muted p-1 rounded-lg border shadow-sm">
@@ -224,7 +180,6 @@ export const RankingHistoryChart: React.FC = () => {
                         size="sm" 
                         onClick={() => setViewMode('performance')}
                         className="h-8 text-xs gap-2"
-                        disabled={isAnimating}
                     >
                         <TrendingUp className="w-3.5 h-3.5" />
                         Performance
@@ -234,7 +189,6 @@ export const RankingHistoryChart: React.FC = () => {
                         size="sm" 
                         onClick={() => setViewMode('ranking')}
                         className="h-8 text-xs gap-2"
-                        disabled={isAnimating}
                     >
                         <Award className="w-3.5 h-3.5" />
                         Ranking
@@ -243,11 +197,6 @@ export const RankingHistoryChart: React.FC = () => {
             </div>
 
             <div className="w-full h-[450px] bg-white rounded-xl p-4 border shadow-sm relative group">
-                {isAnimating && (
-                    <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10 bg-primary/90 text-white px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg animate-bounce">
-                        Reproduzindo Evolução...
-                    </div>
-                )}
                 
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart
@@ -284,9 +233,8 @@ export const RankingHistoryChart: React.FC = () => {
                                 strokeWidth={viewMode === 'ranking' ? 3 : 2}
                                 dot={<RenderAvatarDot data={processedData} userMetadata={userMetadata} color={COLORS[index % COLORS.length]} />}
                                 activeDot={{ r: 7, strokeWidth: 2, fill: COLORS[index % COLORS.length] }}
-                                animationDuration={isAnimating ? 300 : 1000}
                                 connectNulls
-                                isAnimationActive={!isAnimating}
+                                isAnimationActive={true}
                             />
                         ))}
                     </LineChart>
@@ -313,11 +261,6 @@ export const RankingHistoryChart: React.FC = () => {
                 {viewMode === 'ranking' && (
                     <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest">
                         As linhas representam a posição de cada colaborador. Quanto mais alta a linha, melhor o ranking (1º lugar no topo).
-                    </p>
-                )}
-                {maxIndex !== null && (
-                    <p className="text-[10px] text-center text-primary font-bold uppercase tracking-widest">
-                        Visualizando até o {maxIndex + 1}º check-in do trimestre.
                     </p>
                 )}
             </div>
