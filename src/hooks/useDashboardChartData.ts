@@ -104,11 +104,29 @@ export function useDashboardChartData(filterUserId?: string | null) {
             // Isso permite fazer "último resultado disponível até a data do check-in"
             const checkinIds = checkins.map(c => c.id);
 
-            const { data: allResults } = await supabase
-                .from('checkin_results')
-                .select('checkin_id, key_result_id, valor_realizado, meta_checkin, minimo_orcamento')
-                .in('checkin_id', checkinIds)
-                .in('key_result_id', krIds);
+            let allResults: any[] = [];
+            let hasMore = true;
+            let offset = 0;
+            const batchSize = 1000;
+
+            while (hasMore) {
+                const { data: batchData, error: batchError } = await supabase
+                    .from('checkin_results')
+                    .select('checkin_id, key_result_id, valor_realizado, meta_checkin, minimo_orcamento')
+                    .in('checkin_id', checkinIds)
+                    .in('key_result_id', krIds)
+                    .range(offset, offset + batchSize - 1);
+
+                if (batchError) throw batchError;
+
+                if (batchData && batchData.length > 0) {
+                    allResults = [...allResults, ...batchData];
+                    offset += batchSize;
+                    hasMore = batchData.length === batchSize;
+                } else {
+                    hasMore = false;
+                }
+            }
 
             // Group KRs by objective title
             const titleMap = new Map<string, typeof krs>();

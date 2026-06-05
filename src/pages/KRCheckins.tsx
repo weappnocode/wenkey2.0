@@ -414,32 +414,61 @@ export default function KRCheckins() {
 
     // Buscar resultados do check-in do quarter selecionado
     // Se um usuário for selecionado, filtramos pelo DONO do KR (key_results.user_id)
-    let query = supabase
-      .from('checkin_results')
-      .select('*, key_results!inner(user_id, profiles!user_id!inner(is_active))')
-      .in('checkin_id', checkinIds)
-      .eq('key_results.profiles.is_active', true);
+    let allData: any[] = [];
+    let hasMore = true;
+    let offset = 0;
+    const batchSize = 1000;
+    let fetchError: any = null;
 
-    if (selectedUserId) {
-      query = query.eq('key_results.user_id', selectedUserId);
+    try {
+      while (hasMore) {
+        let batchQuery = supabase
+          .from('checkin_results')
+          .select('*, key_results!inner(user_id, profiles!user_id!inner(is_active))')
+          .in('checkin_id', checkinIds)
+          .eq('key_results.profiles.is_active', true)
+          .range(offset, offset + batchSize - 1);
+
+        if (selectedUserId) {
+          batchQuery = batchQuery.eq('key_results.user_id', selectedUserId);
+        }
+
+        const { data: batchData, error } = await batchQuery;
+
+        if (error) {
+          fetchError = error;
+          break;
+        }
+
+        if (batchData && batchData.length > 0) {
+          allData = [...allData, ...batchData];
+          offset += batchSize;
+          hasMore = batchData.length === batchSize;
+        } else {
+          hasMore = false;
+        }
+      }
+    } catch (err) {
+      fetchError = err;
     }
 
-    const { data, error } = await query;
-
-    if (error) {
+    if (fetchError) {
       // Erros transitórios de rede (troca de empresa, componente desmontado) não precisam de toast
-      const isTransient = error.message?.includes('Failed to fetch') || error.message?.includes('AbortError') || error.code === '20';
+      const msg = fetchError.message || String(fetchError);
+      const isTransient = msg?.includes('Failed to fetch') || msg?.includes('AbortError') || fetchError.code === '20';
       if (!isTransient) {
         toast({
           title: 'Erro ao carregar valores',
-          description: error.message,
+          description: msg,
           variant: 'destructive',
         });
       } else {
-        console.warn('[KRCheckins] Erro transitório ao carregar valores (ignorado):', error.message);
+        console.warn('[KRCheckins] Erro transitório ao carregar valores (ignorado):', msg);
       }
       return;
     }
+
+    const data = allData;
 
 
     const resultsMap: Record<string, CheckinResult> = {};

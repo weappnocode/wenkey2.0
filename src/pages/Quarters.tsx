@@ -147,29 +147,94 @@ export default function Quarters() {
         setCheckIns(grouped);
 
         if (checkInsData.length > 0) {
-          const { data: krData } = await supabase
-            .from('key_results')
-            .select('id, user_id, quarter_id')
-            .in('quarter_id', quarterIds);
-          
-          if (krData) setKeyResults(krData);
-
-          const { data: crData } = await supabase
-            .from('checkin_results')
-            .select('checkin_id, key_result_id, meta_checkin, minimo_orcamento, valor_realizado, user_id')
-            .in('checkin_id', checkInsData.map((c) => c.id));
-          
-          if (crData) setAllCheckinResults(crData);
-
-          const { data: profData } = await supabase
+          // Fetch profiles with is_active
+          const { data: profData, error: profError } = await supabase
             .from('profiles')
-            .select('id, full_name');
+            .select('id, full_name, is_active');
             
+          if (profError) throw profError;
+
+          const activeProfilesSet = new Set<string>();
           if (profData) {
             const map: Record<string, string> = {};
-            profData.forEach(p => map[p.id] = p.full_name);
+            profData.forEach(p => {
+              map[p.id] = p.full_name;
+              if (p.is_active) activeProfilesSet.add(p.id);
+            });
             setProfilesMap(map);
           }
+
+          // Fetch objectives to filter archived ones
+          const { data: objectivesData, error: objectivesError } = await supabase
+            .from('objectives')
+            .select('id, archived')
+            .in('quarter_id', quarterIds);
+
+          if (objectivesError) throw objectivesError;
+
+          const archivedObjectiveIds = new Set(
+            objectivesData?.filter((o) => o.archived).map((o) => o.id) || []
+          );
+
+          // Fetch key results in batches
+          let allKrData: any[] = [];
+          let krHasMore = true;
+          let krOffset = 0;
+          const batchSize = 1000;
+          
+          while (krHasMore) {
+            const { data: krBatch, error: krError } = await supabase
+              .from('key_results')
+              .select('id, user_id, quarter_id, objective_id')
+              .in('quarter_id', quarterIds)
+              .range(krOffset, krOffset + batchSize - 1);
+              
+            if (krError) throw krError;
+            
+            if (krBatch && krBatch.length > 0) {
+              allKrData = [...allKrData, ...krBatch];
+              krOffset += batchSize;
+              krHasMore = krBatch.length === batchSize;
+            } else {
+              krHasMore = false;
+            }
+          }
+
+          const filteredKrData = allKrData.filter((kr) => {
+            // Filter out if owner is inactive (if user_id is set)
+            if (kr.user_id && !activeProfilesSet.has(kr.user_id)) return false;
+            // Filter out if objective is archived
+            if (kr.objective_id && archivedObjectiveIds.has(kr.objective_id)) return false;
+            return true;
+          });
+
+          setKeyResults(filteredKrData);
+
+          // Fetch check-in results in batches
+          let allCrData: any[] = [];
+          let crHasMore = true;
+          let crOffset = 0;
+          const checkinIds = checkInsData.map((c) => c.id);
+
+          while (crHasMore) {
+            const { data: crBatch, error: crError } = await supabase
+              .from('checkin_results')
+              .select('checkin_id, key_result_id, meta_checkin, minimo_orcamento, valor_realizado, user_id')
+              .in('checkin_id', checkinIds)
+              .range(crOffset, crOffset + batchSize - 1);
+
+            if (crError) throw crError;
+            
+            if (crBatch && crBatch.length > 0) {
+              allCrData = [...allCrData, ...crBatch];
+              crOffset += batchSize;
+              crHasMore = crBatch.length === batchSize;
+            } else {
+              crHasMore = false;
+            }
+          }
+          
+          setAllCheckinResults(allCrData);
         }
       }
     } catch (error) {

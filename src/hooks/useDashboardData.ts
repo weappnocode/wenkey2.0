@@ -113,11 +113,30 @@ export const calculateQuarterProgress = async (
 
     const krIds = krs.map(kr => kr.id);
 
-    const { data: checkins } = await supabase
-        .from('checkin_results')
-        .select('key_result_id, percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins!inner(id, quarter_id, checkin_date)')
-        .eq('checkins.quarter_id', quarterId)
-        .in('key_result_id', krIds);
+    let checkinResultsList: any[] = [];
+    let hasMore = true;
+    let offset = 0;
+    const batchSize = 1000;
+
+    while (hasMore) {
+        const { data: batchData, error: batchError } = await supabase
+            .from('checkin_results')
+            .select('key_result_id, percentual_atingido, valor_realizado, meta_checkin, minimo_orcamento, created_at, checkins!inner(id, quarter_id, checkin_date)')
+            .eq('checkins.quarter_id', quarterId)
+            .in('key_result_id', krIds)
+            .range(offset, offset + batchSize - 1);
+
+        if (batchError) throw batchError;
+
+        if (batchData && batchData.length > 0) {
+            checkinResultsList = [...checkinResultsList, ...batchData];
+            offset += batchSize;
+            hasMore = batchData.length === batchSize;
+        } else {
+            hasMore = false;
+        }
+    }
+    const checkins = checkinResultsList;
 
     const { data: globalCheckins } = await supabase
         .from('checkins')

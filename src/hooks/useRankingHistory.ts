@@ -76,12 +76,32 @@ export function useRankingHistory() {
 
             if (!krs || krs.length === 0) return [];
 
-            // 5. Get all checkin results for these KRs in this quarter
-            const { data: allResults } = await supabase
-                .from('checkin_results')
-                .select('checkin_id, key_result_id, valor_realizado, meta_checkin, minimo_orcamento')
-                .in('checkin_id', checkins.map(c => c.id))
-                .in('key_result_id', krs.map(kr => kr.id));
+            // 5. Get all checkin results for these KRs in this quarter in batches
+            let allResults: any[] = [];
+            let hasMore = true;
+            let offset = 0;
+            const batchSize = 1000;
+            const checkinIds = checkins.map(c => c.id);
+            const krIds = krs.map(kr => kr.id);
+
+            while (hasMore) {
+                const { data: batchData, error: batchError } = await supabase
+                    .from('checkin_results')
+                    .select('checkin_id, key_result_id, valor_realizado, meta_checkin, minimo_orcamento')
+                    .in('checkin_id', checkinIds)
+                    .in('key_result_id', krIds)
+                    .range(offset, offset + batchSize - 1);
+
+                if (batchError) throw batchError;
+
+                if (batchData && batchData.length > 0) {
+                    allResults = [...allResults, ...batchData];
+                    offset += batchSize;
+                    hasMore = batchData.length === batchSize;
+                } else {
+                    hasMore = false;
+                }
+            }
 
             // 6. Get Current Results (quarter_results) for consistency with dashboard
             const { data: quarterResults } = await supabase
@@ -205,9 +225,9 @@ export function useRankingHistory() {
 
             let filteredHistory = history.slice(0, lastCheckinWithResultsIndex + 1);
 
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayDateStr = today.toISOString().split('T')[0];
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0);
+            const todayDateStr = todayDate.toISOString().split('T')[0];
 
             let finalHistory = filteredHistory;
 
