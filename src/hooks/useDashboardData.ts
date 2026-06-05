@@ -496,7 +496,14 @@ export function useDashboardData(filterUserId?: string | null) {
                     const krs = (obj.key_results as Record<string, unknown>[]) || [];
 
                     krs.forEach((kr) => {
-                        const krPercentage = getKRAttainment(kr, activeQuarter.id);
+                        const liveAttainment = getKRAttainment(kr, activeQuarter.id);
+                        // Fallback para o percentual consolidado salvo (percent_kr) quando o
+                        // período de check-in ativo ainda não tem dados preenchidos — assim o
+                        // objetivo continua exibindo seu último valor conhecido, de forma
+                        // consistente com okrRankings (que usa kr.percent_kr ?? 0).
+                        const krPercentage = liveAttainment !== null
+                            ? liveAttainment
+                            : (typeof kr.percent_kr === 'number' ? kr.percent_kr : null);
                         const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
                         entry.krCount += 1;
 

@@ -30,10 +30,14 @@ export function useDashboardChartData(filterUserId?: string | null) {
             const activeQuarter = quarters.find(q => q.start_date <= today && q.end_date >= today) || quarters[0];
             const quarter_id = activeQuarter.id;
 
-            // 2. Get checkins for the quarter (filter by user when applicable)
-            let checkinsQuery = supabase
+            // 2. Get checkins (datas/períodos) do quarter.
+            // A tabela `checkins` representa os períodos de check-in do quarter (globais),
+            // não registros por usuário — por isso NÃO filtramos por user_id aqui (mesma
+            // lógica da aba Check-ins). A filtragem por usuário é aplicada a jusante nas
+            // queries de objectives/key_results, refletindo apenas os KRs do usuário nos averages.
+            const { data: checkins } = await supabase
                 .from('checkins')
-                .select('id, checkin_date, user_id')
+                .select('id, checkin_date')
                 .eq('quarter_id', quarter_id)
                 .order('checkin_date', { ascending: true });
 
@@ -43,12 +47,6 @@ export function useDashboardChartData(filterUserId?: string | null) {
             } else if (role === 'admin') {
                 userIdFilter = (filterUserId && filterUserId !== 'all') ? filterUserId : null;
             }
-
-            if (userIdFilter) {
-                checkinsQuery = checkinsQuery.eq('user_id', userIdFilter);
-            }
-
-            const { data: checkins } = await checkinsQuery;
 
             if (!checkins || checkins.length === 0) return { checkins: [], averages: {} };
 
