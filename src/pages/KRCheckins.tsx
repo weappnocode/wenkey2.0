@@ -1364,6 +1364,10 @@ export default function KRCheckins() {
       case 'date':
       case 'data':
         return new Date(numValue).toLocaleDateString('pt-BR');
+      case 'numero':
+      case 'number':
+        // Número é quantidade: exibe como inteiro, sem casas decimais/vírgula.
+        return numValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + (unit ? ' ' + unit : '');
       default:
         return numValue.toLocaleString('pt-BR') + ' ' + (unit || '');
     }
@@ -1381,7 +1385,7 @@ export default function KRCheckins() {
         return 'percentual';
       case 'numero':
       case 'number':
-        return 'número';
+        return 'quantidade';
       case 'date':
       case 'data':
         return 'data';

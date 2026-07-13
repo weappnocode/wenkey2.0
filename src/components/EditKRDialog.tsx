@@ -285,7 +285,7 @@ export function EditKRDialog({ krId, companyId, onSuccess, trigger }: EditKRDial
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover z-50">
-                  <SelectItem value="number">Número</SelectItem>
+                  <SelectItem value="number">Quantidade</SelectItem>
                   <SelectItem value="percentage">Porcentagem</SelectItem>
                   <SelectItem value="currency">Moeda</SelectItem>
                   <SelectItem value="date">Data</SelectItem>
