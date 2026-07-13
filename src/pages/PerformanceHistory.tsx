@@ -254,13 +254,16 @@ export default function PerformanceHistory() {
     };
 
     // Helper to calculate average for a user
+    // Considera TODOS os quarters (inclusive o atual); quarters sem valor contam como 0.
     const getUserAverage = useCallback((userId: string) => {
-        const userResults = results.filter(r => r.user_id === userId);
-        if (userResults.length === 0) return 0;
+        if (quarters.length === 0) return 0;
 
-        const sum = userResults.reduce((acc, curr) => acc + (curr.result_percent || 0), 0);
-        return Math.round(sum / userResults.length);
-    }, [results]);
+        const sum = quarters.reduce((acc, quarter) => {
+            const res = results.find(r => r.user_id === userId && r.quarter_id === quarter.id);
+            return acc + (res?.result_percent || 0);
+        }, 0);
+        return Math.round(sum / quarters.length);
+    }, [results, quarters]);
 
     const getPerformanceColor = (pct: number) => {
         return 'text-black font-normal';
