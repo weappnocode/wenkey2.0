@@ -614,6 +614,10 @@ export default function KRCheckins() {
       case 'moeda':
       case 'currency':
         return numValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      case 'numero':
+      case 'number':
+        // Quantidade é número absoluto: sem casas decimais.
+        return Math.round(numValue).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
       default:
         return numValue.toLocaleString('pt-BR');
     }
