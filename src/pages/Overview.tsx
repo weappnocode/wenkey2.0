@@ -188,9 +188,16 @@ export default function Overview() {
               av = data.publicUrl;
             }
 
-            let resultPercent = userResultMap.get(profile.id) || 0;
+            // Times sempre calculam ao vivo. Para indivíduos, usa o resultado salvo
+            // (quarters já processados); se não houver resultado salvo — caso do
+            // quarter em andamento — calcula o progresso atual ao vivo.
+            let resultPercent: number;
             if (profile.is_team) {
-              resultPercent = await calculateQuarterProgress(selectedCompany, selectedQuarter, profile.id);
+              resultPercent = (await calculateQuarterProgress(selectedCompany, selectedQuarter, profile.id)) ?? 0;
+            } else if (userResultMap.has(profile.id)) {
+              resultPercent = userResultMap.get(profile.id) ?? 0;
+            } else {
+              resultPercent = (await calculateQuarterProgress(selectedCompany, selectedQuarter, profile.id)) ?? 0;
             }
 
             return {
