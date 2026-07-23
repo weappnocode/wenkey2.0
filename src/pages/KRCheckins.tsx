@@ -604,7 +604,7 @@ export default function KRCheckins() {
       return `${year}-${month}-${day}`;
     }
 
-    const numValue = parseFloat(parseInputValue(value));
+    const numValue = parseFloat(parseInputValue(value, type));
     if (isNaN(numValue)) return value;
 
     switch (type) {
@@ -623,11 +623,17 @@ export default function KRCheckins() {
     }
   };
 
-  const parseInputValue = (value: string) => {
+  const parseInputValue = (value: string, type?: string | null) => {
     if (!value) return '';
 
     // Remove currency/percent symbols and spaces (including NBSP/thin space)
     let v = value.replace(/[R$%]/g, '').replace(/[\s\u00A0\u202F]/g, '');
+
+    // Quantidade \u00E9 sempre inteiro: o ponto \u00E9 separador de milhar, nunca decimal.
+    // Ex.: "1.438" deve virar 1438, n\u00E3o 1,438.
+    if (type === 'numero' || type === 'number') {
+      return v.replace(/\./g, '');
+    }
 
     // If value has both '.' and ',', assume Brazilian format: '.' thousands and ',' decimal
     if (v.includes(',') && v.includes('.')) {
@@ -657,7 +663,7 @@ export default function KRCheckins() {
     if (type === 'date' || type === 'data') {
       return parseDateInputToMs(raw);
     }
-    const num = parseFloat(parseInputValue(raw));
+    const num = parseFloat(parseInputValue(raw, type));
     return Number.isNaN(num) ? null : num;
   };
 
