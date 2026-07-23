@@ -1182,9 +1182,9 @@ export default function KRCheckins() {
       minimo = getTime(formData.minimo);
       realizado = getTime(formData.realizado);
     } else {
-      meta = parseFloat(parseInputValue(formData.meta));
-      minimo = parseFloat(parseInputValue(formData.minimo));
-      realizado = parseFloat(parseInputValue(formData.realizado));
+      meta = parseFloat(parseInputValue(formData.meta, currentKR.type));
+      minimo = parseFloat(parseInputValue(formData.minimo, currentKR.type));
+      realizado = parseFloat(parseInputValue(formData.realizado, currentKR.type));
     }
 
     console.log('Valores parseados:', { meta, minimo, realizado });
