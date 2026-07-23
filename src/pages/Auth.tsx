@@ -11,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Target, Loader2 } from 'lucide-react';
+import { CoverflowGallery } from '@/components/CoverflowGallery';
+import { toTitleCase } from '@/lib/utils';
 
 
 export default function Auth() {
@@ -24,6 +26,7 @@ export default function Auth() {
     company_id: '',
   });
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [avatars, setAvatars] = useState<{ image: string; label: string }[]>([]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,7 +143,38 @@ export default function Auth() {
       }
     };
 
+    // Colaboradores (foto + nome) para o carrossel da coluna direita.
+    const loadAvatars = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('avatar_url, full_name')
+          .eq('is_active', true)
+          .not('avatar_url', 'is', null)
+          .limit(20);
+
+        if (error) throw error;
+
+        const people = (data || [])
+          .map((p) => {
+            let url = p.avatar_url as string;
+            if (url && !url.startsWith('http')) {
+              const { data: pub } = supabase.storage.from('avatars').getPublicUrl(url);
+              url = pub.publicUrl;
+            }
+            return { image: url, label: toTitleCase(p.full_name || '') };
+          })
+          .filter((p) => Boolean(p.image));
+
+        setAvatars(people);
+      } catch (err) {
+        // Sem avatares a coluna cai no fallback da imagem estática.
+        console.warn('Não foi possível carregar avatares para a animação:', err);
+      }
+    };
+
     loadCompanies();
+    loadAvatars();
   }, []);
 
   const { user } = useAuth(); // Add this to hook usage
@@ -306,15 +340,29 @@ export default function Auth() {
         </div>
       </div>
 
-      {/* Coluna direita: imagem de escritório com overlay azul */}
-      <div className="relative hidden md:block overflow-hidden">
+      {/* Coluna direita: animação com os avatares dos colaboradores + overlay azul */}
+      <div className="relative hidden md:block overflow-hidden bg-slate-900">
+        {/* Fundo: imagem do escritório */}
         <img
           src="/images/office.jpg"
           alt="Escritório moderno"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-slate-900/40" />
-        <div className="absolute inset-0 flex items-center justify-center p-10">
+        <div className="absolute inset-0 bg-slate-900/40 pointer-events-none" />
+        {/* Coverflow 3D com as fotos dos colaboradores */}
+        {avatars.length > 0 && (
+          <div className="absolute inset-0">
+            <CoverflowGallery
+              slides={avatars.map((a) => ({ image: a.image, title: a.label }))}
+              cardWidth={340}
+              cardHeight={340}
+              showTitle={false}
+              autoplay
+            />
+          </div>
+        )}
+        {/* Card no topo para não cobrir o card ativo do coverflow */}
+        <div className="absolute inset-x-0 top-0 flex justify-center p-10 pointer-events-none">
           <div className="max-w-md text-center text-white relative z-10 p-8 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl">
             <h2 className="text-4xl font-bold mb-4 tracking-tight drop-shadow-2xl">Bem-vindo ao Wenkey</h2>
             <p className="text-lg text-white/90 font-medium leading-relaxed">Acompanhe metas, quarters e resultados em uma plataforma simples e poderosa.</p>
