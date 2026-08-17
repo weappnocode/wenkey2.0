@@ -34,3 +34,19 @@ entrypoint = "./functions/create-portal-session/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/create-portal-session/*.html" ]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# get-weekly-report-data
+#
+# Esta função está HOJE ACESSÍVEL SEM AUTENTICAÇÃO. Ela usa a SERVICE_ROLE_KEY
+# internamente, o que ignora todas as policies de RLS: qualquer pessoa que
+# descubra a URL pode fazer POST {"user_id":"<uuid>"} e receber e-mail, nome,
+# setor, OKRs e o ranking completo da empresa daquele usuário.
+#
+# Para fechar, descomente as duas linhas abaixo e faça o redeploy. FAÇA ISSO
+# SOMENTE DEPOIS de criar a credencial "Header Auth" no n8n (ver
+# docs/CONFIG_Relatorio_Semanal.md, secao A) — senão o workflow passa a receber
+# 401 na próxima execução.
+# ─────────────────────────────────────────────────────────────────────────────
+# [functions.get-weekly-report-data]
+# verify_jwt = true

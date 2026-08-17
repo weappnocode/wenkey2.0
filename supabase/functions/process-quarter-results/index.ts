@@ -1,4 +1,6 @@
-import '../types.d.ts';
+// NAO reimportar '../types.d.ts': aquele arquivo so tem `declare module`
+// (efeito zero em runtime) e usa specifier pelado '@supabase/supabase-js',
+// o que faz o bundler do Deno falhar no deploy com erro 400.
 import {
   createClient,
   type SupabaseClient,
@@ -12,7 +14,9 @@ const corsHeaders = {
 interface CheckinResult {
   id: string;
   key_result_id: string;
-  percentual_atingido: number | null;
+  valor_realizado: number | null;
+  meta_checkin: number | null;
+  minimo_orcamento: number | null;
 }
 
 interface KeyResult {
@@ -30,6 +34,124 @@ interface Objective {
   id: string;
   user_id: string;
   company_id: string;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// Copia fiel de src/lib/deadlineProgress.ts e src/lib/utils.ts (calculateKR).
+// A tela de Check-ins calcula a media com ESTAS funcoes, sobre as colunas
+// cruas do check-in. Antes esta funcao lia checkin_results.percentual_atingido,
+// que guarda o "Atingimento Visual" (Realizado / Meta) e NAO o progresso com
+// Piso -- por isso quarter_results divergia do que aparece na tela.
+// Se mexer em src/lib/utils.ts, replique aqui.
+// ─────────────────────────────────────────────────────────────────────────
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function normalizeToMidnight(input: unknown): Date | null {
+  if (input === null || input === undefined) return null;
+  if (typeof input === 'string') {
+    const parts = input.split('-').map((p) => Number(p));
+    if (parts.length >= 3 && parts.every((n) => !Number.isNaN(n))) {
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+  }
+  const date = input instanceof Date ? new Date(input.getTime()) : new Date(input as string | number);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function calculateDeadlineProgress(metaDate: unknown, limitDate: unknown, doneDate: unknown): number | null {
+  const meta = normalizeToMidnight(metaDate);
+  const limit = normalizeToMidnight(limitDate);
+  const done = normalizeToMidnight(doneDate);
+  if (!meta || !limit || !done) return null;
+
+  const metaTime = meta.getTime();
+  const limitTime = limit.getTime();
+  const doneTime = done.getTime();
+
+  if (metaTime === limitTime) return doneTime <= metaTime ? 100 : 0;
+  if (doneTime <= metaTime) return 100;
+  if (doneTime >= limitTime) return 0;
+
+  const windowDays = Math.max(1, Math.round((limitTime - metaTime) / MS_PER_DAY));
+  const delayDays = Math.round((doneTime - metaTime) / MS_PER_DAY);
+  const clamped = Math.max(0, Math.min(1, 1 - delayDays / windowDays));
+  return parseFloat((clamped * 100).toFixed(2));
+}
+
+function calculateKR(
+  realized: number | null,
+  min: number | null,
+  target: number | null,
+  direction: string | null,
+  type?: string | null,
+): number | null {
+  if (target === null || target === undefined || Number.isNaN(Number(target))) return null;
+
+  const safeTarget = Number(target);
+  const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized)))
+    ? null
+    : Number(realized);
+  const safeMin = (min !== null && min !== undefined) ? Number(min) : null;
+
+  if (type === 'date' || type === 'data') {
+    if (safeRealized === null) return null;
+    const limit = safeMin !== null ? safeMin : safeTarget;
+    return calculateDeadlineProgress(safeTarget, limit, safeRealized);
+  }
+
+  if (safeRealized === null) return null;
+
+  if (!direction || direction === 'increase' || direction === 'maior-é-melhor') {
+    if (safeMin !== null) {
+      if (safeRealized >= safeTarget) return 100;
+      if (safeRealized < safeMin) return 0;
+      const denominator = safeTarget - safeMin;
+      if (denominator === 0) return 0;
+      return Math.max(0, Math.min(100, ((safeRealized - safeMin) / denominator) * 100));
+    }
+    if (safeTarget === 0) return 0;
+    return Math.min(100, Math.max(0, (safeRealized / safeTarget) * 100));
+  }
+
+  if (direction === 'decrease' || direction === 'menor-é-melhor') {
+    if (safeRealized <= safeTarget) return 100;
+    if (safeTarget === 0) return 0;
+    return Math.max(0, ((2 * safeTarget - safeRealized) / safeTarget) * 100);
+  }
+
+  return 0;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// Check-in ativo: MESMA regra de calculateQuarterProgress()
+// (src/hooks/useDashboardData.ts), que alimenta o card "Progresso do Quarter
+// Atual" no Dashboard. E o check-in cuja JANELA contem agora -- ou seja, o
+// mais recente cuja data ja chegou, antes do proximo comecar.
+//
+// Importante: a lista vem da tabela `checkins` (todas as datas agendadas do
+// quarter), NAO de checkin_results. Se o check-in ativo ainda nao tem
+// resultado lancado, o certo e nao pontuar -- e nao cair no anterior.
+// ─────────────────────────────────────────────────────────────────────────
+function pickActiveCheckinDate(dates: (string | null | undefined)[], nowMs: number): string | null {
+    const unique = Array.from(new Set(dates.filter((d): d is string => !!d)))
+        .sort((a, b) => new Date(`${a}T00:00:00`).getTime() - new Date(`${b}T00:00:00`).getTime());
+
+    if (unique.length === 0) return null;
+
+    for (let i = 0; i < unique.length; i++) {
+        const start = new Date(`${unique[i]}T00:00:00`).getTime();
+        const nextStart = unique[i + 1] ? new Date(`${unique[i + 1]}T00:00:00`).getTime() : null;
+        if (nextStart === null && nowMs >= start) return unique[i];
+        if (nextStart !== null && nowMs >= start && nowMs < nextStart) return unique[i];
+    }
+
+    return unique[unique.length - 1];
 }
 
 Deno.serve(async (req: Request) => {
@@ -52,43 +174,52 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify user from token
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const token = authHeader.replace('Bearer ', '').trim();
 
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid authentication token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Duas formas de chamar:
+    //   1) service_role  -> agendador (n8n / cron). Nao ha usuario logado.
+    //   2) JWT de admin  -> chamada manual pelo app, como antes.
+    if (token === supabaseServiceKey) {
+      console.log('Service role authorized for quarter processing');
+    } else {
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+      if (userError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid authentication token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .single();
+
+      if (roleError || !roleData) {
+        console.log(`Access denied for user ${user.id} - admin role required`);
+        return new Response(
+          JSON.stringify({ error: 'Forbidden - Admin access required' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`Admin user ${user.id} authorized for quarter processing`);
     }
-
-    // Verify admin role using user_roles table
-    const { data: roleData, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .single();
-
-    if (roleError || !roleData) {
-      console.log(`Access denied for user ${user.id} - admin role required`);
-      return new Response(
-        JSON.stringify({ error: 'Forbidden - Admin access required' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Admin user ${user.id} authorized for quarter processing`);
 
     console.log('Starting quarter results processing...');
 
-    // Get quarters that have ended but are still active
+    // Todo quarter ativo que JA COMECOU -- inclui os em andamento.
+    // Antes o filtro era `.lte('end_date', today)`, ou seja, so quarters ja
+    // encerrados: o quarter corrente nunca era processado e quarter_results
+    // ficava congelado no ultimo valor gravado pela tela de Check-ins.
     const today = new Date().toISOString().split('T')[0];
-    const { data: endedQuarters, error: quartersError } = await supabase
+    const { data: quartersToProcess, error: quartersError } = await supabase
       .from('quarters')
       .select('id, company_id, end_date, name')
-      .lte('end_date', today)
+      .lte('start_date', today)
       .eq('is_active', true);
 
     if (quartersError) {
@@ -96,9 +227,9 @@ Deno.serve(async (req: Request) => {
       throw quartersError;
     }
 
-    console.log(`Found ${endedQuarters?.length || 0} quarters to process`);
+    console.log(`Found ${quartersToProcess?.length || 0} quarters to process`);
 
-    if (!endedQuarters || endedQuarters.length === 0) {
+    if (!quartersToProcess || quartersToProcess.length === 0) {
       return new Response(
         JSON.stringify({ message: 'No quarters to process', processed: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -107,7 +238,7 @@ Deno.serve(async (req: Request) => {
 
     let processedCount = 0;
 
-    for (const quarter of endedQuarters) {
+    for (const quarter of quartersToProcess) {
       console.log(`Processing quarter: ${quarter.name} (${quarter.id})`);
 
       // Get all objectives for this quarter
@@ -180,7 +311,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({ 
         message: 'Quarter results processed successfully', 
         processed: processedCount,
-        quarters: endedQuarters.length
+        quarters: quartersToProcess.length
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -204,12 +335,11 @@ async function calculateUserQuarterResult(
   userId: string,
   objectives: Objective[]
 ): Promise<number> {
-  // Get check-ins for this quarter ordered by most recent first
+  // Todos os check-ins agendados do quarter, com data.
   const { data: checkins, error: checkinsError } = await supabase
     .from('checkins')
-    .select('id')
-    .eq('quarter_id', quarterId)
-    .order('checkin_date', { ascending: false });
+    .select('id, checkin_date')
+    .eq('quarter_id', quarterId);
 
   if (checkinsError || !checkins || checkins.length === 0) {
     console.log(`No check-ins found for quarter ${quarterId}`);
@@ -230,22 +360,39 @@ async function calculateUserQuarterResult(
 
   const krIds = keyResults.map((kr: KeyResult) => kr.id);
 
-  // Walk through check-ins (newest first) until we find one with KR results
-  for (const checkin of checkins) {
+  // UM check-in de referencia -- o ativo, mesma regra do Dashboard.
+  // Antes isto percorria os check-ins do mais novo para o mais antigo ate achar
+  // um com resultados, o que podia pontuar por um check-in antigo depois que um
+  // novo ja tinha comecado.
+  const activeCheckinDate = pickActiveCheckinDate(
+    checkins.map((c: { checkin_date: string }) => c.checkin_date),
+    Date.now(),
+  );
+
+  if (!activeCheckinDate) {
+    console.log(`No active check-in for quarter ${quarterId}`);
+    return 0;
+  }
+
+  const activeCheckinIds = checkins
+    .filter((c: { checkin_date: string }) => c.checkin_date === activeCheckinDate)
+    .map((c: { id: string }) => c.id);
+
+  {
     const { data: krResults, error: krResultsError } = await supabase
       .from('checkin_results')
-      .select('id, key_result_id, percentual_atingido')
-      .eq('checkin_id', checkin.id)
+      .select('id, key_result_id, valor_realizado, meta_checkin, minimo_orcamento')
+      .in('checkin_id', activeCheckinIds)
       .in('key_result_id', krIds);
 
     if (krResultsError) {
-      console.error(`Error fetching check-in results for ${checkin.id}:`, krResultsError);
-      continue;
+      console.error(`Error fetching check-in results for ${activeCheckinDate}:`, krResultsError);
+      return 0;
     }
 
     if (!krResults || krResults.length === 0) {
-      console.log(`No KR results found for check-in ${checkin.id}`);
-      continue;
+      console.log(`No KR results in active check-in ${activeCheckinDate} for user ${userId}`);
+      return 0;
     }
 
     // Calculate weighted average by objective using this check-in's results
@@ -262,10 +409,25 @@ async function calculateUserQuarterResult(
         const krResult = krResults.find((c: CheckinResult) => c.key_result_id === kr.id);
         const weight = typeof kr.weight === 'number' && !Number.isNaN(kr.weight) ? kr.weight : 1;
 
-        if (krResult && krResult.percentual_atingido !== null) {
-          weightedSum += krResult.percentual_atingido * weight;
-          totalWeight += weight;
-        }
+        if (!krResult) continue;
+
+        // Mesma exigencia do Dashboard: realizado e meta preenchidos.
+        // minimo_orcamento pode ser nulo (KR sem Piso) -- calculateKR trata.
+        if (krResult.valor_realizado === null || krResult.meta_checkin === null) continue;
+
+        const pct = calculateKR(
+          krResult.valor_realizado,
+          krResult.minimo_orcamento,
+          krResult.meta_checkin,
+          kr.direction,
+          kr.type,
+        );
+
+        // Sem fallback: KR sem calculo valido sai da conta, igual a tela faz.
+        if (pct === null) continue;
+
+        weightedSum += pct * weight;
+        totalWeight += weight;
       }
 
       if (totalWeight > 0) {
@@ -274,13 +436,10 @@ async function calculateUserQuarterResult(
     }
 
     if (objectiveResults.length === 0) {
-      continue;
+      return 0;
     }
 
     const average = objectiveResults.reduce((sum, val) => sum + val, 0) / objectiveResults.length;
     return Math.round(average * 100) / 100;
   }
-
-  // No check-in had data for this user
-  return 0;
 }

@@ -1,0 +1,72 @@
+{
+  "name": "Atualiza Quarter Results",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 30 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b2f4a1c8-3e7d-4a95-9c61-8d0f2e5a7b34",
+      "name": "A cada hora"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tasaalobestljwraqjov.supabase.co/functions/v1/process-quarter-results",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "d9c3e6b7-51a2-4f83-b0d4-6e9a1c48f275",
+      "name": "Recalcular",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "A cada hora": {
+      "main": [
+        [
+          {
+            "node": "Recalcular",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "wenkey"
+  },
+  "tags": []
+}

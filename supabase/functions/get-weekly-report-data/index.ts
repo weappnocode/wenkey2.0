@@ -40,6 +40,33 @@ function calculateKR(
     return 0;
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────
+// Check-in ativo: MESMA regra de calculateQuarterProgress()
+// (src/hooks/useDashboardData.ts), que alimenta o card "Progresso do Quarter
+// Atual" no Dashboard. E o check-in cuja JANELA contem agora -- ou seja, o
+// mais recente cuja data ja chegou, antes do proximo comecar.
+//
+// Importante: a lista vem da tabela `checkins` (todas as datas agendadas do
+// quarter), NAO de checkin_results. Se o check-in ativo ainda nao tem
+// resultado lancado, o certo e nao pontuar -- e nao cair no anterior.
+// ─────────────────────────────────────────────────────────────────────────
+function pickActiveCheckinDate(dates: (string | null | undefined)[], nowMs: number): string | null {
+    const unique = Array.from(new Set(dates.filter((d): d is string => !!d)))
+        .sort((a, b) => new Date(`${a}T00:00:00`).getTime() - new Date(`${b}T00:00:00`).getTime());
+
+    if (unique.length === 0) return null;
+
+    for (let i = 0; i < unique.length; i++) {
+        const start = new Date(`${unique[i]}T00:00:00`).getTime();
+        const nextStart = unique[i + 1] ? new Date(`${unique[i + 1]}T00:00:00`).getTime() : null;
+        if (nextStart === null && nowMs >= start) return unique[i];
+        if (nextStart !== null && nowMs >= start && nowMs < nextStart) return unique[i];
+    }
+
+    return unique[unique.length - 1];
+}
+
 function getProgressColor(pct: number): string {
     if (pct >= 100) return "#16a34a";
     if (pct >= 70) return "#d97706";
@@ -56,6 +83,10 @@ Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
+
+    // Dominio do app. Estava "wenkey.com.br" fixo aqui, mas o resto do
+    // projeto usa wenkey.app: o botao do email ia para o lugar errado.
+    const APP_URL = (Deno.env.get("APP_URL") ?? "https://wenkey.app").replace(/\/+$/, "");
 
     try {
         const supabase = createClient(
@@ -115,36 +146,72 @@ Deno.serve(async (req: Request) => {
         // Load schedule configs for all companies
         const { data: scheduleConfigs } = await supabase
             .from("email_schedule_config")
-            .select("company_id, day_of_week, send_hour, is_active");
+            .select("company_id, day_of_week, send_hour, is_active, last_sent_at");
 
-        const scheduleMap = new Map<string, { day_of_week: number; send_hour: number; is_active: boolean }>();
+        const scheduleMap = new Map<string, { day_of_week: number; send_hour: number; is_active: boolean; last_sent_at: string | null }>();
         (scheduleConfigs ?? []).forEach((s) => scheduleMap.set(s.company_id, s));
+
+        // -- Emails de auth.users: UMA vez, paginado -------------------------
+        // listUsers() sem argumento devolve apenas 50 registros do projeto
+        // inteiro. Sem paginar, do 51o usuario em diante ninguem recebia, sem
+        // erro e sem log (falha silenciosa).
+        const emailMap = new Map<string, string>();
+        const PER_PAGE = 200;
+        for (let page = 1; page <= 100; page++) {
+            const { data: authPage, error: authErr } = await supabase.auth.admin.listUsers({
+                page,
+                perPage: PER_PAGE,
+            });
+            if (authErr) throw new Error(`listUsers falhou na pagina ${page}: ${authErr.message}`);
+            const users = authPage?.users ?? [];
+            if (users.length === 0) break;   // para na primeira pagina vazia
+            users.forEach((u) => { if (u.email) emailMap.set(u.id, u.email); });
+        }
+        console.log(`[get-weekly-report-data] ${emailMap.size} emails carregados de auth.users`);
+
+        // -- Inicio da semana corrente: segunda-feira 00:00 BRT --------------
+        const curIdx = (currentDayBRT + 6) % 7;            // Seg=0 ... Dom=6
+        const weekStartBRT = new Date(nowBRT);
+        weekStartBRT.setUTCDate(nowBRT.getUTCDate() - curIdx);
+        weekStartBRT.setUTCHours(0, 0, 0, 0);
+        // nowBRT e UTC deslocado -3h; volta ao instante real para comparar
+        // com o timestamptz gravado em last_sent_at
+        const weekStartUTC = new Date(weekStartBRT.getTime() + 3 * 60 * 60 * 1000);
 
         const emailPayloads = [];
         const skipped: string[] = [];
+        const marked: string[] = [];
 
         for (const quarter of activeQuarters) {
             const companyId = quarter.company_id;
             const quarterId = quarter.id;
+            const payloadsAntes = emailPayloads.length;
 
-            // ── Check schedule (Skip if isTest) ──────────────────────────────────
+            // -- Agenda: vencimento + catch-up + idempotencia semanal --------
             if (!isTest) {
                 const schedule = scheduleMap.get(companyId);
-                if (schedule) {
-                    if (!schedule.is_active) { skipped.push(companyId + "(disabled)"); continue; }
-                    if (schedule.day_of_week !== currentDayBRT || schedule.send_hour !== currentHourBRT) {
-                        skipped.push(companyId + `(wrong time: day=${currentDayBRT}/${schedule.day_of_week} hour=${currentHourBRT}/${schedule.send_hour})`);
-                        continue;
-                    }
-                } else {
-                    // Default: Monday (1) at 9 BRT
-                    if (currentDayBRT !== 1 || currentHourBRT !== 9) {
-                        skipped.push(companyId + "(default schedule not matched)");
-                        continue;
-                    }
+                const cfg = schedule ?? { day_of_week: 1, send_hour: 9, is_active: true, last_sent_at: null };
+                if (!schedule) skipped.push(`${companyId}(sem config; usando padrao seg/09h)`);
+
+                if (!cfg.is_active) { skipped.push(`${companyId}(envio desativado)`); continue; }
+
+                // Ja enviou nesta semana? Nunca duplica, mesmo reexecutando.
+                if (cfg.last_sent_at && new Date(cfg.last_sent_at) >= weekStartUTC) {
+                    skipped.push(`${companyId}(ja enviado nesta semana em ${cfg.last_sent_at})`);
+                    continue;
+                }
+
+                // Venceu? O >= da catch-up: se o cron falhou as 9h, envia as 10h.
+                const cfgIdx = (cfg.day_of_week + 6) % 7;
+                const isDue = curIdx > cfgIdx || (curIdx === cfgIdx && currentHourBRT >= cfg.send_hour);
+                if (!isDue) {
+                    skipped.push(
+                        `${companyId}(ainda nao venceu: agora=dia${currentDayBRT}/${currentHourBRT}h ` +
+                        `alvo=dia${cfg.day_of_week}/${cfg.send_hour}h)`
+                    );
+                    continue;
                 }
             }
-            // ────────────────────────────────────────────────────────────
 
             // Profiles
             let profileQuery = supabase
@@ -170,12 +237,6 @@ Deno.serve(async (req: Request) => {
                 }
                 return { ...p, avatar_url: av };
             });
-
-            const { data: authUsers } = await supabase.auth.admin.listUsers();
-            const emailMap = new Map<string, string>();
-            if (authUsers?.users) {
-                authUsers.users.forEach((u) => emailMap.set(u.id, u.email ?? ""));
-            }
 
             const { data: objectives } = await supabase
                 .from("objectives")
@@ -204,6 +265,12 @@ Deno.serve(async (req: Request) => {
                 : { data: [] };
             const checkinResults = checkinResult.data ?? [];
 
+            // Todas as datas de check-in agendadas para o quarter
+            const { data: quarterCheckins } = await supabase
+                .from("checkins")
+                .select("checkin_date")
+                .eq("quarter_id", quarterId);
+
             const { data: quarterResults } = await supabase
                 .from("quarter_results")
                 .select("user_id, result_percent")
@@ -218,38 +285,52 @@ Deno.serve(async (req: Request) => {
                 .sort((a, b) => b.result_pct - a.result_pct)
                 .map((r, i) => ({ ...r, rank: i + 1 }));
 
-            function getKRProgress(krId: string, krType: string, krDirection: string, krPercentKr: number): number {
-                const krCheckins = checkinResults
-                    .filter((c: Record<string, unknown>) => c.key_result_id === krId &&
-                        (c.checkins as Record<string, string>)?.checkin_date <= today)
-                    .sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
-                        new Date((b.checkins as Record<string, string>).checkin_date).getTime() -
-                        new Date((a.checkins as Record<string, string>).checkin_date).getTime()
-                    );
-                if (krCheckins.length === 0) return krPercentKr ?? 0;
-                const latest = krCheckins[0] as Record<string, number>;
-                const calc = calculateKR(
-                    Number(latest.valor_realizado), Number(latest.minimo_orcamento),
-                    Number(latest.meta_checkin), krDirection, krType
+            // Check-in ativo: UM so, para todos os KRs -- mesma escolha do
+            // Dashboard. Antes cada KR usava o SEU proprio ultimo check-in,
+            // entao KRs do mesmo objetivo vinham de datas diferentes.
+            const activeCheckinDate: string | null = pickActiveCheckinDate(
+                (quarterCheckins ?? []).map((c: Record<string, string>) => c.checkin_date),
+                Date.now(),
+            );
+
+            // Devolve null quando o KR nao deve entrar na conta -- o chamador
+            // descarta. Antes caia em `percent_kr` (valor residual gravado na
+            // tabela) e ainda somava o peso, o que inflava a media: era dai que
+            // saia 7% num objetivo que a tela mostra como 0%.
+            function getKRProgress(kr: Record<string, unknown>): number | null {
+                if (!activeCheckinDate) return null;
+
+                const r = checkinResults.find((c: Record<string, unknown>) =>
+                    c.key_result_id === kr.id &&
+                    (c.checkins as Record<string, string>)?.checkin_date === activeCheckinDate
+                ) as Record<string, number | null> | undefined;
+
+                if (!r) return null;
+
+                // Mesma exigencia do Dashboard: realizado e meta preenchidos.
+                // minimo_orcamento pode ser nulo -- calculateKR trata isso como
+                // "sem Piso" e usa a formula simples. Exigir os tres (como faz a
+                // tela de Check-ins) descartaria KR sem Piso definido.
+                if (r.valor_realizado === null || r.meta_checkin === null) {
+                    return null;
+                }
+
+                return calculateKR(
+                    Number(r.valor_realizado), Number(r.minimo_orcamento),
+                    Number(r.meta_checkin), kr.direction as string, kr.type as string
                 );
-                return calc !== null ? calc : (krPercentKr ?? 0);
             }
 
             function getWeightedProgress(krList: Record<string, unknown>[]): number {
-                let weightedSum = 0; let totalWeight = 0; let hasData = false;
+                let weightedSum = 0; let totalWeight = 0;
                 krList.forEach((kr) => {
-                    const pct = getKRProgress(kr.id as string, kr.type as string, kr.direction as string, kr.percent_kr as number);
+                    const pct = getKRProgress(kr);
+                    if (pct === null) return;   // descarta, sem fallback
                     const weight = typeof kr.weight === 'number' && !isNaN(kr.weight) ? kr.weight : 1;
-                    const krCheckins = checkinResults.filter((c: Record<string, unknown>) => c.key_result_id === kr.id);
-                    if (krCheckins.length > 0) { weightedSum += pct * weight; totalWeight += weight; hasData = true; }
+                    weightedSum += pct * weight;
+                    totalWeight += weight;
                 });
-                if (hasData && totalWeight > 0) return weightedSum / totalWeight;
-                let fb = 0; let fw = 0;
-                krList.forEach((kr) => {
-                    const w = typeof kr.weight === 'number' && !isNaN(kr.weight) ? kr.weight : 1;
-                    fb += (kr.percent_kr as number ?? 0) * w; fw += w;
-                });
-                return fw > 0 ? fb / fw : 0;
+                return totalWeight > 0 ? weightedSum / totalWeight : 0;
             }
 
             for (const profile of profilesWithAvatars) {
@@ -269,7 +350,7 @@ Deno.serve(async (req: Request) => {
                 const userOKRs = userKRs
                     .map((kr: Record<string, unknown>) => ({
                         title: kr.title as string,
-                        result_pct: Math.round(getKRProgress(kr.id as string, kr.type as string, kr.direction as string, kr.percent_kr as number)),
+                        result_pct: Math.round(getKRProgress(kr) ?? 0),
                     }))
                     .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (b.result_pct as number) - (a.result_pct as number))
                     .slice(0, 6);
@@ -286,15 +367,44 @@ Deno.serve(async (req: Request) => {
                     objective_progress: objectiveProgress,
                     top5_ranking: companyRanking.slice(0, 5),
                     user_okrs: userOKRs,
-                    dashboard_url: "https://wenkey.com.br/dashboard",
+                    dashboard_url: `${APP_URL}/dashboard`,
                 });
+            }
+            // -- Marca a semana como enviada (idempotencia) ------------------
+            // ATENCAO: marca quando os payloads foram ENTREGUES ao n8n, nao
+            // quando o Gmail confirmou a entrega. Se o n8n cair depois deste
+            // ponto, a semana fica marcada como enviada.
+            if (!isTest && emailPayloads.length > payloadsAntes) {
+                const { error: markErr } = await supabase
+                    .from("email_schedule_config")
+                    .upsert(
+                        { company_id: companyId, last_sent_at: new Date().toISOString() },
+                        { onConflict: "company_id" }
+                    );
+                if (markErr) {
+                    console.error(`[get-weekly-report-data] Falha ao marcar last_sent_at de ${companyId}: ${markErr.message}`);
+                } else {
+                    marked.push(companyId);
+                }
             }
         }
 
-        console.log(`[get-weekly-report-data] Sending ${emailPayloads.length} emails. Skipped: ${skipped.join(', ')}`);
+        console.log(
+            `[get-weekly-report-data] ${emailPayloads.length} emails | ` +
+            `marcadas: ${marked.join(", ") || "-"} | puladas: ${skipped.join(", ") || "-"}`
+        );
 
         return new Response(
-            JSON.stringify({ success: true, count: emailPayloads.length, is_test: isTest, skipped, emails: emailPayloads }),
+            JSON.stringify({
+                success: true,
+                count: emailPayloads.length,
+                is_test: isTest,
+                auth_users_loaded: emailMap.size,
+                week_start_brt: weekStartUTC.toISOString(),
+                marked,
+                skipped,
+                emails: emailPayloads,
+            }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     } catch (error) {
