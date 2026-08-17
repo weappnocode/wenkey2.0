@@ -188,6 +188,10 @@ export const calculateKR = (
   if (direction === 'decrease' || direction === 'menor-é-melhor') {
     if (safeRealized <= safeTarget) return 100;
 
+    // Piso tambem no decrescente: realizado acima do MIN. ORCAM. zera.
+    // Mesma regra ja aplicada em src/pages/KRCheckins.tsx (calculateKR local).
+    if (safeMin !== null && safeRealized > safeMin) return 0;
+
     // Simple linear decay for now as no formula provided for decrease
     if (safeTarget === 0) return 0; // Prevent div by zero
     // Example: 200% - (Realized/Target)%

@@ -120,6 +120,9 @@ function calculateKR(
 
   if (direction === 'decrease' || direction === 'menor-é-melhor') {
     if (safeRealized <= safeTarget) return 100;
+    // Piso tambem no decrescente: realizado acima do MIN. ORCAM. zera.
+    // Mesma regra ja aplicada em src/pages/KRCheckins.tsx (calculateKR local).
+    if (safeMin !== null && safeRealized > safeMin) return 0;
     if (safeTarget === 0) return 0;
     return Math.max(0, ((2 * safeTarget - safeRealized) / safeTarget) * 100);
   }
