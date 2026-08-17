@@ -355,8 +355,11 @@ Deno.serve(async (req: Request) => {
                         title: kr.title as string,
                         result_pct: Math.round(getKRProgress(kr) ?? 0),
                     }))
-                    .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (b.result_pct as number) - (a.result_pct as number))
-                    .slice(0, 6);
+                    // Do MENOR para o maior: o que precisa de atencao aparece
+                    // primeiro. Sem corte -- o .slice(0, 6) que existia aqui
+                    // escondia justamente o KR de pior desempenho e deixava a
+                    // lista em desacordo com o contador "OKRs ativos" do topo.
+                    .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (a.result_pct as number) - (b.result_pct as number));
 
                 emailPayloads.push({
                     to_email: email,
