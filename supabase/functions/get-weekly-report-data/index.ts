@@ -381,16 +381,28 @@ Deno.serve(async (req: Request) => {
             // quando o Gmail confirmou a entrega. Se o n8n cair depois deste
             // ponto, a semana fica marcada como enviada.
             if (!isTest && emailPayloads.length > payloadsAntes) {
+                const agora = new Date().toISOString();
                 const { error: markErr } = await supabase
                     .from("email_schedule_config")
                     .upsert(
-                        { company_id: companyId, last_sent_at: new Date().toISOString() },
+                        { company_id: companyId, last_sent_at: agora },
                         { onConflict: "company_id" }
                     );
                 if (markErr) {
                     console.error(`[get-weekly-report-data] Falha ao marcar last_sent_at de ${companyId}: ${markErr.message}`);
                 } else {
                     marked.push(companyId);
+                    // Reflete a marcacao no cache em memoria. Sem isto, se a
+                    // mesma empresa tiver outro quarter ativo, a proxima volta
+                    // do loop ainda leria last_sent_at = null e reenviaria.
+                    const emCache = scheduleMap.get(companyId);
+                    if (emCache) {
+                        emCache.last_sent_at = agora;
+                    } else {
+                        scheduleMap.set(companyId, {
+                            day_of_week: 1, send_hour: 9, is_active: true, last_sent_at: agora,
+                        });
+                    }
                 }
             }
         }

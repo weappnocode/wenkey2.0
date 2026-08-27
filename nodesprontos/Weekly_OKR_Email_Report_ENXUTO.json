@@ -57,7 +57,9 @@
     {
       "parameters": {
         "batchSize": 1,
-        "options": {}
+        "options": {
+          "reset": false
+        }
       },
       "id": "f8bad516-bff6-4dda-93d4-4fb168137822",
       "name": "Split in Batches",
@@ -100,13 +102,14 @@
       "webhookId": "eb8ef4a8-f4d9-4ab0-a3b8-e8d2713ab76f",
       "credentials": {
         "gmailOAuth2": {
-          "id": "PGQhFRwb1q0ZIbVS",
-          "name": "Gmail account"
+          "id": "h0v5KSOasSdI0ffp",
+          "name": "Gmail Conta"
         }
       },
       "retryOnFail": true,
       "maxTries": 3,
-      "waitBetweenTries": 5000
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
