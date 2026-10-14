@@ -14,9 +14,9 @@ export default function Pricing() {
     const plan = {
         name: "Pro",
         description: "Ideal para empresas em crescimento precisando de recursos avançados.",
-        monthlyPrice: "R$ 24,90",
-        annualPrice: "R$ 238,80",
-        monthlyEquivalent: "R$ 19,90",
+        monthlyPrice: "R$ 49,90",
+        annualPrice: "R$ 478,80",
+        monthlyEquivalent: "R$ 39,90",
         monthlyPeriod: "/mês",
         annualPeriod: "/ano",
         features: [
