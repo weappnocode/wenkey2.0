@@ -811,8 +811,8 @@ export default function KRCheckins() {
 
     const safeTarget = Number(target);
 
-    // If 0-0-0 is registered: target was 0, realized was 0 = achieved exactly what was planned → 100%
-    if (safeTarget === 0 && (safeMin === null || safeMin === 0) && safeRealized === 0) return 100;
+    // If 0-0-0 is registered: explicitly filled with all zeros → counts as 0% in the average
+    if (safeTarget === 0 && (safeMin === null || safeMin === 0) && safeRealized === 0) return 0;
 
     if (type === 'date' || type === 'data') {
       return null;
@@ -841,8 +841,8 @@ export default function KRCheckins() {
     const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
     const safeMin = (min !== null && min !== undefined) ? Number(min) : null;
 
-    // If 0-0-0 is registered: target was 0, realized was 0 = achieved exactly what was planned → 100%
-    if (safeTarget === 0 && (safeMin === null || safeMin === 0) && safeRealized === 0) return 100;
+    // If 0-0-0 is registered: explicitly filled with all zeros → counts as 0% in the average
+    if (safeTarget === 0 && (safeMin === null || safeMin === 0) && safeRealized === 0) return 0;
 
     if (type === 'date' || type === 'data') {
       if (safeRealized === null) return null;

@@ -119,8 +119,8 @@ export const calculateSimpleAttainment = (
   type?: string | null
 ): number | null => {
   if (target === null || target === undefined || Number.isNaN(Number(target))) return null;
-  // 0-0-0: target was 0, realized was 0 = achieved exactly what was planned → 100%
-  if (Number(target) === 0 && Number(realized) === 0) return 100;
+  // 0-0-0: explicitly filled with all zeros → counts as 0% in the average
+  if (Number(target) === 0 && Number(realized) === 0) return 0;
   const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
   if (safeRealized === null) return null;
 
@@ -152,8 +152,8 @@ export const calculateKR = (
   const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
   const safeMin = (min !== null && min !== undefined) ? Number(min) : null;
 
-  // 0-0-0: target was 0, realized was 0 = achieved exactly what was planned → 100%
-  if (safeTarget === 0 && (safeMin === null || safeMin === 0) && safeRealized === 0) return 100;
+  // 0-0-0: explicitly filled with all zeros → counts as 0% in the average
+  if (safeTarget === 0 && (safeMin === null || safeMin === 0) && safeRealized === 0) return 0;
 
   // Lógica específica para DATAS
   if (type === 'date' || type === 'data') {
