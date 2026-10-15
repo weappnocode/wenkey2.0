@@ -811,8 +811,8 @@ export default function KRCheckins() {
 
     const safeTarget = Number(target);
 
-    // If 0-0-0 is registered
-    if (safeTarget === 0 && safeMin === 0 && safeRealized === 0) return null;
+    // If 0-0-0 is registered: target was 0, realized was 0 = achieved exactly what was planned → 100%
+    if (safeTarget === 0 && (safeMin === null || safeMin === 0) && safeRealized === 0) return 100;
 
     if (type === 'date' || type === 'data') {
       return null;
@@ -841,8 +841,8 @@ export default function KRCheckins() {
     const safeRealized = (realized === null || realized === undefined || Number.isNaN(Number(realized))) ? null : Number(realized);
     const safeMin = (min !== null && min !== undefined) ? Number(min) : null;
 
-    // If 0-0-0 is registered, count as Not Filled
-    if (safeTarget === 0 && safeMin === 0 && safeRealized === 0) return null;
+    // If 0-0-0 is registered: target was 0, realized was 0 = achieved exactly what was planned → 100%
+    if (safeTarget === 0 && (safeMin === null || safeMin === 0) && safeRealized === 0) return 100;
 
     if (type === 'date' || type === 'data') {
       if (safeRealized === null) return null;
@@ -1769,7 +1769,7 @@ export default function KRCheckins() {
                                   className={`p-4 ${selectedCheckinDate === checkin.id ? 'bg-primary/5' : ''} cursor-pointer hover:bg-muted/50`}
                                   onClick={() => openDialog(kr, checkin)}
                                 >
-                                  {(result && !(result.meta_checkin === 0 && result.minimo_orcamento === 0 && result.valor_realizado === 0)) ? (
+                                  {result ? (
                                     (() => {
                                       const cellContent = (
                                         <div className="space-y-2">
